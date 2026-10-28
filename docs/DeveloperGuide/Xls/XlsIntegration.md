@@ -75,14 +75,14 @@ targets to allow for conditional compilation.
 ### General Structure
 
 XLS-specific passes were simply added to normal XLS pass sets (like `Conversion/Passes.td`, 
-or `experimental`'s `Transforms/Passes.td`) and gates using `DYNAMATIC_ENABLE_XLS`,
+or `Transforms/Passes.td`) and gates using `DYNAMATIC_ENABLE_XLS`,
 this will still require all dynamatic tools and libraries that uses these passes
 to link against the XLS dialect if `DYNAMATIC_ENABLE_XLS` is set. While the dialect
 is not particularly large, this would `CMakeLists.txt` all over Dynamatic.
 
 Instead, all XLS-specific passes, dialects, and code is placed in its own
-folder hierarchy (located at `experimental/xls`), featuring its own `include`,
-folder, Pass sets, and namespace (`dynamatic::experimental::xls`). 
+folder hierarchy (located at `xls-interop`), featuring its own `include`,
+folder, Pass sets, and namespace (`dynamatic::xls`). 
 
 With this setup, only tools that explicitly require XLS features and import
 headers from this hierarchy need to link against the XLS dialect and passes

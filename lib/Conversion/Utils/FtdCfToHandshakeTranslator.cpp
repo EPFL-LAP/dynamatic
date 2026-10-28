@@ -31,18 +31,18 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/BooleanLogic/BDD.h"
 #include "dynamatic/Support/CFG.h"
-#include "experimental/Support/BooleanLogic/BDD.h"
-#include "experimental/Support/CFGAnnotation.h"
-#include "experimental/Support/FtdImplementation.h"
-#include "experimental/Support/FtdSuppression.h"
+#include "dynamatic/Support/CFGAnnotation.h"
+#include "dynamatic/Support/FtdImplementation.h"
+#include "dynamatic/Support/FtdSuppression.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::boolean;
+using namespace dynamatic;
+using namespace dynamatic::boolean;
 
 LogicalResult FtdCfToHandshakeTranslator::initTranslation() {
   Region &cfRegion = cfFunc.getBody();
@@ -65,7 +65,7 @@ LogicalResult FtdCfToHandshakeTranslator::initTranslation() {
 }
 
 LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
-  using namespace experimental::gsa;
+  using namespace gsa;
   Region &cfRegion = cfFunc.getBody();
   if (cfRegion.hasOneBlock())
     return success();
@@ -353,9 +353,9 @@ LogicalResult FtdCfToHandshakeTranslator::finalizeTranslation() {
   return success();
 }
 
-LogicalResult
-dynamatic::ftdLowerCfToHandshake(ModuleOp modOp, NameAnalysis &namer,
-                                 const experimental::gsa::GSAAnalysis &gsa) {
+LogicalResult dynamatic::ftdLowerCfToHandshake(ModuleOp modOp,
+                                               NameAnalysis &namer,
+                                               const gsa::GSAAnalysis &gsa) {
   OpBuilder builder(modOp.getContext());
   return lowerFuncsToHandshake(modOp, [&](func::FuncOp funcOp) {
     return FtdCfToHandshakeTranslator(funcOp, builder, namer, gsa).translate();

@@ -12,9 +12,9 @@ The core responsibilities include:
 
 ## Implementation Overview
 
-The core data structure of this code is [`LogicNetwork`](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/include/experimental/Support/BlifReader.h#L175). This class contains the logic network represented inside a BLIF file.
+The core data structure of this code is [`LogicNetwork`](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/BlifReader.h#L175). This class contains the logic network represented inside a BLIF file.
 
-The pseudo-function for parsing a BLIF file ([`parseBlifFile`](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/BlifReader.cpp#L228)) is the following:
+The pseudo-function for parsing a BLIF file ([`parseBlifFile`](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/BlifReader.cpp#L228)) is the following:
 
 ```
 LogicNetwork *BlifParser::parseBlifFile(filename) {
@@ -46,9 +46,9 @@ LogicNetwork *BlifParser::parseBlifFile(filename) {
 
 This function iterates over the lines of the BLIF file and it adds to the logic network the different nodes. The node type added depends on the `type` variable. This variable exclusively depends on the first word of the `line` variable. This follows the expected structure of BLIF files.
 
-After filling in the logic network, the function `generateTopologicalOrder` saves the topological order of the network in the vector [`nodesTopologicalOrder`](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/include/experimental/Support/BlifReader.h#L179).
+After filling in the logic network, the function `generateTopologicalOrder` saves the topological order of the network in the vector [`nodesTopologicalOrder`](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/BlifReader.h#L179).
 
-The pseudo-function for exporting a logic network in a BLIF file ([`writeToFile`](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/BlifReader.cpp#L357)) is the following one:
+The pseudo-function for exporting a logic network in a BLIF file ([`writeToFile`](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/BlifReader.cpp#L357)) is the following one:
 
 
 ```

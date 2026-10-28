@@ -12,10 +12,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "../Utils/FtdCfToHandshakeTranslator.h"
+#include "dynamatic/Analysis/GSAAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Support/DynamaticPass.h"
-#include "experimental/Analysis/GSAAnalysis.h"
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
@@ -39,9 +39,8 @@ struct FtdCfToHandshakePass
     if (!namer.isAnalysisValid())
       return signalPassFailure();
 
-    if (failed(ftdLowerCfToHandshake(
-            getOperation(), namer,
-            getAnalysis<experimental::gsa::GSAAnalysis>())))
+    if (failed(ftdLowerCfToHandshake(getOperation(), namer,
+                                     getAnalysis<gsa::GSAAnalysis>())))
       return signalPassFailure();
 
     // Make sure all operation names are still unique and name operations that

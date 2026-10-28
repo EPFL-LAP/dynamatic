@@ -57,7 +57,6 @@ set(DYNAMATIC_SOURCE_DIR ${CMAKE_SOURCE_DIR}/..)
 set(DYNAMATIC_INCLUDE_DIR ${DYNAMATIC_SOURCE_DIR}/include)
 set(DYNAMATIC_BINARY_DIR ${CMAKE_SOURCE_DIR}/../build)
 set(DYNAMATIC_TOOLS_DIR ${DYNAMATIC_BINARY_DIR}/bin)
-set(DYNAMATIC_EXPERIMENTAL_DIR ${DYNAMATIC_SOURCE_DIR}/experimental)
 set(DYNAMATIC_BIN_INCLUDE_DIR ${DYNAMATIC_BINARY_DIR}/include)
 
 # Dynamatic include directories
@@ -65,8 +64,6 @@ include_directories(${DYNAMATIC_INCLUDE_DIR})
 include_directories(${DYNAMATIC_BIN_INCLUDE_DIR})
 include_directories(${DYNAMATIC_SOURCE_DIR}/tutorials/include)
 include_directories(${DYNAMATIC_BINARY_DIR}/tutorials/include)
-include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/include)
-include_directories(${DYNAMATIC_BINARY_DIR}/experimental/include)
 
 # visual-dataflow variables
 set(VISUAL_DATAFLOW_SOURCE_DIR ${CMAKE_SOURCE_DIR}/..)

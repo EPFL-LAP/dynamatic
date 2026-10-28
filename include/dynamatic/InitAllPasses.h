@@ -14,6 +14,7 @@
 #ifndef DYNAMATIC_INITALLPASSES_H
 #define DYNAMATIC_INITALLPASSES_H
 
+#include "dynamatic/Analysis/Passes.h"
 #include "dynamatic/Conversion/Passes.h"
 #include "dynamatic/Transforms/Passes.h"
 
@@ -23,6 +24,7 @@ inline void registerAllPasses() {
   // Passes defined in Dynamatic
   registerConversionPasses();
   dynamatic::registerPasses();
+  registerAnalysisPasses();
 }
 
 } // namespace dynamatic

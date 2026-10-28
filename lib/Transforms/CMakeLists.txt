@@ -27,6 +27,9 @@ add_dynamatic_library(DynamaticTransforms
   DropUnlistedFunctions.cpp
   HandshakeTreeHeightReduction.cpp
   HandshakeSetUnitImplAttributes.cpp
+  HandshakePlaceBuffersCustom.cpp
+  HandshakeCombineSteeringLogic.cpp
+  HandshakeStraightToQueue.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
@@ -40,9 +43,14 @@ add_dynamatic_library(DynamaticTransforms
   MLIRTransformUtils
   DynamaticSupport
   DynamaticAnalysis
+  DynamaticFtd
   libclang
 )
 
 add_subdirectory(BufferPlacement)
 add_subdirectory(ResourceSharing)
 add_subdirectory(LLVMIR)
+add_subdirectory(Speculation)
+add_subdirectory(Rigidification)
+add_subdirectory(Duplication)
+add_subdirectory(LSQSizing)

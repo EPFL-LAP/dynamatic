@@ -15,13 +15,13 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/StdProfiler.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
-#include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/Operation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <set>
 
-using namespace dynamatic::experimental;
+using namespace dynamatic;
 
 #include <cstddef>
 
@@ -176,8 +176,8 @@ enumerateTransitionSequences(llvm::ArrayRef<ArchBB> transitions,
   std::vector<std::vector<ArchBB>> result;
 
   // enumerate all sequences with the required number of transitions using DFS
-  std::function<void(std::vector<experimental::ArchBB> &)> dfs =
-      [&](std::vector<experimental::ArchBB> &current) {
+  std::function<void(std::vector<ArchBB> &)> dfs =
+      [&](std::vector<ArchBB> &current) {
         if (current.size() == numTransitions) {
           result.push_back(current);
           return;
@@ -197,7 +197,7 @@ enumerateTransitionSequences(llvm::ArrayRef<ArchBB> transitions,
 
   // Start from each transition
   for (const auto &t : transitions) {
-    std::vector<experimental::ArchBB> seq = {t};
+    std::vector<ArchBB> seq = {t};
     dfs(seq);
   }
 

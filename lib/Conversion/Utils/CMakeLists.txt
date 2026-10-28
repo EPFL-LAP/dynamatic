@@ -11,8 +11,8 @@ add_dynamatic_library(DynamaticConversionUtils
   MLIRControlFlowDialect
   MLIRFuncDialect
   MLIRSupport
-  DynamaticExperimentalSupportBooleanLogic
+  DynamaticSupportBooleanLogic
   DynamaticSupportEspresso
-  DynamaticExperimentalSupport
-  DynamaticExperimentalAnalysis
+  DynamaticFtd
+  DynamaticAnalysis
   )

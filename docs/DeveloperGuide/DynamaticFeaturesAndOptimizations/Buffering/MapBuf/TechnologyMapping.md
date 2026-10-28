@@ -3,10 +3,10 @@
 This file provides support for technology mapping algorithm used in MapBuf that generates K-feasible cuts to map Subject Graph nodes to K-input LUTs.
 
 ## Implementation Overview
-The core data structure of this code is [`Cut`](https://github.com/EPFL-LAP/dynamatic/blob/aafb8cab5705f0cd7f6e3b0660b4deeca776153c/experimental/include/experimental/Support/CutlessMapping.h#L35). This class represents a single cut of a node, containing the root node, leaf nodes, depth of the cut, and a Cut Selection Variable used in MILP formulation.
+The core data structure of this code is [`Cut`](https://github.com/EPFL-LAP/dynamatic/blob/aafb8cab5705f0cd7f6e3b0660b4deeca776153c/include/dynamatic/Support/CutlessMapping.h#L35). This class represents a single cut of a node, containing the root node, leaf nodes, depth of the cut, and a Cut Selection Variable used in MILP formulation.
 
 ## Cutless FPGA Mapping
-The technology mapping algorithm is implemented in the function [cutAlgorithm()](https://github.com/EPFL-LAP/dynamatic/blob/aafb8cab5705f0cd7f6e3b0660b4deeca776153c/experimental/lib/Support/CutlessMapping.cpp#L122). This algorithm is based on the paper [Cutless FPGA Mapping](https://people.eecs.berkeley.edu/~alanmi/publications/2007/tech07_fast.pdf). 
+The technology mapping algorithm is implemented in the function [cutAlgorithm()](https://github.com/EPFL-LAP/dynamatic/blob/aafb8cab5705f0cd7f6e3b0660b4deeca776153c/lib/Support/CutlessMapping.cpp#L122). This algorithm is based on the paper [Cutless FPGA Mapping](https://people.eecs.berkeley.edu/~alanmi/publications/2007/tech07_fast.pdf). 
 
 The algorithm uses a depth-oriented mapping strategy where nodes are grouped into "wavy lines" by depth. By definition, nodes in the n-th wavy line can be implemented using K or fewer nodes from any previous wavy line (0 to n-1). The 0th wavy line consists of Primary Inputs of the Subject Graph. The algorithm iterates over all AIG nodes continuously, until all nodes are mapped to a wavy line. 
 

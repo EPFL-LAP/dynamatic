@@ -2,7 +2,7 @@
 
 The signal manager wraps each unit (e.g., `addi`, `buffer`, etc.) and forwards extra signals.
 
-Signal managers are implemented within the framework of the Python-based, generation-oriented beta backend for VHDL. The implementation files can be found under `experimental/tools/unit-generators/vhdl/generators/support/signal_manager`. Custom signal managers specific to individual units can also be implemented in their respective unit files.
+Signal managers are implemented within the framework of the Python-based, generation-oriented beta backend for VHDL. The implementation files can be found under `tools/unit-generators/vhdl/generators/support/signal_manager`. Custom signal managers specific to individual units can also be implemented in their respective unit files.
 
 ## Design Principles
 

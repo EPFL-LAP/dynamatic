@@ -23,7 +23,8 @@ add_dynamatic_library(DynamaticBufferPlacement
   MLIRTransformUtils
   DynamaticHandshake
   DynamaticSupport
-  DynamaticExperimentalSupport
+  DynamaticSimulation
+  DynamaticTechnologyMapping
   DynamaticConstraintProgramming
 
   )

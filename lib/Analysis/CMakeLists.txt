@@ -4,9 +4,13 @@ add_dynamatic_library(DynamaticAnalysis
   NameAnalysis.cpp
   NumericAnalysis.cpp
   ControlDependenceAnalysis.cpp
+  GSAAnalysis.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR
   MLIRSupport
   DynamaticSupport
+  DynamaticFtdSupport
 )
+
+add_subdirectory(FormalPropertyAnnotation)

@@ -23,13 +23,13 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Support/StdProfiler.h"
+#include "dynamatic/Support/StdProfiler.h"
 
 namespace dynamatic {
 namespace buffer {
 
 /// A set of ArchBB's pointers with a deterministic iteration order.
-using ArchSet = mlir::SetVector<dynamatic::experimental::ArchBB *>;
+using ArchSet = mlir::SetVector<dynamatic::ArchBB *>;
 /// A set of basic block IDs with a deterministic iteration order.
 using BBSet = mlir::SetVector<unsigned>;
 

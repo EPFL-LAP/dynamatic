@@ -10,12 +10,12 @@ The document provides:
 - Results
 
 ## File Structure
-All MapBuf documentation is located under [/docs/Specs/Buffering/MapBuf/](https://github.com/EPFL-LAP/dynamatic/tree/main/docs/Specs/Buffering/MapBuf), while the implementation files are found in the [/experimental/lib/Support/](https://github.com/EPFL-LAP/dynamatic/tree/main/experimental/lib/Support) directory.
+All MapBuf documentation is located under [/docs/Specs/Buffering/MapBuf/](https://github.com/EPFL-LAP/dynamatic/tree/main/docs/Specs/Buffering/MapBuf), while the implementation files are found in the [/lib/Support/](https://github.com/EPFL-LAP/dynamatic/tree/main/lib/Support) directory.
 
 1) [blif_generator.py](https://github.com/EPFL-LAP/dynamatic/blob/main/tools/blif-generator/blif_generator.py): A script that generates AIGs in BLIF using the HDL representations of dataflow units.
-2) [BlifReader.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/BlifReader.cpp): It handles parsing and processing of BLIF files to convert them into internal data structures.
-3) [CutlessMapping.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/CutlessMapping.cpp): It implements cut generation algorithm for technology mapping.
-4) [SubjectGraph.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/SubjectGraph.cpp): It implements the core hardware-specific Subject Graph classes.
+2) [BlifReader.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/BlifReader.cpp): It handles parsing and processing of BLIF files to convert them into internal data structures.
+3) [CutlessMapping.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/CutlessMapping.cpp): It implements cut generation algorithm for technology mapping.
+4) [SubjectGraph.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/SubjectGraph.cpp): It implements the core hardware-specific Subject Graph classes.
 5) [BufferPlacementMILP.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Transforms/BufferPlacement/BufferPlacementMILP.cpp): It contains all the functions and variables that are essential to instantiate variables and constraints in the MILP.
 6) [MAPBUFBuffers.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Transforms/BufferPlacement/MAPBUFBuffers.cpp): It contains the functions generating the MILP formulation for MapBuf buffer placement.
 
@@ -34,14 +34,14 @@ To run MapBuf, BLIF files must first be generated. These can be created using th
 
 2. Read AIGs
 - Takes the dataflow circuit and reads the AIGs corresponding to the dataflow units. Generates individual Subject Graph classes of units.
-- Uses [BlifReader.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/BlifReader.cpp) to read BLIF representations of the AIGs and [SubjectGraph.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/SubjectGraph.cpp) to create Subject Graphs.
+- Uses [BlifReader.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/BlifReader.cpp) to read BLIF representations of the AIGs and [SubjectGraph.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/SubjectGraph.cpp) to create Subject Graphs.
 
 
 3. Merge AIGs
-- Merges neighbouring AIGs, generating a single unified AIG of the whole circuit with functionality provided by [SubjectGraph.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/SubjectGraph.cpp). The information of neighboring AIGs are saved in the Subject Graph classes at this point, therefore it does not require the dataflow circuit.
+- Merges neighbouring AIGs, generating a single unified AIG of the whole circuit with functionality provided by [SubjectGraph.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/SubjectGraph.cpp). The information of neighboring AIGs are saved in the Subject Graph classes at this point, therefore it does not require the dataflow circuit.
 
 4. Cut Enumeration
-- Generates K-feasible cuts of the merged AIG, using the algorithm implemented in [CutlessMapping.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/experimental/lib/Support/CutlessMapping.cpp).
+- Generates K-feasible cuts of the merged AIG, using the algorithm implemented in [CutlessMapping.cpp](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/CutlessMapping.cpp).
 
 5. Formulate MILP Problem
 - Creates a Mixed-Integer Linear Programming problem that simultaneously considers:

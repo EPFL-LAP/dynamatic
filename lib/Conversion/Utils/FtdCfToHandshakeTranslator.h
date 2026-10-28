@@ -17,8 +17,8 @@
 #define DYNAMATIC_LIB_CONVERSION_UTILS_FTDCFTOHANDSHAKETRANSLATOR_H
 
 #include "CfToHandshakeTranslator.h"
-#include "experimental/Analysis/GSAAnalysis.h"
-#include "experimental/Support/FtdSupport.h"
+#include "dynamatic/Analysis/GSAAnalysis.h"
+#include "dynamatic/Support/FtdSupport.h"
 
 namespace dynamatic {
 
@@ -37,14 +37,14 @@ class FtdCfToHandshakeTranslator : public CfToHandshakeTranslator {
 public:
   FtdCfToHandshakeTranslator(mlir::func::FuncOp cfFunc,
                              mlir::OpBuilder &builder, NameAnalysis &namer,
-                             const experimental::gsa::GSAAnalysis &gsaAnalysis)
+                             const gsa::GSAAnalysis &gsaAnalysis)
       : CfToHandshakeTranslator(cfFunc, builder, namer),
         gsaAnalysis(gsaAnalysis) {}
 
 protected:
-  const experimental::gsa::GSAAnalysis &gsaAnalysis;
+  const gsa::GSAAnalysis &gsaAnalysis;
   /// Indexing of the func-level blocks used by the FTD analyses.
-  std::optional<experimental::ftd::BlockIndexing> blockIndexing;
+  std::optional<ftd::BlockIndexing> blockIndexing;
   /// The CFG that the FTD functions (e.g., ftd::addSupp) take as input. Their
   /// interface (ftd::ShadowCFG) bundles the CFG with the Handshake condition of
   /// each conditional block, which the circuits they create read. The CFG is
@@ -52,7 +52,7 @@ protected:
   /// translation, so no shadow copy of it is built; only the conditions are
   /// tracked here. Until the blocks are translated, the conditions are
   /// placeholders.
-  experimental::ftd::ShadowCFG cfgView;
+  ftd::ShadowCFG cfgView;
   /// Placeholder for the condition of each conditional block, replaced by the
   /// block's condition proxy once the blocks are translated.
   SmallVector<std::pair<Block *, Backedge>> condPlaceholders;
@@ -78,7 +78,7 @@ protected:
 /// Lowers all func-level functions of the module to Handshake functions with
 /// a `FtdCfToHandshakeTranslator`.
 LogicalResult ftdLowerCfToHandshake(mlir::ModuleOp modOp, NameAnalysis &namer,
-                                    const experimental::gsa::GSAAnalysis &gsa);
+                                    const gsa::GSAAnalysis &gsa);
 
 } // namespace dynamatic
 

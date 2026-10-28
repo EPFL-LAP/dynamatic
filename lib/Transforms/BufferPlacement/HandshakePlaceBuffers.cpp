@@ -20,6 +20,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/StdProfiler.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
@@ -28,7 +29,6 @@
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
@@ -45,7 +45,7 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::buffer;
-using namespace dynamatic::experimental;
+using namespace dynamatic;
 
 /// Algorithms that do not require solving an MILP.
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");

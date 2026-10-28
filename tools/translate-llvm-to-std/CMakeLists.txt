@@ -13,7 +13,6 @@ target_link_libraries(translate-llvm-to-std
   PRIVATE
   DynamaticSupport
   DynamaticHandshake
-  DynamaticExperimentalSupport
 
   MLIRIR
   MLIRAffineTransforms

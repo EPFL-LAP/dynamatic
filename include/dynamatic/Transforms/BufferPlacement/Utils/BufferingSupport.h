@@ -17,9 +17,9 @@
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/StdProfiler.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
-#include "experimental/Support/StdProfiler.h"
 
 namespace dynamatic {
 namespace buffer {
@@ -31,7 +31,7 @@ struct FuncInfo {
   handshake::FuncOp funcOp;
   /// The list of archs in the function (i.e., transitions between basic
   /// blocks).
-  SmallVector<experimental::ArchBB> archs;
+  SmallVector<ArchBB> archs;
   /// Maps CFDFCs of the function to a boolean indicating whether they each
   /// should be optimized.
   llvm::MapVector<CFDFC *, bool> cfdfcs;

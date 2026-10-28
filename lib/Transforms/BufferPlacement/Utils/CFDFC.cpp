@@ -29,7 +29,7 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::buffer;
-using namespace dynamatic::experimental;
+using namespace dynamatic;
 
 namespace {
 /// Helper data structure to hold mappings between each arch/basic block and the

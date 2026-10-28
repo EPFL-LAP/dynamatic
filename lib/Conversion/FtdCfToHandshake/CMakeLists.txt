@@ -6,7 +6,7 @@ add_dynamatic_library(DynamaticFtdCfToHandshake
 
   LINK_LIBS PUBLIC
   DynamaticConversionUtils
-  DynamaticExperimentalAnalysis
+  DynamaticAnalysis
   MLIRIR
   MLIRPass
   )

@@ -19,20 +19,18 @@
 #ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_MAPBUFBUFFERS_H
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_MAPBUFBUFFERS_H
 
+#include "dynamatic/Support/BlifReader.h"
+#include "dynamatic/Support/CutlessMapping.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
-#include "experimental/Support/BlifReader.h"
-#include "experimental/Support/CutlessMapping.h"
 
 namespace dynamatic {
 namespace buffer {
 namespace mapbuf {
 
-using pathMap =
-    std::unordered_map<std::pair<experimental::Node *, experimental::Node *>,
-                       std::vector<experimental::Node *>,
-                       experimental::NodePairHash>;
+using pathMap = std::unordered_map<std::pair<Node *, Node *>,
+                                   std::vector<Node *>, NodePairHash>;
 
 /// Holds the state and logic for MapBuf smart buffer placement.
 class MAPBUFBuffers : public BufferPlacementMILP {
@@ -61,7 +59,7 @@ private:
   // Average delay in nanoseconds for Look-Up Table (LUT) in the target FPGA.
   double lutDelay;
   // LogicNetwork of the circuit
-  experimental::LogicNetwork *blifData;
+  LogicNetwork *blifData;
   // Map that allows quick lookups from leaf to root nodes
   pathMap leafToRootPaths;
   // Path of BLIF files
