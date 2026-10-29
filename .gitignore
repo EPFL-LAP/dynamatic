@@ -53,3 +53,6 @@ metals.sbt
 
 # ElasticMiter puts external files in this directory
 /ext
+
+# modelsim.ini, created if simulation is run from inside /dynamatic
+/modelsim.ini
