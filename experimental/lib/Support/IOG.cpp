@@ -280,10 +280,15 @@ public:
     } else if (auto arithOp = dyn_cast<ArithOpInterface>(op)) {
       candidate.markFollowed(arithOp->getResults()[0]);
       followSingle(candidate, arithOp->getOperands());
-    } else if (isa<SinkOp, StoreOp, DeadBufferOp>(op)) {
+    } else if (isa<SinkOp, DeadBufferOp>(op)) {
       // These act as terminating units, and no further edges need to be
-      // followed
+      // followed. The annotation replaces the sinks of the IOGs by dead
+      // buffers, which keep the token.
       candidates.push_back(candidate);
+    } else if (isa<StoreOp>(op)) {
+      // A store passes the token on to the memory interface, where it leaves
+      // the circuit. No state keeps the token, so the number of tokens in the
+      // candidate is not fixed, and the candidate is discarded.
     } else if (auto loadOp = dyn_cast<LoadOp>(op)) {
       candidate.markFollowed(loadOp.getAddress());
       // checkpoint.follow(loadOp.getAddressResult());
