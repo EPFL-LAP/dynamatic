@@ -2275,6 +2275,71 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
         isChainActive = false;
       }
     }
+
+    // Same-block gamma mux fed by `val` through exactly one data input
+    auto gammaFedBy = [&](Value val, Operation *from) -> Operation * {
+      for (Operation *user : val.getUsers()) {
+        if (!llvm::isa<handshake::MuxOp>(user) ||
+            !user->hasAttr(FTD_EXPLICIT_GAMMA) || getBB(user) != getBB(from))
+          continue;
+        unsigned count = (user->getOperand(1) == val ? 1 : 0) +
+                         (user->getOperand(2) == val ? 1 : 0);
+        if (count == 1)
+          return user;
+      }
+      return nullptr;
+    };
+
+    // 1. Climb to the root of the tree along the data inputs
+    Operation *rootMuxOp = consumer;
+    DenseSet<Operation *> climbed;
+    while (climbed.insert(rootMuxOp).second) {
+      Operation *up = gammaFedBy(rootMuxOp->getResult(0), rootMuxOp);
+      if (!up)
+        break;
+      rootMuxOp = up;
+    }
+
+    // 2. Visit every mux of the tree from the root down, once each
+    SmallVector<Operation *> worklist{rootMuxOp};
+    DenseSet<Operation *> visited;
+    while (!worklist.empty()) {
+      Operation *muxOp = worklist.pop_back_val();
+      if (!visited.insert(muxOp).second)
+        continue;
+
+      // Trace the select back through suppression branches to the condition
+      Value muxCondition = muxOp->getOperand(0);
+      while (Operation *defOp = muxCondition.getDefiningOp()) {
+        if (llvm::isa<handshake::ConditionalBranchOp>(defOp) &&
+            defOp->hasAttr(FTD_OP_TO_SKIP))
+          muxCondition = defOp->getOperand(1);
+        else
+          break;
+      }
+      Block *muxConditionBlock = returnMuxConditionBlock(muxCondition, shadow);
+
+      // Same filters as the walk above, without recording a constraint
+      if (muxConditionBlock && !bi.isLess(muxConditionBlock, dominatorBlock)) {
+        for (auto it : locGraph->origMap) {
+          if (it.second != muxConditionBlock)
+            continue;
+          muxConditionSet.insert(muxConditionBlock);
+          locConsControlDepsFull.insert(it.first);
+          for (Block *dep : locCDA.getAllBlockDeps()[it.first].allControlDeps)
+            locConsControlDepsFull.insert(dep);
+          break;
+        }
+      }
+
+      // Descend into the sub-trees feeding the two data inputs
+      for (unsigned idx : {1u, 2u}) {
+        Operation *defOp = muxOp->getOperand(idx).getDefiningOp();
+        if (defOp && llvm::isa<handshake::MuxOp>(defOp) &&
+            defOp->hasAttr(FTD_EXPLICIT_GAMMA) && getBB(defOp) == getBB(muxOp))
+          worklist.push_back(defOp);
+      }
+    }
   }
 
   // Early exit: no condition affects this delivery, so there is nothing to

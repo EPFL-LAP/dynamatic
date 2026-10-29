@@ -96,8 +96,8 @@ struct HandshakeTreeHeightReductionPass
     RewritePatternSet patterns{ctx};
     patterns.add<AddTreeHeightReduction>(ctx);
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
-                                            config)))
+    if (failed(
+            applyPatternsGreedily(getOperation(), std::move(patterns), config)))
       signalPassFailure();
 
     NameAnalysis &namer = getAnalysis<NameAnalysis>();

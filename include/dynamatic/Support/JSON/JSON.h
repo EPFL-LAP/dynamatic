@@ -19,17 +19,6 @@
 #include "llvm/Support/JSON.h"
 #include <set>
 
-namespace llvm {
-namespace json {
-/// Deserializes a JSON value into an unsigned number. This function is placed
-/// inside of the ::llvm::json namespace since the deserialization target type
-/// is a standard type. See ::llvm::json::Value's documentation for a longer
-/// description of this function's behavior.
-bool fromJSON(const llvm::json::Value &value, unsigned &number,
-              llvm::json::Path path);
-} // namespace json
-} // namespace llvm
-
 namespace dynamatic {
 
 namespace json {

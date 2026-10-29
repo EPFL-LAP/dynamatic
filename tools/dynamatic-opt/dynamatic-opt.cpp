@@ -16,7 +16,7 @@
 #include "dynamatic/InitAllDialects.h"
 #include "dynamatic/InitAllPasses.h"
 #include "experimental/InitAllPasses.h"
-#include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Affine/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"

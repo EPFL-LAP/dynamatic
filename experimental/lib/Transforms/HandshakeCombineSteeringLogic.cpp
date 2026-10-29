@@ -658,9 +658,12 @@ struct SimplifyKnownConditionBranch
         if (auto bbAttr = br->getAttr("handshake.bb"))
           constOp->setAttr("handshake.bb", bbAttr);
 
-        // Replace condition operand of downstream branch
-        br->setOperand(0, constOp.getResult());
-        refreshBranchAttrsFromCondition(br, br);
+        // Replace the downstream branch with one conditioned on the constant
+        auto newBr = rewriter.create<handshake::ConditionalBranchOp>(
+            br.getLoc(), constOp.getResult(), br.getDataOperand());
+        newBr->setDiscardableAttrs(br->getDiscardableAttrDictionary());
+        refreshBranchAttrsFromCondition(newBr, br);
+        rewriter.replaceOp(br, newBr->getResults());
 
         changed = true;
       }
@@ -861,8 +864,9 @@ struct HandshakeCombineSteeringLogicPass
     MLIRContext *ctx = &getContext();
     ModuleOp mod = getOperation();
     GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(
+        mlir::GreedySimplifyRegionLevel::Disabled);
     RewritePatternSet patterns(ctx);
     patterns.add<RemoveUnusedOp<handshake::MuxOp>,
                  RemoveUnusedOp<handshake::ConditionalBranchOp>,
@@ -875,7 +879,7 @@ struct HandshakeCombineSteeringLogicPass
                  EliminateConstantCondBranch, CombineEquivalentMuxes,
                  CombineEquivalentBranches, EliminateMuxWithIdenticalInputs>(
         ctx);
-    if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
+    if (failed(applyPatternsGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
 
     // Make sure all operation names are still unique and name operations that

@@ -15,7 +15,7 @@
 
 module {
   handshake.func @proc_not(%in: !handshake.channel<i32>) -> (!handshake.channel<i32>) {
-    %0 = handshake.not %in : <i32>
+    %0 = handshake.noti %in : <i32>
     end %0: <i32>
   }
 }

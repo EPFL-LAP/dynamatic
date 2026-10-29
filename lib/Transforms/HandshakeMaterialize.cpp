@@ -438,8 +438,9 @@ struct HandshakeMaterializePass
 
     // Then, greedily optimize forks
     mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(
+        mlir::GreedySimplifyRegionLevel::Disabled);
     RewritePatternSet patterns{ctx};
     patterns.add<
         // clang-format off
@@ -452,8 +453,7 @@ struct HandshakeMaterializePass
     if (this->replicateConstants)
       patterns.add<ReplicateSourceIntoConstant>(ctx);
 
-    if (failed(
-            applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
+    if (failed(applyPatternsGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
 
     // Finally, promote forks to lazy wherever necessary
