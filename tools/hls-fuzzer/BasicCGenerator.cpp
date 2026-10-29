@@ -650,6 +650,36 @@ gen::BasicCGenerator::generateStructuredForStatement(OpaqueContext &&context) {
       });
 }
 
+std::optional<std::pair<ast::IfElseStatement, gen::OpaqueContext>>
+gen::BasicCGenerator::generateIfElseStatement(OpaqueContext &&context) {
+  if (typeSystem.discardIfElseStatementOpaque(context))
+    return std::nullopt;
+
+  return generateWithDependencies<ast::IfElseStatement>(
+      std::move(context), typeSystem.getIfElseStatementTransferFns(),
+
+      /*condition=*/
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
+      /*if clause=*/
+      [&](OpaqueContext &&context) {
+        auto scopeExit = pushNewScope();
+        return generateStatementList(std::move(context));
+      },
+      /*else clause=*/
+      [&](OpaqueContext &&context) {
+        auto scopeExit = pushNewScope();
+        return generateStatementList(std::move(context));
+      },
+      /*constructor=*/
+      [&](ast::Expression &&condition, ast::StatementList &&ifClause,
+          ast::StatementList &&elseClause) {
+        return ast::IfElseStatement(std::move(condition), std::move(ifClause),
+                                    std::move(elseClause));
+      });
+}
+
 void gen::BasicCGenerator::initGenerators() {
   expressionGenerators.emplace_back(&BasicCGenerator::generateConstant,
                                     ast::Constant::Tag{});
@@ -684,6 +714,8 @@ void gen::BasicCGenerator::initGenerators() {
   statementGenerators.emplace_back(
       &BasicCGenerator::generateStructuredForStatement,
       ast::StructuredForStatement::Tag{});
+  statementGenerators.emplace_back(&BasicCGenerator::generateIfElseStatement,
+                                   ast::IfElseStatement::Tag{});
   statementGenerators.emplace_back(
       &BasicCGenerator::generateScalarAssignmentStatement,
       ast::ScalarAssignmentStatement::Tag{});

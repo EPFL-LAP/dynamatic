@@ -6,8 +6,8 @@
 // -----------------------------------------------------------------------
 
 #include "polly/ScopInfo.h"
-#include "polly/ScopPass.h"
 #include "polly/Support/ISLTools.h"
+#include "llvm/IR/IRBuilder.h"
 
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/MapVector.h"
@@ -23,7 +23,7 @@
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/PassPlugin.h"
+#include "llvm/Plugins/PassPlugin.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -880,7 +880,7 @@ std::vector<Value *> decomposeGEPIndices(GetElementPtrInst *gepInst,
   while (auto *gepOp = dyn_cast<GEPOperator>(cur)) {
 
     APInt localConstOff(bitWidth, 0);
-    llvm::MapVector<Value *, APInt> localVarOff;
+    llvm::SmallMapVector<Value *, APInt, 4> localVarOff;
 
     if (!gepOp->collectOffset(DL, bitWidth, localVarOff, localConstOff)) {
       llvm::report_fatal_error(
@@ -1391,7 +1391,7 @@ static void inlineAlwaysInline(Function &f) {
   }
 }
 
-struct ArrayPartition : PassInfoMixin<ArrayPartition> {
+struct ArrayPartition : OptionalPassInfoMixin<ArrayPartition> {
   PreservedAnalyses run(Function &f, FunctionAnalysisManager &fam);
 };
 

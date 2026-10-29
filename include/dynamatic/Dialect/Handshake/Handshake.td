@@ -40,7 +40,11 @@ def Handshake_Dialect : Dialect {
 
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
-  let usePropertiesForAttributes = 0;
+  // Keep printing inherent attributes in `attr-dict` (e.g., the value of
+  // handshake.constant), as before properties became mandatory.
+  // FIXME: This option is deprecated: bind the inherent attributes in the
+  // assembly formats or use `prop-dict` instead.
+  let useStrictPropertiesInAssemblyFormat = 0;
   let hasCanonicalizer = 1;
 }
 

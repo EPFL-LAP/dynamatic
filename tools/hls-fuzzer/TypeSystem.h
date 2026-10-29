@@ -7,6 +7,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FunctionExtras.h"
+#include "llvm/ADT/STLForwardCompat.h"
 
 #include <algorithm>
 #include <any>
@@ -377,7 +378,7 @@ public:
   /*implicit*/ OpaqueTransferFn(
       TransferFn<TypingContext, ASTNode, inputIndices...> dep)
       : OpaqueTransferFn(
-            llvm::identity<TypingContext>{},
+            llvm::type_identity<TypingContext>{},
             []() -> llvm::ArrayRef<std::size_t> {
               // Since the number (and values) of input indices are known at
               // compile time we can define and reference a statically allocated
@@ -413,7 +414,7 @@ public:
   ///                 const TypedContextTuple<ASTNode, TypingContext> &)
   template <typename TypingContext, typename ConcreteTransferFn>
   explicit OpaqueTransferFn(
-      llvm::identity<TypingContext>,
+      llvm::type_identity<TypingContext>,
       std::variant<llvm::ArrayRef<std::size_t>, std::vector<std::size_t>>
           inputIndices,
       ConcreteTransferFn &&f)
@@ -463,7 +464,7 @@ public:
   /// wrapper that needs subelements the wrapped function did not ask for. Like
   /// any dependency they are thereby also forced to be generated first.
   template <typename TypingContext, std::size_t... extraDependencies,
-            typename F, typename Projection = llvm::identity<TypingContext>>
+            typename F, typename Projection = llvm::identity>
   OpaqueTransferFn wrap(F f, Projection projection = {}) && {
     using SubContext = ProjectedContext<TypingContext, Projection>;
 
@@ -477,7 +478,7 @@ public:
     indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
 
     return OpaqueTransferFn(
-        llvm::identity<TypingContext>{}, std::move(indices),
+        llvm::type_identity<TypingContext>{}, std::move(indices),
         [wrapped = std::move(*this), f = std::move(f),
          projection = std::move(projection)](
             const SubElementsTuple<ASTNode> &subElements,
@@ -612,7 +613,7 @@ public:
   /*implicit*/ OpaqueOutputTransferFn(
       OutputTransferFn<TypingContext, ASTNode, inputIndices...> &&dep)
       : OpaqueOutputTransferFn(
-            llvm::identity<TypingContext>{},
+            llvm::type_identity<TypingContext>{},
             [dep = std::move(dep)](
                 const ASTNode &astNode,
                 const TypedContextTuple<ASTNode, TypingContext> &contexts)
@@ -634,7 +635,8 @@ public:
   ///   TypingContext(const ASTNode &,
   ///                 const TypedContextTuple<ASTNode, TypingContext> &)
   template <typename TypingContext, typename ConcreteTransferFn>
-  OpaqueOutputTransferFn(llvm::identity<TypingContext>, ConcreteTransferFn &&f)
+  OpaqueOutputTransferFn(llvm::type_identity<TypingContext>,
+                         ConcreteTransferFn &&f)
       : computationFn(
             [f = std::forward<ConcreteTransferFn>(f)](
                 const ASTNode &astNode,
@@ -679,12 +681,12 @@ public:
   /// returned by 'projection'.
   /// It must be callable as 'const SubContext&(const TypingContext&)'.
   template <typename TypingContext, std::size_t... extraDependencies,
-            typename F, typename Projection = llvm::identity<TypingContext>>
+            typename F, typename Projection = llvm::identity>
   OpaqueOutputTransferFn wrap(F f, Projection projection = {}) && {
     using SubContext = ProjectedContext<TypingContext, Projection>;
 
     return OpaqueOutputTransferFn(
-        llvm::identity<TypingContext>{},
+        llvm::type_identity<TypingContext>{},
         [wrapped = std::move(*this), f = std::move(f),
          projection = std::move(projection)](
             const ASTNode &astNode,
@@ -904,6 +906,11 @@ public:
   virtual TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() = 0;
 
+  virtual bool discardIfElseStatementOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::IfElseStatement>
+  getIfElseStatementTransferFns() = 0;
+
   using ExpressionKey =
       std::variant<ast::Constant::Tag, ast::CastExpression::Tag,
                    ast::Variable::Tag, ast::ArrayReadExpression::Tag,
@@ -918,9 +925,10 @@ public:
   virtual ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTableOpaque(const OpaqueContext &context) = 0;
 
-  using StatementKey = std::variant<ast::StructuredForStatement::Tag,
-                                    ast::ArrayAssignmentStatement::Tag,
-                                    ast::ScalarAssignmentStatement::Tag>;
+  using StatementKey =
+      std::variant<ast::StructuredForStatement::Tag, ast::IfElseStatement::Tag,
+                   ast::ArrayAssignmentStatement::Tag,
+                   ast::ScalarAssignmentStatement::Tag>;
 
   /// Returns the probability table for a given statement, represented by their
   /// tag, to be selected.
@@ -1302,6 +1310,18 @@ public:
     };
   }
 
+  static bool discardIfElseStatement(const TypingContext &) { return false; }
+
+  TransferFnArray<ast::IfElseStatement>
+  getIfElseStatementTransferFns() override {
+    return {
+        /*condition=*/copyFromInput<ast::IfElseStatement>(),
+        /*if clause=*/copyFromInput<ast::IfElseStatement>(),
+        /*else clause=*/copyFromInput<ast::IfElseStatement>(),
+        /*output=*/copyInputToOutput<ast::IfElseStatement>(),
+    };
+  }
+
   static ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTable(const TypingContext &) {
     return {};
@@ -1407,6 +1427,10 @@ public:
     return self().discardStructuredForStatement(context.cast<TypingContext>());
   }
 
+  bool discardIfElseStatementOpaque(const OpaqueContext &context) final {
+    return self().discardIfElseStatement(context.cast<TypingContext>());
+  }
+
   ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTableOpaque(const OpaqueContext &context) final {
     return self().getExpressionProbabilityTable(context.cast<TypingContext>());
@@ -1494,6 +1518,9 @@ public:
           std::forward<Args>(args)...);
     else if constexpr (std::is_same_v<ASTNode, ast::StructuredForStatement>)
       return target.Target::getStructuredForStatementTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::IfElseStatement>)
+      return target.Target::getIfElseStatementTransferFns(
           std::forward<Args>(args)...);
     else {
       static_assert(sizeof(ASTNode) == 0,
@@ -1585,6 +1612,9 @@ public:
     else if constexpr (std::is_same_v<ASTNode, ast::StructuredForStatement>)
       return target.Target::discardStructuredForStatement(
           context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::IfElseStatement>)
+      return target.Target::discardIfElseStatement(context,
+                                                   std::forward<Args>(args)...);
     else {
       static_assert(sizeof(ASTNode) == 0,
                     "'ASTNode' is not a non-terminal that can be discarded");

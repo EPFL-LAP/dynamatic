@@ -73,11 +73,10 @@ xls::SprocOp createSprocSkeleton(ImplicitLocOpBuilder &builder,
 
   OpBuilder::InsertionGuard guard(builder);
 
-  auto sproc = builder.create<xls::SprocOp>(name,
-                                            /*is_top=*/false,
-                                            /*boundary_channel_names=*/
-                                            nullptr,
-                                            /*zeroinitializer=*/true);
+  auto sproc = builder.create<xls::SprocOp>(
+      StringRef(name), /*sym_visibility=*/StringAttr(), /*is_top=*/false,
+      /*boundary_channels=*/ArrayAttr(),
+      /*min_pipeline_stages=*/IntegerAttr());
 
   Block &spawns = sproc.getSpawns().emplaceBlock();
   Block &next = sproc.getNext().emplaceBlock();
@@ -159,7 +158,7 @@ void NopProc::build(OpBuilder builder) const {
 
   auto ty = b.getIntegerType(width);
 
-  TypeRange inputs{ty};
+  llvm::SmallVector<Type> inputs{ty};
   llvm::SmallVector<Type> outputs{ty};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
@@ -199,7 +198,7 @@ void ForkProc::build(OpBuilder builder) const {
   OpBuilder::InsertionGuard guard(builder);
   auto b = ImplicitLocOpBuilder(builder.getUnknownLoc(), builder);
 
-  TypeRange inputs{b.getIntegerType(width)};
+  llvm::SmallVector<Type> inputs{b.getIntegerType(width)};
   llvm::SmallVector<Type> outputs{};
   for (size_t i = 0; i < fanout; i++) {
     outputs.push_back(b.getIntegerType(width));
@@ -257,7 +256,7 @@ void JoinProc::build(OpBuilder builder) const {
   for (size_t i = 0; i < numDataOperands; i++) {
     inputs.push_back(typeCtrl);
   }
-  TypeRange outputs{typeCtrl};
+  llvm::SmallVector<Type> outputs{typeCtrl};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
 
@@ -331,7 +330,7 @@ void SelectProc::build(OpBuilder builder) const {
   auto typeBool = b.getI1Type();
 
   llvm::SmallVector<Type> inputs{typeBool, typeVal, typeVal};
-  TypeRange outputs{typeVal};
+  llvm::SmallVector<Type> outputs{typeVal};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
 
@@ -403,7 +402,7 @@ void MuxProc::build(OpBuilder builder) const {
   for (unsigned int i = 0; i < numDataOperands; i++) {
     inputs.push_back(typeVal);
   }
-  TypeRange outputs{typeVal};
+  llvm::SmallVector<Type> outputs{typeVal};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
 
@@ -477,7 +476,7 @@ void CMergeProc::build(OpBuilder builder) const {
   for (unsigned int i = 0; i < numDataOperands; i++) {
     inputs.push_back(typeVal);
   }
-  TypeRange outputs{typeVal, typeIdx};
+  llvm::SmallVector<Type> outputs{typeVal, typeIdx};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
 
@@ -568,7 +567,7 @@ void CBranchProc::build(OpBuilder builder) const {
   auto typeBool = b.getI1Type();
 
   llvm::SmallVector<Type> inputs{typeBool, typeVal};
-  TypeRange outputs{typeVal, typeVal};
+  llvm::SmallVector<Type> outputs{typeVal, typeVal};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
 
@@ -664,7 +663,7 @@ void ConstantProc::build(OpBuilder builder) const {
   auto type = b.getIntegerType(value.getBitWidth());
   auto valueAttr = b.getIntegerAttr(type, value);
 
-  TypeRange inputs{b.getIntegerType(0)};
+  llvm::SmallVector<Type> inputs{b.getIntegerType(0)};
   llvm::SmallVector<Type> outputs{type};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
@@ -715,7 +714,7 @@ void SinkProc::build(OpBuilder builder) const {
   OpBuilder::InsertionGuard guard(builder);
   auto b = ImplicitLocOpBuilder(builder.getUnknownLoc(), builder);
 
-  TypeRange inputs{b.getIntegerType(width)};
+  llvm::SmallVector<Type> inputs{b.getIntegerType(width)};
   llvm::SmallVector<Type> outputs{};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
@@ -791,7 +790,7 @@ void BinaryIOpProc::build(OpBuilder builder) const {
   auto b = ImplicitLocOpBuilder(builder.getUnknownLoc(), builder);
 
   auto type = b.getIntegerType(width);
-  TypeRange inputs{type, type};
+  llvm::SmallVector<Type> inputs{type, type};
   llvm::SmallVector<Type> outputs{type};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
@@ -865,7 +864,7 @@ public:
 
   void build(OpBuilder builder) const override;
 
-  static std::shared_ptr<HandshakeProc> get(NotOp op);
+  static std::shared_ptr<HandshakeProc> get(NotIOp op);
 
 private:
   unsigned int width;
@@ -876,7 +875,7 @@ void NotOpProc::build(OpBuilder builder) const {
   auto b = ImplicitLocOpBuilder(builder.getUnknownLoc(), builder);
 
   auto type = b.getIntegerType(width);
-  TypeRange inputs{type};
+  llvm::SmallVector<Type> inputs{type};
   llvm::SmallVector<Type> outputs{type};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
@@ -896,7 +895,7 @@ void NotOpProc::build(OpBuilder builder) const {
   b.create<xls::SSendOp>(tok1, result, nextArgs[1]);
 }
 
-std::shared_ptr<HandshakeProc> NotOpProc::get(NotOp op) {
+std::shared_ptr<HandshakeProc> NotOpProc::get(NotIOp op) {
   auto width = getHandshakeTypeBitWidth(op.getResult().getType());
   return std::make_shared<NotOpProc>(NotOpProc(width));
 }
@@ -943,7 +942,7 @@ void CmpIProc::build(OpBuilder builder) const {
 
   auto type = b.getIntegerType(width);
   auto boolType = b.getI1Type();
-  TypeRange inputs{type, type};
+  llvm::SmallVector<Type> inputs{type, type};
   llvm::SmallVector<Type> outputs{boolType};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
@@ -1025,7 +1024,7 @@ void IntCastProc::build(OpBuilder builder) const {
   auto typeIn = b.getIntegerType(fromWidth);
   auto typeOut = b.getIntegerType(toWidth);
 
-  TypeRange inputs{typeIn};
+  llvm::SmallVector<Type> inputs{typeIn};
   llvm::SmallVector<Type> outputs{typeOut};
 
   auto sproc = createSprocSkeleton(b, inputs, outputs, name());
@@ -1144,7 +1143,7 @@ public:
             .Case<AndIOp, AddIOp, DivSIOp, DivUIOp, MulIOp, OrIOp, XOrIOp,
                   ShLIOp, ShRSIOp, ShRUIOp, SubIOp>(
                 [&](auto op) { return BinaryIOpProc::get(op); })
-            .Case<NotOp>([&](NotOp op) { return NotOpProc::get(op); })
+            .Case<NotIOp>([&](NotIOp op) { return NotOpProc::get(op); })
             .Case<handshake::CmpIOp>(
                 [&](CmpIOp op) { return CmpIProc::get(op); })
             .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
@@ -1221,10 +1220,10 @@ LogicalResult ConvertToXlsSpawn<T>::matchAndRewrite(
 
     xls::SchanOp ch = rewriter.create<xls::SchanOp>( // TODO BROKEN BUILD
         op.getLoc(), returnType, "ssa", innerType,
-        xls::FifoConfigAttr::get(ctx, /*fifo_depth=*/0,
-                                 /*bypass=*/true,
-                                 /*register_push_outputs=*/false,
-                                 /*register_pop_outputs=*/false),
+        xls::FifoConfig::get(ctx, /*fifo_depth=*/0,
+                             /*bypass=*/true,
+                             /*register_push_outputs=*/false,
+                             /*register_pop_outputs=*/false),
         /*input_flop_kind=*/xls::FlopKindAttr::get(ctx, xls::FlopKind::kNone),
         /*output_flop_kind=*/xls::FlopKindAttr::get(ctx, xls::FlopKind::kNone));
     resultChannels.push_back(ch);
@@ -1282,19 +1281,23 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   assert(funcType.getInputs().size() == funcOp.getArgNames().size());
   for (auto [input, name] : zip(funcType.getInputs(), funcOp.getArgNames())) {
     inputTypes.push_back(convertInnerType(rewriter, input));
-    boundaryChs.push_back(name);
+    boundaryChs.push_back(xls::BoundaryChannelAttr::get(
+        rewriter.getContext(), cast<StringAttr>(name), /*fifo_config=*/{},
+        /*input_flop_kind=*/{}, /*output_flop_kind=*/{}));
   }
 
   assert(funcType.getResults().size() == funcOp.getResNames().size());
   for (auto [output, name] : zip(funcType.getResults(), funcOp.getResNames())) {
     outputTypes.push_back(convertInnerType(rewriter, output));
-    boundaryChs.push_back(name);
+    boundaryChs.push_back(xls::BoundaryChannelAttr::get(
+        rewriter.getContext(), cast<StringAttr>(name), /*fifo_config=*/{},
+        /*input_flop_kind=*/{}, /*output_flop_kind=*/{}));
   }
 
   auto boundaryChsAttr = rewriter.getArrayAttr(ArrayRef(boundaryChs));
-  auto sproc = rewriter.create<xls::SprocOp>(funcOp->getLoc(), name,
-                                             /*is_top=*/true, boundaryChsAttr,
-                                             /*zeroinitializer=*/true);
+  auto sproc = rewriter.create<xls::SprocOp>(
+      funcOp->getLoc(), name, /*sym_visibility=*/StringAttr(), /*is_top=*/true,
+      boundaryChsAttr, /*min_pipeline_stages=*/IntegerAttr());
 
   Block &spawns = sproc.getSpawns().emplaceBlock();
   Block &next = sproc.getNext().emplaceBlock();
@@ -1422,7 +1425,7 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
 
   uint64_t depth = bufOp.getNumSlots();
 
-  switch (bufferOp.getBufferType()) {
+  switch (bufOp.getBufferType()) {
   case BufferType::ONE_SLOT_BREAK_DV:
   case BufferType::ONE_SLOT_BREAK_DVR:
   case BufferType::ONE_SLOT_BREAK_R:
@@ -1435,10 +1438,10 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
   }
 
   auto newFifoConfig =
-      xls::FifoConfigAttr::get(rewriter.getContext(), /*fifo_depth=*/depth,
-                               /*bypass=*/bufferOp.isBypassDV(),
-                               /*register_push_outputs=*/false,
-                               /*register_pop_outputs=*/false);
+      xls::FifoConfig::get(rewriter.getContext(), /*fifo_depth=*/depth,
+                           /*bypass=*/bufOp.isBypassDV(),
+                           /*register_push_outputs=*/false,
+                           /*register_pop_outputs=*/false);
   ch.setFifoConfigAttr(newFifoConfig);
 
   rewriter.replaceOp(bufOp, inp);
@@ -1514,7 +1517,7 @@ public:
     patterns.insert<ConvertToXlsSpawn<SourceOp>>(ctx, procs);
     patterns.insert<ConvertToXlsSpawn<SinkOp>>(ctx, procs);
     patterns.insert<ConvertToXlsSpawn<ConstantOp>>(ctx, procs);
-    patterns.insert<ConvertToXlsSpawn<NotOp>>(ctx, procs);
+    patterns.insert<ConvertToXlsSpawn<NotIOp>>(ctx, procs);
 
     // BinaryIOp:
     patterns.insert<ConvertToXlsSpawn<AndIOp>>(ctx, procs);

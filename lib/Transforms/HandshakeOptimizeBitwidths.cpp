@@ -2089,8 +2089,9 @@ struct HandshakeOptimizeBitwidthsPass
 
     // Create greedy config for all optimization passes
     mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(
+        mlir::GreedySimplifyRegionLevel::Disabled);
 
     // Some optimizations do not need to be applied iteratively. We include
     // patterns to downgrade control merges and muxes with useless indices into
@@ -2102,8 +2103,7 @@ struct HandshakeOptimizeBitwidthsPass
     patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex, MemInterfaceAddrOpt,
                  MemPortAddrOpt>(bitwidthReduced, getAnalysis<NameAnalysis>(),
                                  ctx);
-    if (failed(
-            applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
+    if (failed(applyPatternsGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
 
     for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
@@ -2121,8 +2121,8 @@ struct HandshakeOptimizeBitwidthsPass
         ops.clear();
         llvm::transform(funcOp.getOps(), std::back_inserter(ops),
                         [&](Operation &op) { return &op; });
-        return applyOpPatternsAndFold(ops, std::move(patterns), config,
-                                      &changed);
+        return applyOpPatternsGreedily(ops, std::move(patterns), config,
+                                       &changed);
       };
 
       // Apply the forward and backward pass continuously until the IR converges
