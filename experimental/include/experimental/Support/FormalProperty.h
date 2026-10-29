@@ -45,6 +45,25 @@ struct FormalProperty {
   /// Valid equivalence: the two channels are always valid in the same cycles.
   static constexpr StringLiteral VALID_EQUIVALENCE = "ValidEquivalence";
 
+  // Kinds of the invariants, which hold by construction (see the documentation
+  // of formal properties for their description)
+  static constexpr StringLiteral EAGER_FORK_NOT_ALL_OUTPUT_SENT =
+      "EagerForkNotAllOutputSent";
+  static constexpr StringLiteral COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL =
+      "CopiedSlotsOfActiveForksAreFull";
+  static constexpr StringLiteral EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE =
+      "EagerForkPathTokenCopiedMaximumOnce";
+  static constexpr StringLiteral RECONVERGENT_PATH_FLOW =
+      "ReconvergentPathFlow";
+  static constexpr StringLiteral IOG_SINGLE_TOKEN = "IOGSingleToken";
+  static constexpr StringLiteral IOG_CONSECUTIVE_TOKENS =
+      "IOGConsecutiveTokens";
+  static constexpr StringLiteral ENTRY_TOKEN_ORDER = "EntryTokenOrder";
+  static constexpr StringLiteral SINGLE_ENTRY_TOKEN = "SingleEntryToken";
+  static constexpr StringLiteral EXIT_TOKEN_ORDER = "ExitTokenOrder";
+  static constexpr StringLiteral EXIT_TOKEN_NO_ANCESTORS =
+      "ExitTokenNoAncestors";
+
   /// Unique identifier, which also names the property in the model.
   uint64_t id;
   /// What the property describes (e.g., "AbsenceOfBackpressure").

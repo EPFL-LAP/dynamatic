@@ -49,7 +49,7 @@ To illustrate how a new property can be integrated, we take an example from the 
 
 ### Write a Generator in the `annotate-properties` Pass
 
-A generator walks the circuit and adds one property per instance with `addProperty`, building its formula from the internal states and signals of the units:
+First, declare the name of the new kind next to the other kinds in `FormalProperty`. A generator walks the circuit and adds one property per instance with `addProperty`, building its formula from the internal states and signals of the units:
 
 ```
 LogicalResult
@@ -63,8 +63,8 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(ModuleOp modO
         PropertyExpr expr =
             BinaryExpr(NaryExpr(NaryExpr::Count, getStates(sents)),
                        BinaryExpr::Lt, Constant::integer(sents.size()));
-        addProperty(EAGER_FORK_NOT_ALL_OUTPUT_SENT, FormalProperty::TAG::INVAR,
-                    expr);
+        addProperty(FormalProperty::EAGER_FORK_NOT_ALL_OUTPUT_SENT,
+                    FormalProperty::TAG::INVAR, expr);
       }
     }
   }

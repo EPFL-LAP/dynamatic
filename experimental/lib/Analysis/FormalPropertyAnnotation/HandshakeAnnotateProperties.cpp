@@ -128,38 +128,23 @@ private:
   LogicalResult annotateExitTokenOrder(ModuleOp modOp);
 };
 
-// Kinds of the invariants
-constexpr StringLiteral EAGER_FORK_NOT_ALL_OUTPUT_SENT =
-    "EagerForkNotAllOutputSent";
-constexpr StringLiteral COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL =
-    "CopiedSlotsOfActiveForksAreFull";
-constexpr StringLiteral EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE =
-    "EagerForkPathTokenCopiedMaximumOnce";
-constexpr StringLiteral RECONVERGENT_PATH_FLOW = "ReconvergentPathFlow";
-constexpr StringLiteral IOG_SINGLE_TOKEN = "IOGSingleToken";
-constexpr StringLiteral IOG_CONSECUTIVE_TOKENS = "IOGConsecutiveTokens";
-constexpr StringLiteral ENTRY_TOKEN_ORDER = "EntryTokenOrder";
-constexpr StringLiteral SINGLE_ENTRY_TOKEN = "SingleEntryToken";
-constexpr StringLiteral EXIT_TOKEN_ORDER = "ExitTokenOrder";
-constexpr StringLiteral EXIT_TOKEN_NO_ANCESTORS = "ExitTokenNoAncestors";
-
 // The generators in the order in which they run by default. The generator of
 // ExitTokenOrder also generates the ExitTokenNoAncestors invariants, as both
 // are derived from the same paths.
 // clang-format off
 const HandshakeAnnotatePropertiesPass::GeneratorEntry
     HandshakeAnnotatePropertiesPass::GENERATORS[] = {
-    {FormalProperty::ABSENCE_OF_BACKPRESSURE,   &HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure,     /*isInvariant=*/false},
-    {FormalProperty::VALID_EQUIVALENCE,         &HandshakeAnnotatePropertiesPass::annotateValidEquivalence,          /*isInvariant=*/false},
-    {EAGER_FORK_NOT_ALL_OUTPUT_SENT,            &HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent, /*isInvariant=*/true},
-    {COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL,     &HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks,     /*isInvariant=*/true},
-    {EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE, &HandshakeAnnotatePropertiesPass::annotateEagerForkPath,             /*isInvariant=*/true},
-    {RECONVERGENT_PATH_FLOW,                    &HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow,      /*isInvariant=*/true},
-    {IOG_SINGLE_TOKEN,                          &HandshakeAnnotatePropertiesPass::annotateIOGSingleToken,            /*isInvariant=*/true},
-    {IOG_CONSECUTIVE_TOKENS,                    &HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens,      /*isInvariant=*/true},
-    {ENTRY_TOKEN_ORDER,                         &HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder,           /*isInvariant=*/true},
-    {SINGLE_ENTRY_TOKEN,                        &HandshakeAnnotatePropertiesPass::annotateSingleEntryToken,          /*isInvariant=*/true},
-    {EXIT_TOKEN_ORDER,                          &HandshakeAnnotatePropertiesPass::annotateExitTokenOrder,            /*isInvariant=*/true},
+    {FormalProperty::ABSENCE_OF_BACKPRESSURE,                   &HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure,     /*isInvariant=*/false},
+    {FormalProperty::VALID_EQUIVALENCE,                         &HandshakeAnnotatePropertiesPass::annotateValidEquivalence,          /*isInvariant=*/false},
+    {FormalProperty::EAGER_FORK_NOT_ALL_OUTPUT_SENT,            &HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent, /*isInvariant=*/true},
+    {FormalProperty::COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL,     &HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks,     /*isInvariant=*/true},
+    {FormalProperty::EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE, &HandshakeAnnotatePropertiesPass::annotateEagerForkPath,             /*isInvariant=*/true},
+    {FormalProperty::RECONVERGENT_PATH_FLOW,                    &HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow,      /*isInvariant=*/true},
+    {FormalProperty::IOG_SINGLE_TOKEN,                          &HandshakeAnnotatePropertiesPass::annotateIOGSingleToken,            /*isInvariant=*/true},
+    {FormalProperty::IOG_CONSECUTIVE_TOKENS,                    &HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens,      /*isInvariant=*/true},
+    {FormalProperty::ENTRY_TOKEN_ORDER,                         &HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder,           /*isInvariant=*/true},
+    {FormalProperty::SINGLE_ENTRY_TOKEN,                        &HandshakeAnnotatePropertiesPass::annotateSingleEntryToken,          /*isInvariant=*/true},
+    {FormalProperty::EXIT_TOKEN_ORDER,                          &HandshakeAnnotatePropertiesPass::annotateExitTokenOrder,            /*isInvariant=*/true},
 };
 // clang-format on
 
@@ -286,8 +271,8 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(
         PropertyExpr expr =
             BinaryExpr(NaryExpr(NaryExpr::Count, getStates(sents)),
                        BinaryExpr::Lt, Constant::integer(sents.size()));
-        addProperty(EAGER_FORK_NOT_ALL_OUTPUT_SENT, FormalProperty::TAG::INVAR,
-                    expr);
+        addProperty(FormalProperty::EAGER_FORK_NOT_ALL_OUTPUT_SENT,
+                    FormalProperty::TAG::INVAR, expr);
       }
     }
   }
@@ -312,7 +297,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlotsRec(
   auto annotateCopiedSlot = [&](const PropertyExpr &copiedSlot) {
     PropertyExpr anySent =
         disjunction(getStates(originFork.getInternalSentStateNamers()));
-    addProperty(COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL,
+    addProperty(FormalProperty::COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL,
                 FormalProperty::TAG::INVAR, implies(anySent, copiedSlot));
   };
   if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(curOp)) {
@@ -379,7 +364,7 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkPath(ModuleOp modOp) {
         PropertyExpr anySent =
             disjunction(getStates(forkOp.getInternalSentStateNamers()));
         // A fork has a single operand
-        addProperty(EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE,
+        addProperty(FormalProperty::EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE,
                     FormalProperty::TAG::INVAR,
                     implies(anySent, getOperandSignal(Signal::Valid,
                                                       op.getOpOperand(0))));
@@ -448,7 +433,8 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
     }
     if (terms.empty())
       continue;
-    addProperty(RECONVERGENT_PATH_FLOW, FormalProperty::TAG::INVAR,
+    addProperty(FormalProperty::RECONVERGENT_PATH_FLOW,
+                FormalProperty::TAG::INVAR,
                 BinaryExpr(sum(terms), BinaryExpr::Eq, Constant::integer(0)));
   }
   return success();
@@ -520,14 +506,19 @@ HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(ModuleOp modOp) {
       }
       if (auto forkOp = dyn_cast<EagerForkLikeOpInterface>(op)) {
         auto forkSlots = forkOp.getInternalSentStateNamers();
-        // Only read by the assertion
-        [[maybe_unused]] int count = 0;
+#ifndef NDEBUG
+        // Number of outputs of the fork in the IOG
+        int count = 0;
+#endif
         for (auto [i, channel] : llvm::enumerate(forkOp->getResults())) {
           if (iog.contains(channel)) {
             forks.emplace_back(State(forkSlots[i]));
+#ifndef NDEBUG
             count += 1;
+#endif
           }
         }
+        // An IOG contains exactly one output of each of its forks
         assert(count == 1);
       }
     }
@@ -535,7 +526,7 @@ HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(ModuleOp modOp) {
     if (!forks.empty())
       tokens = sum({tokens, NaryExpr(NaryExpr::Count, forks)});
     addProperty(
-        IOG_SINGLE_TOKEN, FormalProperty::TAG::INVAR,
+        FormalProperty::IOG_SINGLE_TOKEN, FormalProperty::TAG::INVAR,
         BinaryExpr(NaryExpr(NaryExpr::Count, slots), BinaryExpr::Eq, tokens));
   }
   return success();
@@ -592,7 +583,8 @@ void HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokensOf(
       };
       PropertyExpr bothOccupied =
           conjunction({isOccupied(slot1->second), isOccupied(slot2->second)});
-      addProperty(IOG_CONSECUTIVE_TOKENS, FormalProperty::TAG::INVAR,
+      addProperty(FormalProperty::IOG_CONSECUTIVE_TOKENS,
+                  FormalProperty::TAG::INVAR,
                   implies(bothOccupied, disjunction(getStates(copiedSents))));
     }
   }
@@ -763,7 +755,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
       implications.push_back(
           implies(State(*start, entryValue), conjunction(laterSlotsEmpty)));
     }
-    addProperty(ENTRY_TOKEN_ORDER, FormalProperty::TAG::INVAR,
+    addProperty(FormalProperty::ENTRY_TOKEN_ORDER, FormalProperty::TAG::INVAR,
                 conjunction(implications));
   }
   return success();
@@ -800,8 +792,8 @@ HandshakeAnnotatePropertiesPass::annotateSingleEntryToken(ModuleOp modOp) {
           PropertyExpr ecEmpty =
               BinaryExpr(NaryExpr(NaryExpr::Count, getStates(ec.slots)),
                          BinaryExpr::Eq, Constant::integer(0));
-          addProperty(SINGLE_ENTRY_TOKEN, FormalProperty::TAG::INVAR,
-                      implies(cmOccupied, ecEmpty));
+          addProperty(FormalProperty::SINGLE_ENTRY_TOKEN,
+                      FormalProperty::TAG::INVAR, implies(cmOccupied, ecEmpty));
         }
       }
     }
@@ -1064,7 +1056,7 @@ HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
             implies(State(*start, exitValue), conjunction(earlierSlotsEmpty)));
         earlierSlotsEmpty.push_back(!State(*start));
       }
-      addProperty(EXIT_TOKEN_ORDER, FormalProperty::TAG::INVAR,
+      addProperty(FormalProperty::EXIT_TOKEN_ORDER, FormalProperty::TAG::INVAR,
                   conjunction(implications));
     }
     // [END Enumerating ExitTokenOrder invariants]
@@ -1114,7 +1106,8 @@ HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
           PropertyExpr ancestorsEmpty =
               BinaryExpr(NaryExpr(NaryExpr::Count, getStates(ancestorPath)),
                          BinaryExpr::Eq, Constant::integer(0));
-          addProperty(EXIT_TOKEN_NO_ANCESTORS, FormalProperty::TAG::INVAR,
+          addProperty(FormalProperty::EXIT_TOKEN_NO_ANCESTORS,
+                      FormalProperty::TAG::INVAR,
                       implies(anyExitToken, ancestorsEmpty));
         }
       }
