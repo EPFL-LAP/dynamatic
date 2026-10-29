@@ -150,6 +150,10 @@ CMAKE_DYNAMATIC_ENABLE_CBC=""
 CMAKE_DYNAMATIC_ENABLE_ABC=""
 CMAKE_LLVM_ENABLE_ASSERTIONS=""
 LLVM_DIR="$PWD/build/llvm-project"
+# Version of the prebuilt LLVM (release tag llvm-$PREBUILT_LLVM_VERSION in
+# ETHZ-DYNAMO/llvm-project), which must match the llvm-project submodule
+PREBUILT_LLVM_VERSION="e974cfe"
+PREBUILT_LLVM_URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-$PREBUILT_LLVM_VERSION"
 
 
 # Loop over command line arguments and update script variables
@@ -255,46 +259,48 @@ if [[ $PREBUILT_LLVM -eq 1 ]]; then
 
 
   if [[ $BUILD_TYPE == "Release" ]]; then
-    URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux.tar.gz"
-    PREBUILT_LLVM_TARBALL=$(realpath "./llvm-project-x86_64.tar.gz")
+    PREBUILT_LLVM_NAME="llvm-$PREBUILT_LLVM_VERSION-x86_64-linux"
+    PREBUILT_LLVM_TARBALL=$(realpath "./$PREBUILT_LLVM_NAME.tar.gz")
     # Download only if the file doesn't exist
     if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
         echo "Downloading $PREBUILT_LLVM_TARBALL..."
-        wget --no-verbose --show-progress -O "$PREBUILT_LLVM_TARBALL" "$URL"
+        wget --no-verbose --show-progress -O "$PREBUILT_LLVM_TARBALL" \
+          "$PREBUILT_LLVM_URL/$PREBUILT_LLVM_NAME.tar.gz"
         exit_on_fail "Failed to download the prebuilt llvm-project (release)!"
     fi
   else
-    PREBUILT_LLVM_TARBALL=$(realpath "./llvm-b06546b-x86_64-linux-Debug.tar.gz")
+    PREBUILT_LLVM_NAME="llvm-$PREBUILT_LLVM_VERSION-x86_64-linux-Debug"
+    PREBUILT_LLVM_TARBALL=$(realpath "./$PREBUILT_LLVM_NAME.tar.gz")
     if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
-      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-aa" \
-        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-aa"
-      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ab" \
-        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ab"
-      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ac" \
-        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ac"
-      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ad" \
-        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ad"
-      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ae" \
-        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ae"
-      cat \
-        "llvm-b06546b-x86_64-linux-Debug.part-aa" \
-        "llvm-b06546b-x86_64-linux-Debug.part-ab" \
-        "llvm-b06546b-x86_64-linux-Debug.part-ac" \
-        "llvm-b06546b-x86_64-linux-Debug.part-ad" \
-        "llvm-b06546b-x86_64-linux-Debug.part-ae" \
-        > $PREBUILT_LLVM_TARBALL
-      exit_on_fail "Failed to download the prebuilt llvm-project (debug)!"
+      # The debug build is split into parts (GitHub limits the size of release
+      # assets)
+      PARTS=()
+      for PART in aa ab ac ad ae af ag ah; do
+        wget --no-verbose --show-progress -O "$PREBUILT_LLVM_NAME.part-$PART" \
+          "$PREBUILT_LLVM_URL/$PREBUILT_LLVM_NAME.part-$PART"
+        exit_on_fail "Failed to download the prebuilt llvm-project (debug)!"
+        PARTS+=("$PREBUILT_LLVM_NAME.part-$PART")
+      done
+      cat "${PARTS[@]}" > "$PREBUILT_LLVM_TARBALL"
+      exit_on_fail "Failed to assemble the prebuilt llvm-project (debug)!"
+      rm -f "${PARTS[@]}"
     fi
   fi
 
-  # untar the file 
-  if [ ! -f "$LLVM_DIR/lib/cmake/llvm/AddLLVM.cmake" ]; then
+  # Untar the file, unless the same prebuilt LLVM was already extracted. A
+  # stamp file records which one was extracted, so that a different version
+  # (e.g., after switching branches) replaces it
+  PREBUILT_LLVM_STAMP="$LLVM_DIR/.prebuilt-llvm"
+  if [ -f "$LLVM_DIR/lib/cmake/llvm/AddLLVM.cmake" ] && \
+     [ "$(cat "$PREBUILT_LLVM_STAMP" 2> /dev/null)" == "$PREBUILT_LLVM_NAME" ]; then
+    echo "Found Prebuilt LLVM ($PREBUILT_LLVM_NAME)! Skipping untaring the llvm-project!"
+  else
+    rm -rf "$LLVM_DIR"
     mkdir -p "$LLVM_DIR"
-    echo "Prebuilt LLVM directory not found. Unzipping the prebuilt llvm-project!"
+    echo "Prebuilt LLVM ($PREBUILT_LLVM_NAME) not found. Unzipping the prebuilt llvm-project!"
     tar -xf "$PREBUILT_LLVM_TARBALL" -C "$LLVM_DIR"
     exit_on_fail "Failed to untar the prebuilt llvm-project!"
-  else
-    echo "Found Prebuilt LLVM! Skipping untaring the llvm-project!"
+    echo "$PREBUILT_LLVM_NAME" > "$PREBUILT_LLVM_STAMP"
   fi
 
 fi
@@ -302,8 +308,8 @@ fi
 #### XLS ####
 
 XLS_DIR="$SCRIPT_CWD/xls"
-XLS_UPSTREAM="https://github.com/ETHZ-DYNAMO/xls.git"
-XLS_COMMIT="939eb43c307005caf4af75ed9b8a0dbc6c905386"
+XLS_UPSTREAM="https://github.com/google/xls.git"
+XLS_COMMIT="25714cebaf6150c30a53914e34fb94306cab373b"
 
 if [[ ENABLE_XLS_INTEGRATION -eq 1 || -d "$XLS_DIR" ]]; then
     echo_section "Preparing XLS"
@@ -497,7 +503,9 @@ if [[ ENABLE_CBC -eq 1 ]]; then
 fi 
 
 # Create symbolic links to clang headers (standard c library for clang)
-create_include_symlink "$LLVM_DIR/lib/clang/18/include"
+# The clang resource directory is named after clang's major version
+CLANG_RESOURCE_INCLUDE_DIR=$(ls -d "$LLVM_DIR"/lib/clang/*/include | head -n 1)
+create_include_symlink "$CLANG_RESOURCE_INCLUDE_DIR"
 
 
 if [[ $GODOT_PATH != "" ]]; then

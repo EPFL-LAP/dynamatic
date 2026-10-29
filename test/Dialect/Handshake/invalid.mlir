@@ -41,7 +41,7 @@ handshake.func @reservedExtraSignalNameControl(%arg0: !handshake.control<[valid:
 // -----
 
 handshake.func @invalidUnbundleControlMissingReady(%ctrl: !handshake.control<>) {
-  // expected-error @below {{custom op 'handshake.unbundle' 1 operands present, but expected 2}}
+  // expected-error @below {{custom op 'handshake.unbundle' number of operands and types do not match: got 1 operands and 2 types}}
   %valid = unbundle %ctrl : <> to _  
   end
 }
@@ -66,7 +66,7 @@ handshake.func @invalidUnbundleChannelNotEnoughResults(%channel: !handshake.chan
 // -----
 
 handshake.func @invalidUnbundleChannelMisingUp(%channel: !handshake.channel<i32, [extraUp: i1 (U), extraDown: i4]>) -> !handshake.control<> {
-  // expected-error @below {{custom op 'handshake.unbundle' 1 operands present, but expected 2}}
+  // expected-error @below {{custom op 'handshake.unbundle' number of operands and types do not match: got 1 operands and 2 types}}
   %ctrl, %data, %extraDown = unbundle %channel : <i32, [extraUp: i1 (U), extraDown: i4]> to _ 
   end %ctrl : !handshake.control<>
 }
@@ -83,7 +83,7 @@ handshake.func @invalidUnbundleChannelBadUp(%channel: !handshake.channel<i32, [e
 // -----
 
 handshake.func @invalidUnbundleChannelExtraUp(%channel: !handshake.channel<i32, [extraUp: i1 (U), extraDown: i4]>, %extraUp: i1, %otherExtraUp: i1) -> !handshake.control<> {
-  // expected-error @below {{custom op 'handshake.unbundle' 3 operands present, but expected 2}}
+  // expected-error @below {{custom op 'handshake.unbundle' number of operands and types do not match: got 3 operands and 2 types}}
   %ctrl, %data, %extraDown = unbundle %channel [%extraUp, %otherExtraUp] : <i32, [extraUp: i1 (U), extraDown: i4]> to _
   end %ctrl : !handshake.control<>
 }

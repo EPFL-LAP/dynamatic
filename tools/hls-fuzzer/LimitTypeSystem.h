@@ -67,6 +67,11 @@ public:
     return statementsLeft(context) < 2;
   }
 
+  static bool discardIfElseStatement(const DepthTypingContext &context) {
+    // The if clause is required to contain at least 1 statement
+    return statementsLeft(context) < 3;
+  }
+
   bool discardBinaryExpression(ast::BinaryExpression::Op,
                                const DepthTypingContext &context) const {
     return context.expressionDepth >= maxExpressionDepth;
@@ -242,6 +247,50 @@ public:
               // The only thing about the body that outlives the loop is how
               // many statements it generated.
               context.totalNumberOfStatements = body.totalNumberOfStatements;
+              return context;
+            }),
+    };
+  }
+
+  TransferFnArray<ast::IfElseStatement>
+  getIfElseStatementTransferFns() override {
+    return {
+        /*condition=*/copyFromInput<ast::IfElseStatement>(),
+        /*if-clause=*/
+        TransferFn<ast::IfElseStatement, INPUT_DEPENDENCY>(
+            [this](DepthTypingContext context) {
+              // The if itself, like any statement, counts against the
+              // statement budget.
+              ++context.totalNumberOfStatements;
+              // Give the if-clause some budget for the number of
+              // statements it should generate.
+              context.statementBudget = drawNestedBudget(context);
+              return context;
+            }),
+        /*else-clause=*/
+        TransferFn<ast::IfElseStatement, INPUT_DEPENDENCY,
+                   ast::IfElseStatement::IF>(
+            [this](DepthTypingContext context,
+                   const DepthTypingContext &ifClause,
+                   const ast::StatementList &) {
+              // Give the else-clause some budget for the number of
+              // statements it should generate.
+              // TODO: currently else branch has at least one statement, make 0
+              // possible
+              context.totalNumberOfStatements =
+                  ifClause.totalNumberOfStatements;
+              context.statementBudget = drawNestedBudget(context);
+              return context;
+            }),
+        /*output=*/
+        OutputTransferFn<ast::IfElseStatement, INPUT_DEPENDENCY,
+                         ast::IfElseStatement::ELSE>(
+            [](const ast::IfElseStatement &, DepthTypingContext context,
+               const DepthTypingContext &elseClause) {
+              // The only thing about the clauses that outlives the if statement
+              // is how many statements they generated.
+              context.totalNumberOfStatements =
+                  elseClause.totalNumberOfStatements;
               return context;
             }),
     };

@@ -22,22 +22,11 @@ enum ID {
 
 using namespace llvm::opt;
 
-#define PREFIX(NAME, VALUE)                                                    \
-  static constexpr llvm::StringLiteral NAME##_init[] = VALUE;                  \
-  static constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                   \
-      NAME##_init, std::size(NAME##_init) - 1);
+#define OPTTABLE_CODE
 #include "Opts.inc"
-#undef PREFIX
-
-static constexpr OptTable::Info InfoTable[] = {
-#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
-#include "Opts.inc"
-
-#undef OPTION
-};
 
 dynamatic::OptionsParser::OptionsParser(llvm::ArrayRef<char *> args)
-    : GenericOptTable(InfoTable), stringSaver(allocator),
+    : OptTable(optionTables()), stringSaver(allocator),
       args(parseArgs(
           args.size(), args.data(), OPT_UNKNOWN, stringSaver,
           [](llvm::StringRef error) { llvm::report_fatal_error(error); })) {}
