@@ -44,7 +44,7 @@ MODULE {name}(ins_valid, outs_ready)
   {"\n  ".join([f"VAR v{n} : boolean;" for n in range(no_one_slot_break_dv_latency)])}
 
   ASSIGN init(v0) := FALSE;
-  ASSIGN next(v0) := ins_valid;
+  ASSIGN next(v0) := inner_one_slot_break_dv.ins_ready ? ins_valid : v0;
 
   {"\n  ".join([f"""ASSIGN init(v{n + 1}) := FALSE;
   ASSIGN next(v{n + 1}) := inner_one_slot_break_dv.ins_ready ? v{n} : v{n + 1};
