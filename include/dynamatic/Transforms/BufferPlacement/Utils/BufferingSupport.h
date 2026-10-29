@@ -35,6 +35,9 @@ struct FuncInfo {
   /// Maps CFDFCs of the function to a boolean indicating whether they each
   /// should be optimized.
   llvm::MapVector<CFDFC *, bool> cfdfcs;
+  /// CFDFCs that keep their throughput constraints but must not contribute to
+  /// the MILP's throughput objective. Empty unless requested.
+  SmallPtrSet<CFDFC *, 4> excludedFromObjective;
 
   /// Argument-less constructor so that we can use the struct as a value type
   /// for maps.

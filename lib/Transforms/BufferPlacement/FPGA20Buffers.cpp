@@ -203,8 +203,14 @@ void FPGA20Buffers::setup() {
     addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
   }
-
+  // CFDFCs excluded by the pass keep their constraints but do not contribute
+  // to the throughput objective
   // Add the MILP objective and mark the MILP ready to be optimized
-  addMaxThroughputObjective(allChannels, cfdfcs);
+  SmallVector<CFDFC *> objectiveCFDFCs;
+  llvm::copy_if(cfdfcs, std::back_inserter(objectiveCFDFCs), [&](CFDFC *cf) {
+    return !funcInfo.excludedFromObjective.contains(cf);
+  });
+  addMaxThroughputObjective(allChannels, objectiveCFDFCs);
+  // addMaxThroughputObjective(allChannels, cfdfcs);
   markReadyToOptimize();
 }

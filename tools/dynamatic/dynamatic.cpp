@@ -311,6 +311,9 @@ public:
       "calculate-path-delays";
   static constexpr llvm::StringLiteral INSTRUMENT_II = "instrument-ii";
   static constexpr llvm::StringLiteral LSQ_SIZING = "lsq-sizing";
+  static constexpr llvm::StringLiteral ONLY_INNERMOST_CFDFCS = 
+      "only-innermost-cfdfcs";
+
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -361,6 +364,11 @@ public:
              "Size the load and store queues of the LSQs from the CFDFCs "
              "found by buffer placement (requires an MILP-based buffer "
              "placement algorithm); otherwise LSQs use the default depth"});
+    addFlag({ONLY_INNERMOST_CFDFCS,
+            "Leave CFDFCs whose block cycle strictly contains another "
+            "CFDFC's (e.g., outer loops) out of the buffer placement MILP's "
+            "throughput objective (FPGA20 and FPL22 only)"});
+
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -809,6 +817,9 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
   std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
   std::string lsqSizing = args.flags.contains(LSQ_SIZING) ? "1" : "0";
+  std::string onlyInnermostCFDFCs =
+      args.flags.contains(ONLY_INNERMOST_CFDFCS) ? "1" : "0";
+
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
@@ -816,7 +827,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
                  fastTokenDelivery, milpSolver, straightToQueue, speculation,
                  enableShortCircuit, enableDuplication, calculatePathDelays,
-                 instrumentII, lsqSizing);
+                 instrumentII, lsqSizing, onlyInnermostCFDFCs);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

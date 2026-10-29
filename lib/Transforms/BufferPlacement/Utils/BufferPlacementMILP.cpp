@@ -1411,7 +1411,7 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
   }
 
   // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
-  // coefficient to any positive value
+  // coefficient to any positive value§
   if (maxCoefCFDFC == 0.0)
     maxCoefCFDFC = 1.0;
 

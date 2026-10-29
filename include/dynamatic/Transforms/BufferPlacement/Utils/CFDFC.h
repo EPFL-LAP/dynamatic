@@ -73,6 +73,9 @@ struct CFDFC {
   /// edge in this CFDFC's CFG cycle.
   bool isCFGCompliant(unsigned srcBB, unsigned dstBB) const;
 
+  /// Returns whether this CFDFC is an outer loop of `other`
+  bool strictlyContains(const CFDFC &other) const;
+
   // Determines whether the channel is a "CFDFC backedge" i.e., the first
   // channel along a sequence of backedges from a source block to a destination
   // block. The distinction is important for the buffer placement MILP, which

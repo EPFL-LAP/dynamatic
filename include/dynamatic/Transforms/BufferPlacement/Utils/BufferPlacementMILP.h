@@ -219,6 +219,9 @@ protected:
   FuncInfo &funcInfo;
   /// Whether the circuit was produced using fast token delivery.
   bool ftd;
+  /// Whether the optimizer should ignore CFDFC's that contain 
+  /// other CFDFC's in the original CFG
+  bool onlyInnermostCFDFCs;
   /// After construction, maps all channels (i.e, values) defined in the
   /// function to their specific channel buffering properties (unconstraining
   /// properties if none were explicitly specified).

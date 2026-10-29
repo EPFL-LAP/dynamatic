@@ -1,0 +1,3176 @@
+Reading pref.tcl
+
+# 10.7b_1
+
+# do simulation_vsim.do
+# QuestaSim-64 vmap 10.7b_1 Lib Mapping Utility 2018.07 Jul 26 2018
+# vmap work work 
+# Modifying modelsim.ini
+# Loading project simulation
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:36 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_addi_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_0_join_and_n
+# -- Compiling architecture arch of handshake_addi_0_join_and_n
+# -- Compiling entity handshake_addi_0_join
+# -- Compiling architecture arch of handshake_addi_0_join
+# -- Loading entity handshake_addi_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_addi_0
+# -- Compiling architecture arch of handshake_addi_0
+# -- Loading entity handshake_addi_0_join
+# End time: 14:04:36 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_addi_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:36 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_addi_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_1_join_and_n
+# -- Compiling architecture arch of handshake_addi_1_join_and_n
+# -- Compiling entity handshake_addi_1_join
+# -- Compiling architecture arch of handshake_addi_1_join
+# -- Loading entity handshake_addi_1_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_addi_1
+# -- Compiling architecture arch of handshake_addi_1
+# -- Loading entity handshake_addi_1_join
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of handshake_addi_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_addi_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_2_join_and_n
+# -- Compiling architecture arch of handshake_addi_2_join_and_n
+# -- Compiling entity handshake_addi_2_join
+# -- Compiling architecture arch of handshake_addi_2_join
+# -- Loading entity handshake_addi_2_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_addi_2
+# -- Compiling architecture arch of handshake_addi_2
+# -- Loading entity handshake_addi_2_join
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_addi_2.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_0_dataless
+# -- Compiling architecture arch of handshake_buffer_0_dataless
+# -- Compiling entity handshake_buffer_0
+# -- Compiling architecture arch of handshake_buffer_0
+# -- Loading entity handshake_buffer_0_dataless
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_10.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_10_fifo
+# -- Compiling architecture arch of handshake_buffer_10_fifo
+# -- Compiling entity handshake_buffer_10
+# -- Compiling architecture arch of handshake_buffer_10
+# -- Loading entity handshake_buffer_10_fifo
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_10.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_11.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_11
+# -- Compiling architecture arch of handshake_buffer_11
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_11.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_12.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_12_fifo_inner
+# -- Compiling architecture arch of handshake_buffer_12_fifo_inner
+# -- Compiling entity handshake_buffer_12_fifo
+# -- Compiling architecture arch of handshake_buffer_12_fifo
+# -- Loading entity handshake_buffer_12_fifo_inner
+# -- Compiling entity handshake_buffer_12
+# -- Compiling architecture arch of handshake_buffer_12
+# -- Loading entity handshake_buffer_12_fifo
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_12.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_13.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_13_fifo
+# -- Compiling architecture arch of handshake_buffer_13_fifo
+# -- Compiling entity handshake_buffer_13
+# -- Compiling architecture arch of handshake_buffer_13
+# -- Loading entity handshake_buffer_13_fifo
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_13.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_14.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_14_inner
+# -- Compiling architecture arch of handshake_buffer_14_inner
+# -- Compiling entity handshake_buffer_14
+# -- Compiling architecture arch of handshake_buffer_14
+# -- Loading entity handshake_buffer_14_inner
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_14.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_1_inner
+# -- Compiling architecture arch of handshake_buffer_1_inner
+# -- Compiling entity handshake_buffer_1
+# -- Compiling architecture arch of handshake_buffer_1
+# -- Loading entity handshake_buffer_1_inner
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_2_fifo_inner
+# -- Compiling architecture arch of handshake_buffer_2_fifo_inner
+# -- Compiling entity handshake_buffer_2_fifo
+# -- Compiling architecture arch of handshake_buffer_2_fifo
+# -- Loading entity handshake_buffer_2_fifo_inner
+# -- Compiling entity handshake_buffer_2
+# -- Compiling architecture arch of handshake_buffer_2
+# -- Loading entity handshake_buffer_2_fifo
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_2.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_3_fifo
+# -- Compiling architecture arch of handshake_buffer_3_fifo
+# -- Compiling entity handshake_buffer_3
+# -- Compiling architecture arch of handshake_buffer_3
+# -- Loading entity handshake_buffer_3_fifo
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_3.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_4_inner
+# -- Compiling architecture arch of handshake_buffer_4_inner
+# -- Compiling entity handshake_buffer_4
+# -- Compiling architecture arch of handshake_buffer_4
+# -- Loading entity handshake_buffer_4_inner
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_4.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_5_fifo_inner
+# -- Compiling architecture arch of handshake_buffer_5_fifo_inner
+# -- Compiling entity handshake_buffer_5_fifo
+# -- Compiling architecture arch of handshake_buffer_5_fifo
+# -- Loading entity handshake_buffer_5_fifo_inner
+# -- Compiling entity handshake_buffer_5
+# -- Compiling architecture arch of handshake_buffer_5
+# -- Loading entity handshake_buffer_5_fifo
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_5.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_6.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_6_inner
+# -- Compiling architecture arch of handshake_buffer_6_inner
+# -- Compiling entity handshake_buffer_6
+# -- Compiling architecture arch of handshake_buffer_6
+# -- Loading entity handshake_buffer_6_inner
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_6.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_7.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_7_fifo
+# -- Compiling architecture arch of handshake_buffer_7_fifo
+# -- Compiling entity handshake_buffer_7
+# -- Compiling architecture arch of handshake_buffer_7
+# -- Loading entity handshake_buffer_7_fifo
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_7.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_8.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_8_dataless
+# -- Compiling architecture arch of handshake_buffer_8_dataless
+# -- Compiling entity handshake_buffer_8
+# -- Compiling architecture arch of handshake_buffer_8
+# -- Loading entity handshake_buffer_8_dataless
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_8.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_9.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_9_inner
+# -- Compiling architecture arch of handshake_buffer_9_inner
+# -- Compiling entity handshake_buffer_9
+# -- Compiling architecture arch of handshake_buffer_9
+# -- Loading entity handshake_buffer_9_inner
+# End time: 14:04:37 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_buffer_9.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:37 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_cmpi_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cmpi_0_join_and_n
+# -- Compiling architecture arch of handshake_cmpi_0_join_and_n
+# -- Compiling entity handshake_cmpi_0_join
+# -- Compiling architecture arch of handshake_cmpi_0_join
+# -- Loading entity handshake_cmpi_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# -- Loading entity handshake_cmpi_0_join
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of handshake_cmpi_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_cond_br_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cond_br_0_inner_join_and_n
+# -- Compiling architecture arch of handshake_cond_br_0_inner_join_and_n
+# -- Compiling entity handshake_cond_br_0_inner_join
+# -- Compiling architecture arch of handshake_cond_br_0_inner_join
+# -- Loading entity handshake_cond_br_0_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cond_br_0_inner
+# -- Compiling architecture arch of handshake_cond_br_0_inner
+# -- Loading entity handshake_cond_br_0_inner_join
+# -- Compiling entity handshake_cond_br_0
+# -- Compiling architecture arch of handshake_cond_br_0
+# -- Loading entity handshake_cond_br_0_inner
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cond_br_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_cond_br_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cond_br_1_inner_join_and_n
+# -- Compiling architecture arch of handshake_cond_br_1_inner_join_and_n
+# -- Compiling entity handshake_cond_br_1_inner_join
+# -- Compiling architecture arch of handshake_cond_br_1_inner_join
+# -- Loading entity handshake_cond_br_1_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cond_br_1_inner
+# -- Compiling architecture arch of handshake_cond_br_1_inner
+# -- Loading entity handshake_cond_br_1_inner_join
+# -- Compiling entity handshake_cond_br_1
+# -- Compiling architecture arch of handshake_cond_br_1
+# -- Loading entity handshake_cond_br_1_inner
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cond_br_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_cond_br_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cond_br_2_join_and_n
+# -- Compiling architecture arch of handshake_cond_br_2_join_and_n
+# -- Compiling entity handshake_cond_br_2_join
+# -- Compiling architecture arch of handshake_cond_br_2_join
+# -- Loading entity handshake_cond_br_2_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cond_br_2
+# -- Compiling architecture arch of handshake_cond_br_2
+# -- Loading entity handshake_cond_br_2_join
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_cond_br_2.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_0
+# -- Compiling architecture arch of handshake_constant_0
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_1
+# -- Compiling architecture arch of handshake_constant_1
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_2
+# -- Compiling architecture arch of handshake_constant_2
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_2.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_3
+# -- Compiling architecture arch of handshake_constant_3
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_3.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_4
+# -- Compiling architecture arch of handshake_constant_4
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_4.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_5
+# -- Compiling architecture arch of handshake_constant_5
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_5.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_6.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_6
+# -- Compiling architecture arch of handshake_constant_6
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_constant_6.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_control_merge_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_control_merge_0_merge
+# -- Compiling architecture arch of handshake_control_merge_0_merge
+# -- Compiling entity handshake_control_merge_0_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_control_merge_0_one_slot_break_r_dataless
+# -- Compiling entity handshake_control_merge_0_one_slot_break_r
+# -- Compiling architecture arch of handshake_control_merge_0_one_slot_break_r
+# -- Loading entity handshake_control_merge_0_one_slot_break_r_dataless
+# -- Compiling entity handshake_control_merge_0_fork_or_n
+# -- Compiling architecture arch of handshake_control_merge_0_fork_or_n
+# -- Compiling entity handshake_control_merge_0_fork_regblock
+# -- Compiling architecture arch of handshake_control_merge_0_fork_regblock
+# -- Compiling entity handshake_control_merge_0_fork
+# -- Compiling architecture arch of handshake_control_merge_0_fork
+# -- Loading entity handshake_control_merge_0_fork_or_n
+# -- Loading entity handshake_control_merge_0_fork_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_control_merge_0.vhd(258): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_control_merge_0.vhd(258): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_control_merge_0.vhd(261): VHDL Compiler exiting
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_extui_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_extui_0
+# -- Compiling architecture arch of handshake_extui_0
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extui_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_extui_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_extui_1
+# -- Compiling architecture arch of handshake_extui_1
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extui_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_extui_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_extui_2
+# -- Compiling architecture arch of handshake_extui_2
+# End time: 14:04:38 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extui_2.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:38 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_extui_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_extui_3
+# -- Compiling architecture arch of handshake_extui_3
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+# Compile of handshake_extui_3.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_extui_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_extui_4
+# -- Compiling architecture arch of handshake_extui_4
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_extui_4.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_0_or_n
+# -- Compiling architecture arch of handshake_fork_0_or_n
+# -- Compiling entity handshake_fork_0_regblock
+# -- Compiling architecture arch of handshake_fork_0_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_0
+# -- Compiling architecture arch of handshake_fork_0
+# -- Loading entity handshake_fork_0_or_n
+# -- Loading entity handshake_fork_0_regblock
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_10.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_10_inner_or_n
+# -- Compiling architecture arch of handshake_fork_10_inner_or_n
+# -- Compiling entity handshake_fork_10_inner_regblock
+# -- Compiling architecture arch of handshake_fork_10_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_10_inner
+# -- Compiling architecture arch of handshake_fork_10_inner
+# -- Loading entity handshake_fork_10_inner_or_n
+# -- Loading entity handshake_fork_10_inner_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_10.vhd(115): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_10.vhd(115): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_10.vhd(118): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_1_inner_or_n
+# -- Compiling architecture arch of handshake_fork_1_inner_or_n
+# -- Compiling entity handshake_fork_1_inner_regblock
+# -- Compiling architecture arch of handshake_fork_1_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_1_inner
+# -- Compiling architecture arch of handshake_fork_1_inner
+# -- Loading entity handshake_fork_1_inner_or_n
+# -- Loading entity handshake_fork_1_inner_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_1.vhd(115): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_1.vhd(115): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_1.vhd(118): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_2_or_n
+# -- Compiling architecture arch of handshake_fork_2_or_n
+# -- Compiling entity handshake_fork_2_regblock
+# -- Compiling architecture arch of handshake_fork_2_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_2
+# -- Compiling architecture arch of handshake_fork_2
+# -- Loading entity handshake_fork_2_or_n
+# -- Loading entity handshake_fork_2_regblock
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_2.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_3_inner_or_n
+# -- Compiling architecture arch of handshake_fork_3_inner_or_n
+# -- Compiling entity handshake_fork_3_inner_regblock
+# -- Compiling architecture arch of handshake_fork_3_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_3_inner
+# -- Compiling architecture arch of handshake_fork_3_inner
+# -- Loading entity handshake_fork_3_inner_or_n
+# -- Loading entity handshake_fork_3_inner_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_3.vhd(115): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_3.vhd(115): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_3.vhd(118): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_4_inner_or_n
+# -- Compiling architecture arch of handshake_fork_4_inner_or_n
+# -- Compiling entity handshake_fork_4_inner_regblock
+# -- Compiling architecture arch of handshake_fork_4_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_4_inner
+# -- Compiling architecture arch of handshake_fork_4_inner
+# -- Loading entity handshake_fork_4_inner_or_n
+# -- Loading entity handshake_fork_4_inner_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_4.vhd(115): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_4.vhd(115): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_4.vhd(118): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_5_inner_or_n
+# -- Compiling architecture arch of handshake_fork_5_inner_or_n
+# -- Compiling entity handshake_fork_5_inner_regblock
+# -- Compiling architecture arch of handshake_fork_5_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_5_inner
+# -- Compiling architecture arch of handshake_fork_5_inner
+# -- Loading entity handshake_fork_5_inner_or_n
+# -- Loading entity handshake_fork_5_inner_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_5.vhd(115): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_5.vhd(115): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_5.vhd(118): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_6.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_6_inner_or_n
+# -- Compiling architecture arch of handshake_fork_6_inner_or_n
+# -- Compiling entity handshake_fork_6_inner_regblock
+# -- Compiling architecture arch of handshake_fork_6_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_6_inner
+# -- Compiling architecture arch of handshake_fork_6_inner
+# -- Loading entity handshake_fork_6_inner_or_n
+# -- Loading entity handshake_fork_6_inner_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_6.vhd(115): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_6.vhd(115): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_6.vhd(118): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_7.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_7_inner_or_n
+# -- Compiling architecture arch of handshake_fork_7_inner_or_n
+# -- Compiling entity handshake_fork_7_inner_regblock
+# -- Compiling architecture arch of handshake_fork_7_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_7_inner
+# -- Compiling architecture arch of handshake_fork_7_inner
+# -- Loading entity handshake_fork_7_inner_or_n
+# -- Loading entity handshake_fork_7_inner_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_7.vhd(115): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_7.vhd(115): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_7.vhd(118): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_8.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_8_inner_or_n
+# -- Compiling architecture arch of handshake_fork_8_inner_or_n
+# -- Compiling entity handshake_fork_8_inner_regblock
+# -- Compiling architecture arch of handshake_fork_8_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_8_inner
+# -- Compiling architecture arch of handshake_fork_8_inner
+# -- Loading entity handshake_fork_8_inner_or_n
+# -- Loading entity handshake_fork_8_inner_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_8.vhd(115): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_8.vhd(115): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_8.vhd(118): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_9.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_9_inner_or_n
+# -- Compiling architecture arch of handshake_fork_9_inner_or_n
+# -- Compiling entity handshake_fork_9_inner_regblock
+# -- Compiling architecture arch of handshake_fork_9_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_9_inner
+# -- Compiling architecture arch of handshake_fork_9_inner
+# -- Loading entity handshake_fork_9_inner_or_n
+# -- Loading entity handshake_fork_9_inner_regblock
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_9.vhd(115): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_9.vhd(115): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_9.vhd(118): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_load_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_load_0_addr_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_load_0_addr_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_0_addr_one_slot_break_r
+# -- Compiling architecture arch of handshake_load_0_addr_one_slot_break_r
+# -- Loading entity handshake_load_0_addr_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_0_data_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_load_0_data_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_0_data_one_slot_break_r
+# -- Compiling architecture arch of handshake_load_0_data_one_slot_break_r
+# -- Loading entity handshake_load_0_data_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_0
+# -- Compiling architecture arch of handshake_load_0
+# -- Loading entity handshake_load_0_addr_one_slot_break_r
+# -- Loading entity handshake_load_0_data_one_slot_break_r
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_load_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_load_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_load_1_addr_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_load_1_addr_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_1_addr_one_slot_break_r
+# -- Compiling architecture arch of handshake_load_1_addr_one_slot_break_r
+# -- Loading entity handshake_load_1_addr_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_1_data_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_load_1_data_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_1_data_one_slot_break_r
+# -- Compiling architecture arch of handshake_load_1_data_one_slot_break_r
+# -- Loading entity handshake_load_1_data_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_1
+# -- Compiling architecture arch of handshake_load_1
+# -- Loading entity handshake_load_1_addr_one_slot_break_r
+# -- Loading entity handshake_load_1_data_one_slot_break_r
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_load_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_0_control
+# -- Compiling architecture arch of handshake_mem_controller_0_control
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_priority
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_0.vhd(122): (vcom-1246) Range 1 to 0 is null.
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_0.vhd(132): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_0.vhd(132): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_0.vhd(135): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 1
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_1_control
+# -- Compiling architecture arch of handshake_mem_controller_1_control
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_priority
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(118): (vcom-1246) Range 1 to 0 is null.
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(128): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(128): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(131): VHDL Compiler exiting
+# End time: 14:04:39 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 1
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:39 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_2_control
+# -- Compiling architecture arch of handshake_mem_controller_2_control
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_priority
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_2.vhd(118): (vcom-1246) Range 1 to 0 is null.
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_2.vhd(128): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_2.vhd(128): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_2.vhd(131): VHDL Compiler exiting
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:01
+# Errors: 3, Warnings: 1
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_muli_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_muli_0_join_and_n
+# -- Compiling architecture arch of handshake_muli_0_join_and_n
+# -- Compiling entity handshake_muli_0_join
+# -- Compiling architecture arch of handshake_muli_0_join
+# -- Loading entity handshake_muli_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_muli_0_valid_buffer
+# -- Compiling architecture arch of handshake_muli_0_valid_buffer
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_muli_0
+# -- Compiling architecture arch of handshake_muli_0
+# -- Loading entity handshake_muli_0_join
+# -- Loading entity handshake_muli_0_valid_buffer
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_muli_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mux_0_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_mux_0_one_slot_break_r_dataless
+# -- Compiling entity handshake_mux_0_one_slot_break_r
+# -- Compiling architecture arch of handshake_mux_0_one_slot_break_r
+# -- Loading entity handshake_mux_0_one_slot_break_r_dataless
+# -- Loading package MATH_REAL
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_0.vhd(108): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_0.vhd(108): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_0.vhd(111): VHDL Compiler exiting
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mux_1_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_mux_1_one_slot_break_r_dataless
+# -- Compiling entity handshake_mux_1_one_slot_break_r
+# -- Compiling architecture arch of handshake_mux_1_one_slot_break_r
+# -- Loading entity handshake_mux_1_one_slot_break_r_dataless
+# -- Loading package MATH_REAL
+# ** Error: (vcom-11) Could not find work.types.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_1.vhd(108): (vcom-1195) Cannot find expanded name "work.types".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_1.vhd(108): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_1.vhd(111): VHDL Compiler exiting
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_shli_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_shli_0_join_and_n
+# -- Compiling architecture arch of handshake_shli_0_join_and_n
+# -- Compiling entity handshake_shli_0_join
+# -- Compiling architecture arch of handshake_shli_0_join
+# -- Loading entity handshake_shli_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_shli_0
+# -- Compiling architecture arch of handshake_shli_0
+# -- Loading entity handshake_shli_0_join
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_shli_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_sink_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_sink_0
+# -- Compiling architecture arch of handshake_sink_0
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_sink_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_sink_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_sink_1
+# -- Compiling architecture arch of handshake_sink_1
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_sink_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_source_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_source_0
+# -- Compiling architecture arch of handshake_source_0
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_source_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_store_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_store_0
+# -- Compiling architecture arch of handshake_store_0
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_store_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_trunci_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_trunci_0
+# -- Compiling architecture arch of handshake_trunci_0
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_trunci_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_trunci_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_trunci_1
+# -- Compiling architecture arch of handshake_trunci_1
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_trunci_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matvec
+# -- Compiling architecture behavioral of matvec
+# -- Loading entity handshake_fork_0
+# ** Error: (vcom-11) Could not find work.handshake_mem_controller_0.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(512): (vcom-1195) Cannot find expanded name "work.handshake_mem_controller_0".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(512): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_mem_controller_1.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(539): (vcom-1195) Cannot find expanded name "work.handshake_mem_controller_1".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(539): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_mem_controller_2.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(563): (vcom-1195) Cannot find expanded name "work.handshake_mem_controller_2".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(563): Unknown expanded name.
+# -- Loading entity handshake_constant_0
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Loading entity handshake_extui_0
+# ** Error: (vcom-11) Could not find work.handshake_mux_0.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(610): (vcom-1195) Cannot find expanded name "work.handshake_mux_0".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(610): Unknown expanded name.
+# -- Loading entity handshake_buffer_0
+# ** Error: (vcom-11) Could not find work.handshake_fork_1.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(640): (vcom-1195) Cannot find expanded name "work.handshake_fork_1".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(640): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_control_merge_0.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(655): (vcom-1195) Cannot find expanded name "work.handshake_control_merge_0".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(655): Unknown expanded name.
+# -- Loading entity handshake_fork_2
+# ** Error: (vcom-11) Could not find work.handshake_fork_3.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(693): (vcom-1195) Cannot find expanded name "work.handshake_fork_3".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(693): Unknown expanded name.
+# -- Loading entity handshake_extui_1
+# ** Error: (vcom-11) Could not find work.handshake_mux_0.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(732): (vcom-1195) Cannot find expanded name "work.handshake_mux_0".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(732): Unknown expanded name.
+# -- Loading entity handshake_buffer_1
+# ** Error: (vcom-11) Could not find work.handshake_fork_4.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(774): (vcom-1195) Cannot find expanded name "work.handshake_fork_4".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(774): Unknown expanded name.
+# -- Loading entity handshake_buffer_2
+# -- Loading entity handshake_extui_2
+# -- Loading entity handshake_extui_3
+# -- Loading entity handshake_constant_1
+# -- Loading entity handshake_buffer_3
+# ** Error: (vcom-11) Could not find work.handshake_mux_1.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(851): (vcom-1195) Cannot find expanded name "work.handshake_mux_1".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(851): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_mux_0.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(869): (vcom-1195) Cannot find expanded name "work.handshake_mux_0".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(869): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_mux_0.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(887): (vcom-1195) Cannot find expanded name "work.handshake_mux_0".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(887): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_1.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(929): (vcom-1195) Cannot find expanded name "work.handshake_fork_1".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(929): Unknown expanded name.
+# -- Loading entity handshake_extui_4
+# ** Error: (vcom-11) Could not find work.handshake_fork_5.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(956): (vcom-1195) Cannot find expanded name "work.handshake_fork_5".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(956): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_control_merge_0.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(974): (vcom-1195) Cannot find expanded name "work.handshake_control_merge_0".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(974): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_6.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(989): (vcom-1195) Cannot find expanded name "work.handshake_fork_6".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(989): Unknown expanded name.
+# -- Loading entity handshake_source_0
+# -- Loading entity handshake_constant_2
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_load_0
+# -- Loading entity handshake_shli_0
+# -- Loading entity handshake_trunci_0
+# -- Loading entity handshake_addi_0
+# -- Loading entity handshake_buffer_4
+# -- Loading entity handshake_load_1
+# -- Loading entity handshake_buffer_5
+# -- Loading entity handshake_muli_0
+# -- Loading entity handshake_buffer_6
+# -- Loading entity handshake_buffer_7
+# -- Loading entity handshake_buffer_8
+# -- Loading entity handshake_addi_1
+# -- Loading entity handshake_addi_2
+# ** Error: (vcom-11) Could not find work.handshake_fork_7.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1350): (vcom-1195) Cannot find expanded name "work.handshake_fork_7".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1350): Unknown expanded name.
+# -- Loading entity handshake_trunci_1
+# -- Loading entity handshake_constant_5
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity handshake_buffer_9
+# ** Error: (vcom-11) Could not find work.handshake_fork_8.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1415): (vcom-1195) Cannot find expanded name "work.handshake_fork_8".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1415): Unknown expanded name.
+# -- Loading entity handshake_cond_br_0
+# -- Loading entity handshake_sink_0
+# -- Loading entity handshake_buffer_10
+# -- Loading entity handshake_cond_br_1
+# -- Loading entity handshake_buffer_11
+# -- Loading entity handshake_buffer_12
+# -- Loading entity handshake_cond_br_2
+# ** Error: (vcom-11) Could not find work.handshake_fork_1.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1626): (vcom-1195) Cannot find expanded name "work.handshake_fork_1".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1626): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_9.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1664): (vcom-1195) Cannot find expanded name "work.handshake_fork_9".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1664): Unknown expanded name.
+# -- Loading entity handshake_constant_6
+# -- Loading entity handshake_buffer_13
+# -- Loading entity handshake_store_0
+# -- Loading entity handshake_buffer_14
+# ** Error: (vcom-11) Could not find work.handshake_fork_7.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1775): (vcom-1195) Cannot find expanded name "work.handshake_fork_7".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1775): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.handshake_fork_10.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1828): (vcom-1195) Cannot find expanded name "work.handshake_fork_10".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1828): Unknown expanded name.
+# -- Loading entity handshake_sink_1
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd(1953): VHDL Compiler exiting
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 66, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec_wrapper.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matvec_wrapper
+# -- Compiling architecture behavioral of matvec_wrapper
+# ** Error: (vcom-11) Could not find work.mem_to_bram_32_14.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec_wrapper.vhd(155): (vcom-1195) Cannot find expanded name "work.mem_to_bram_32_14".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec_wrapper.vhd(155): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_to_bram_32_7.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec_wrapper.vhd(175): (vcom-1195) Cannot find expanded name "work.mem_to_bram_32_7".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec_wrapper.vhd(175): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.mem_to_bram_32_7.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec_wrapper.vhd(195): (vcom-1195) Cannot find expanded name "work.mem_to_bram_32_7".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec_wrapper.vhd(195): Unknown expanded name.
+# -- Loading entity matvec
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec_wrapper.vhd(258): VHDL Compiler exiting
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 9, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:40 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/mem_to_bram_32_14.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram_32_14
+# -- Compiling architecture arch of mem_to_bram_32_14
+# End time: 14:04:40 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_to_bram_32_14.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/mem_to_bram_32_7.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram_32_7
+# -- Compiling architecture arch of mem_to_bram_32_7
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of mem_to_bram_32_7.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/types.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling package types
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of types.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tb_join.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/two_port_RAM.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/two_port_RAM.vhd(8): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/two_port_RAM.vhd(11): VHDL Compiler exiting
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/single_argument.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/single_argument.vhd(8): Unknown expanded name.
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/single_argument.vhd(11): VHDL Compiler exiting
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/simpackage.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of simpackage.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(92): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity matvec
+# ** Error: (vcom-11) Could not find work.two_port_ram.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(138): (vcom-1195) Cannot find expanded name "work.two_port_RAM".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(138): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.two_port_ram.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(162): (vcom-1195) Cannot find expanded name "work.two_port_RAM".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(162): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.two_port_ram.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(186): (vcom-1195) Cannot find expanded name "work.two_port_RAM".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(186): Unknown expanded name.
+# ** Error: (vcom-11) Could not find work.single_argument.
+# ** Error (suppressible): /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(210): (vcom-1195) Cannot find expanded name "work.single_argument".
+# ** Error: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(210): Unknown expanded name.
+# -- Loading entity tb_join
+# ** Note: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(473): VHDL Compiler exiting
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 12, Warnings: 1
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_control_merge_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_control_merge_0_merge
+# -- Compiling architecture arch of handshake_control_merge_0_merge
+# -- Compiling entity handshake_control_merge_0_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_control_merge_0_one_slot_break_r_dataless
+# -- Compiling entity handshake_control_merge_0_one_slot_break_r
+# -- Compiling architecture arch of handshake_control_merge_0_one_slot_break_r
+# -- Loading entity handshake_control_merge_0_one_slot_break_r_dataless
+# -- Compiling entity handshake_control_merge_0_fork_or_n
+# -- Compiling architecture arch of handshake_control_merge_0_fork_or_n
+# -- Compiling entity handshake_control_merge_0_fork_regblock
+# -- Compiling architecture arch of handshake_control_merge_0_fork_regblock
+# -- Compiling entity handshake_control_merge_0_fork
+# -- Compiling architecture arch of handshake_control_merge_0_fork
+# -- Loading entity handshake_control_merge_0_fork_or_n
+# -- Loading entity handshake_control_merge_0_fork_regblock
+# -- Loading package types
+# -- Compiling entity handshake_control_merge_0
+# -- Compiling architecture arch of handshake_control_merge_0
+# -- Loading entity handshake_control_merge_0_merge
+# -- Loading entity handshake_control_merge_0_one_slot_break_r
+# -- Loading entity handshake_control_merge_0_fork
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_control_merge_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_10.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_10_inner_or_n
+# -- Compiling architecture arch of handshake_fork_10_inner_or_n
+# -- Compiling entity handshake_fork_10_inner_regblock
+# -- Compiling architecture arch of handshake_fork_10_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_10_inner
+# -- Compiling architecture arch of handshake_fork_10_inner
+# -- Loading entity handshake_fork_10_inner_or_n
+# -- Loading entity handshake_fork_10_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_10
+# -- Compiling architecture arch of handshake_fork_10
+# -- Loading entity handshake_fork_10_inner
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_10.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_1_inner_or_n
+# -- Compiling architecture arch of handshake_fork_1_inner_or_n
+# -- Compiling entity handshake_fork_1_inner_regblock
+# -- Compiling architecture arch of handshake_fork_1_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_1_inner
+# -- Compiling architecture arch of handshake_fork_1_inner
+# -- Loading entity handshake_fork_1_inner_or_n
+# -- Loading entity handshake_fork_1_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_1
+# -- Compiling architecture arch of handshake_fork_1
+# -- Loading entity handshake_fork_1_inner
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_3.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_3_inner_or_n
+# -- Compiling architecture arch of handshake_fork_3_inner_or_n
+# -- Compiling entity handshake_fork_3_inner_regblock
+# -- Compiling architecture arch of handshake_fork_3_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_3_inner
+# -- Compiling architecture arch of handshake_fork_3_inner
+# -- Loading entity handshake_fork_3_inner_or_n
+# -- Loading entity handshake_fork_3_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_3
+# -- Compiling architecture arch of handshake_fork_3
+# -- Loading entity handshake_fork_3_inner
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_3.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_4.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_4_inner_or_n
+# -- Compiling architecture arch of handshake_fork_4_inner_or_n
+# -- Compiling entity handshake_fork_4_inner_regblock
+# -- Compiling architecture arch of handshake_fork_4_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_4_inner
+# -- Compiling architecture arch of handshake_fork_4_inner
+# -- Loading entity handshake_fork_4_inner_or_n
+# -- Loading entity handshake_fork_4_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_4
+# -- Compiling architecture arch of handshake_fork_4
+# -- Loading entity handshake_fork_4_inner
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_4.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_5.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_5_inner_or_n
+# -- Compiling architecture arch of handshake_fork_5_inner_or_n
+# -- Compiling entity handshake_fork_5_inner_regblock
+# -- Compiling architecture arch of handshake_fork_5_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_5_inner
+# -- Compiling architecture arch of handshake_fork_5_inner
+# -- Loading entity handshake_fork_5_inner_or_n
+# -- Loading entity handshake_fork_5_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_5
+# -- Compiling architecture arch of handshake_fork_5
+# -- Loading entity handshake_fork_5_inner
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_5.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_6.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_6_inner_or_n
+# -- Compiling architecture arch of handshake_fork_6_inner_or_n
+# -- Compiling entity handshake_fork_6_inner_regblock
+# -- Compiling architecture arch of handshake_fork_6_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_6_inner
+# -- Compiling architecture arch of handshake_fork_6_inner
+# -- Loading entity handshake_fork_6_inner_or_n
+# -- Loading entity handshake_fork_6_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_6
+# -- Compiling architecture arch of handshake_fork_6
+# -- Loading entity handshake_fork_6_inner
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_6.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_7.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_7_inner_or_n
+# -- Compiling architecture arch of handshake_fork_7_inner_or_n
+# -- Compiling entity handshake_fork_7_inner_regblock
+# -- Compiling architecture arch of handshake_fork_7_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_7_inner
+# -- Compiling architecture arch of handshake_fork_7_inner
+# -- Loading entity handshake_fork_7_inner_or_n
+# -- Loading entity handshake_fork_7_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_7
+# -- Compiling architecture arch of handshake_fork_7
+# -- Loading entity handshake_fork_7_inner
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_7.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_8.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_8_inner_or_n
+# -- Compiling architecture arch of handshake_fork_8_inner_or_n
+# -- Compiling entity handshake_fork_8_inner_regblock
+# -- Compiling architecture arch of handshake_fork_8_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_8_inner
+# -- Compiling architecture arch of handshake_fork_8_inner
+# -- Loading entity handshake_fork_8_inner_or_n
+# -- Loading entity handshake_fork_8_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_8
+# -- Compiling architecture arch of handshake_fork_8
+# -- Loading entity handshake_fork_8_inner
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_8.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_9.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_9_inner_or_n
+# -- Compiling architecture arch of handshake_fork_9_inner_or_n
+# -- Compiling entity handshake_fork_9_inner_regblock
+# -- Compiling architecture arch of handshake_fork_9_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_9_inner
+# -- Compiling architecture arch of handshake_fork_9_inner
+# -- Loading entity handshake_fork_9_inner_or_n
+# -- Loading entity handshake_fork_9_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_9
+# -- Compiling architecture arch of handshake_fork_9
+# -- Loading entity handshake_fork_9_inner
+# End time: 14:04:41 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_fork_9.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:41 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_0_control
+# -- Compiling architecture arch of handshake_mem_controller_0_control
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_priority
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_0.vhd(122): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_data
+# -- Compiling entity handshake_mem_controller_0_write_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter
+# -- Loading entity handshake_mem_controller_0_write_arbiter_priority
+# -- Loading entity handshake_mem_controller_0_write_arbiter_addressing
+# -- Loading entity handshake_mem_controller_0_write_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_0_write_arbiter_data
+# -- Compiling entity handshake_mem_controller_0
+# -- Compiling architecture arch of handshake_mem_controller_0
+# -- Loading entity handshake_mem_controller_0_write_arbiter
+# -- Loading entity handshake_mem_controller_0_control
+# End time: 14:04:42 on Oct 29,2026, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 1
+# Compile of handshake_mem_controller_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:42 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_1_control
+# -- Compiling architecture arch of handshake_mem_controller_1_control
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_priority
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(118): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_1_read_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter
+# -- Loading entity handshake_mem_controller_1_read_arbiter_priority
+# -- Loading entity handshake_mem_controller_1_read_arbiter_addressing
+# -- Loading entity handshake_mem_controller_1_read_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_1_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_1
+# -- Compiling architecture arch of handshake_mem_controller_1
+# -- Loading entity handshake_mem_controller_1_read_arbiter
+# -- Loading entity handshake_mem_controller_1_control
+# End time: 14:04:42 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of handshake_mem_controller_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:42 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_2.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_2_control
+# -- Compiling architecture arch of handshake_mem_controller_2_control
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_priority
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_2.vhd(118): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_2_read_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter
+# -- Loading entity handshake_mem_controller_2_read_arbiter_priority
+# -- Loading entity handshake_mem_controller_2_read_arbiter_addressing
+# -- Loading entity handshake_mem_controller_2_read_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_2_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_2
+# -- Compiling architecture arch of handshake_mem_controller_2
+# -- Loading entity handshake_mem_controller_2_read_arbiter
+# -- Loading entity handshake_mem_controller_2_control
+# End time: 14:04:42 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of handshake_mem_controller_2.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:42 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_0.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mux_0_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_mux_0_one_slot_break_r_dataless
+# -- Compiling entity handshake_mux_0_one_slot_break_r
+# -- Compiling architecture arch of handshake_mux_0_one_slot_break_r
+# -- Loading entity handshake_mux_0_one_slot_break_r_dataless
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity handshake_mux_0
+# -- Compiling architecture arch of handshake_mux_0
+# -- Loading entity handshake_mux_0_one_slot_break_r
+# End time: 14:04:42 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_mux_0.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:42 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_1.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mux_1_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_mux_1_one_slot_break_r_dataless
+# -- Compiling entity handshake_mux_1_one_slot_break_r
+# -- Compiling architecture arch of handshake_mux_1_one_slot_break_r
+# -- Loading entity handshake_mux_1_one_slot_break_r_dataless
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity handshake_mux_1
+# -- Compiling architecture arch of handshake_mux_1
+# -- Loading entity handshake_mux_1_one_slot_break_r
+# End time: 14:04:42 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of handshake_mux_1.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:42 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matvec
+# -- Compiling architecture behavioral of matvec
+# -- Loading entity handshake_fork_0
+# -- Loading package types
+# -- Loading entity handshake_mem_controller_0
+# -- Loading entity handshake_mem_controller_1
+# -- Loading entity handshake_mem_controller_2
+# -- Loading entity handshake_constant_0
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Loading entity handshake_extui_0
+# -- Loading entity handshake_mux_0
+# -- Loading entity handshake_buffer_0
+# -- Loading entity handshake_fork_1
+# -- Loading entity handshake_control_merge_0
+# -- Loading entity handshake_fork_2
+# -- Loading entity handshake_fork_3
+# -- Loading entity handshake_extui_1
+# -- Loading entity handshake_buffer_1
+# -- Loading entity handshake_fork_4
+# -- Loading entity handshake_buffer_2
+# -- Loading entity handshake_extui_2
+# -- Loading entity handshake_extui_3
+# -- Loading entity handshake_constant_1
+# -- Loading entity handshake_buffer_3
+# -- Loading entity handshake_mux_1
+# -- Loading entity handshake_extui_4
+# -- Loading entity handshake_fork_5
+# -- Loading entity handshake_fork_6
+# -- Loading entity handshake_source_0
+# -- Loading entity handshake_constant_2
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_load_0
+# -- Loading entity handshake_shli_0
+# -- Loading entity handshake_trunci_0
+# -- Loading entity handshake_addi_0
+# -- Loading entity handshake_buffer_4
+# -- Loading entity handshake_load_1
+# -- Loading entity handshake_buffer_5
+# -- Loading entity handshake_muli_0
+# -- Loading entity handshake_buffer_6
+# -- Loading entity handshake_buffer_7
+# -- Loading entity handshake_buffer_8
+# -- Loading entity handshake_addi_1
+# -- Loading entity handshake_addi_2
+# -- Loading entity handshake_fork_7
+# -- Loading entity handshake_trunci_1
+# -- Loading entity handshake_constant_5
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity handshake_buffer_9
+# -- Loading entity handshake_fork_8
+# -- Loading entity handshake_cond_br_0
+# -- Loading entity handshake_sink_0
+# -- Loading entity handshake_buffer_10
+# -- Loading entity handshake_cond_br_1
+# -- Loading entity handshake_buffer_11
+# -- Loading entity handshake_buffer_12
+# -- Loading entity handshake_cond_br_2
+# -- Loading entity handshake_fork_9
+# -- Loading entity handshake_constant_6
+# -- Loading entity handshake_buffer_13
+# -- Loading entity handshake_store_0
+# -- Loading entity handshake_buffer_14
+# -- Loading entity handshake_fork_10
+# -- Loading entity handshake_sink_1
+# End time: 14:04:42 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of matvec.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:42 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec_wrapper.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matvec_wrapper
+# -- Compiling architecture behavioral of matvec_wrapper
+# -- Loading entity mem_to_bram_32_14
+# -- Loading entity mem_to_bram_32_7
+# -- Loading entity matvec
+# End time: 14:04:42 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of matvec_wrapper.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:42 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# End time: 14:04:42 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of two_port_RAM.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:42 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# End time: 14:04:42 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of single_argument.vhd was successful.
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# Start time: 14:04:42 on Oct 29,2026
+# vcom -work work -2008 -explicit -vopt /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(92): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity matvec
+# -- Loading entity two_port_RAM
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+# End time: 14:04:42 on Oct 29,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of tb_matvec.vhd was successful.
+# All compile dependencies have been resolved.vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_addi_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_0_join_and_n
+# -- Compiling architecture arch of handshake_addi_0_join_and_n
+# -- Compiling entity handshake_addi_0_join
+# -- Compiling architecture arch of handshake_addi_0_join
+# -- Loading entity handshake_addi_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_addi_0
+# -- Compiling architecture arch of handshake_addi_0
+# -- Loading entity handshake_addi_0_join
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_addi_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_1_join_and_n
+# -- Compiling architecture arch of handshake_addi_1_join_and_n
+# -- Compiling entity handshake_addi_1_join
+# -- Compiling architecture arch of handshake_addi_1_join
+# -- Loading entity handshake_addi_1_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_addi_1
+# -- Compiling architecture arch of handshake_addi_1
+# -- Loading entity handshake_addi_1_join
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_addi_2.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_addi_2_join_and_n
+# -- Compiling architecture arch of handshake_addi_2_join_and_n
+# -- Compiling entity handshake_addi_2_join
+# -- Compiling architecture arch of handshake_addi_2_join
+# -- Loading entity handshake_addi_2_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_addi_2
+# -- Compiling architecture arch of handshake_addi_2
+# -- Loading entity handshake_addi_2_join
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_0_dataless
+# -- Compiling architecture arch of handshake_buffer_0_dataless
+# -- Compiling entity handshake_buffer_0
+# -- Compiling architecture arch of handshake_buffer_0
+# -- Loading entity handshake_buffer_0_dataless
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_10.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_10_fifo
+# -- Compiling architecture arch of handshake_buffer_10_fifo
+# -- Compiling entity handshake_buffer_10
+# -- Compiling architecture arch of handshake_buffer_10
+# -- Loading entity handshake_buffer_10_fifo
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_11.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_11
+# -- Compiling architecture arch of handshake_buffer_11
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_12.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_12_fifo_inner
+# -- Compiling architecture arch of handshake_buffer_12_fifo_inner
+# -- Compiling entity handshake_buffer_12_fifo
+# -- Compiling architecture arch of handshake_buffer_12_fifo
+# -- Loading entity handshake_buffer_12_fifo_inner
+# -- Compiling entity handshake_buffer_12
+# -- Compiling architecture arch of handshake_buffer_12
+# -- Loading entity handshake_buffer_12_fifo
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_13.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_13_fifo
+# -- Compiling architecture arch of handshake_buffer_13_fifo
+# -- Compiling entity handshake_buffer_13
+# -- Compiling architecture arch of handshake_buffer_13
+# -- Loading entity handshake_buffer_13_fifo
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_14.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_14_inner
+# -- Compiling architecture arch of handshake_buffer_14_inner
+# -- Compiling entity handshake_buffer_14
+# -- Compiling architecture arch of handshake_buffer_14
+# -- Loading entity handshake_buffer_14_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_1_inner
+# -- Compiling architecture arch of handshake_buffer_1_inner
+# -- Compiling entity handshake_buffer_1
+# -- Compiling architecture arch of handshake_buffer_1
+# -- Loading entity handshake_buffer_1_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_2.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_2_fifo_inner
+# -- Compiling architecture arch of handshake_buffer_2_fifo_inner
+# -- Compiling entity handshake_buffer_2_fifo
+# -- Compiling architecture arch of handshake_buffer_2_fifo
+# -- Loading entity handshake_buffer_2_fifo_inner
+# -- Compiling entity handshake_buffer_2
+# -- Compiling architecture arch of handshake_buffer_2
+# -- Loading entity handshake_buffer_2_fifo
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_3.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_3_fifo
+# -- Compiling architecture arch of handshake_buffer_3_fifo
+# -- Compiling entity handshake_buffer_3
+# -- Compiling architecture arch of handshake_buffer_3
+# -- Loading entity handshake_buffer_3_fifo
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_4.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_4_inner
+# -- Compiling architecture arch of handshake_buffer_4_inner
+# -- Compiling entity handshake_buffer_4
+# -- Compiling architecture arch of handshake_buffer_4
+# -- Loading entity handshake_buffer_4_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_5.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_5_fifo_inner
+# -- Compiling architecture arch of handshake_buffer_5_fifo_inner
+# -- Compiling entity handshake_buffer_5_fifo
+# -- Compiling architecture arch of handshake_buffer_5_fifo
+# -- Loading entity handshake_buffer_5_fifo_inner
+# -- Compiling entity handshake_buffer_5
+# -- Compiling architecture arch of handshake_buffer_5
+# -- Loading entity handshake_buffer_5_fifo
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_6.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_6_inner
+# -- Compiling architecture arch of handshake_buffer_6_inner
+# -- Compiling entity handshake_buffer_6
+# -- Compiling architecture arch of handshake_buffer_6
+# -- Loading entity handshake_buffer_6_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_7.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_7_fifo
+# -- Compiling architecture arch of handshake_buffer_7_fifo
+# -- Compiling entity handshake_buffer_7
+# -- Compiling architecture arch of handshake_buffer_7
+# -- Loading entity handshake_buffer_7_fifo
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_8.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_8_dataless
+# -- Compiling architecture arch of handshake_buffer_8_dataless
+# -- Compiling entity handshake_buffer_8
+# -- Compiling architecture arch of handshake_buffer_8
+# -- Loading entity handshake_buffer_8_dataless
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_buffer_9.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_buffer_9_inner
+# -- Compiling architecture arch of handshake_buffer_9_inner
+# -- Compiling entity handshake_buffer_9
+# -- Compiling architecture arch of handshake_buffer_9
+# -- Loading entity handshake_buffer_9_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_cmpi_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cmpi_0_join_and_n
+# -- Compiling architecture arch of handshake_cmpi_0_join_and_n
+# -- Compiling entity handshake_cmpi_0_join
+# -- Compiling architecture arch of handshake_cmpi_0_join
+# -- Loading entity handshake_cmpi_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_cmpi_0
+# -- Compiling architecture arch of handshake_cmpi_0
+# -- Loading entity handshake_cmpi_0_join
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_cond_br_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cond_br_0_inner_join_and_n
+# -- Compiling architecture arch of handshake_cond_br_0_inner_join_and_n
+# -- Compiling entity handshake_cond_br_0_inner_join
+# -- Compiling architecture arch of handshake_cond_br_0_inner_join
+# -- Loading entity handshake_cond_br_0_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cond_br_0_inner
+# -- Compiling architecture arch of handshake_cond_br_0_inner
+# -- Loading entity handshake_cond_br_0_inner_join
+# -- Compiling entity handshake_cond_br_0
+# -- Compiling architecture arch of handshake_cond_br_0
+# -- Loading entity handshake_cond_br_0_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_cond_br_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cond_br_1_inner_join_and_n
+# -- Compiling architecture arch of handshake_cond_br_1_inner_join_and_n
+# -- Compiling entity handshake_cond_br_1_inner_join
+# -- Compiling architecture arch of handshake_cond_br_1_inner_join
+# -- Loading entity handshake_cond_br_1_inner_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cond_br_1_inner
+# -- Compiling architecture arch of handshake_cond_br_1_inner
+# -- Loading entity handshake_cond_br_1_inner_join
+# -- Compiling entity handshake_cond_br_1
+# -- Compiling architecture arch of handshake_cond_br_1
+# -- Loading entity handshake_cond_br_1_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_cond_br_2.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_cond_br_2_join_and_n
+# -- Compiling architecture arch of handshake_cond_br_2_join_and_n
+# -- Compiling entity handshake_cond_br_2_join
+# -- Compiling architecture arch of handshake_cond_br_2_join
+# -- Loading entity handshake_cond_br_2_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_cond_br_2
+# -- Compiling architecture arch of handshake_cond_br_2
+# -- Loading entity handshake_cond_br_2_join
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_0
+# -- Compiling architecture arch of handshake_constant_0
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_1
+# -- Compiling architecture arch of handshake_constant_1
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_2.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_2
+# -- Compiling architecture arch of handshake_constant_2
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_3.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_3
+# -- Compiling architecture arch of handshake_constant_3
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_4.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_4
+# -- Compiling architecture arch of handshake_constant_4
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_5.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_5
+# -- Compiling architecture arch of handshake_constant_5
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_constant_6.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_constant_6
+# -- Compiling architecture arch of handshake_constant_6
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_extui_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_extui_0
+# -- Compiling architecture arch of handshake_extui_0
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_extui_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_extui_1
+# -- Compiling architecture arch of handshake_extui_1
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_extui_2.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_extui_2
+# -- Compiling architecture arch of handshake_extui_2
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_extui_3.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_extui_3
+# -- Compiling architecture arch of handshake_extui_3
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_extui_4.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_extui_4
+# -- Compiling architecture arch of handshake_extui_4
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_0_or_n
+# -- Compiling architecture arch of handshake_fork_0_or_n
+# -- Compiling entity handshake_fork_0_regblock
+# -- Compiling architecture arch of handshake_fork_0_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_0
+# -- Compiling architecture arch of handshake_fork_0
+# -- Loading entity handshake_fork_0_or_n
+# -- Loading entity handshake_fork_0_regblock
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_2.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_2_or_n
+# -- Compiling architecture arch of handshake_fork_2_or_n
+# -- Compiling entity handshake_fork_2_regblock
+# -- Compiling architecture arch of handshake_fork_2_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_2
+# -- Compiling architecture arch of handshake_fork_2
+# -- Loading entity handshake_fork_2_or_n
+# -- Loading entity handshake_fork_2_regblock
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_load_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_load_0_addr_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_load_0_addr_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_0_addr_one_slot_break_r
+# -- Compiling architecture arch of handshake_load_0_addr_one_slot_break_r
+# -- Loading entity handshake_load_0_addr_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_0_data_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_load_0_data_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_0_data_one_slot_break_r
+# -- Compiling architecture arch of handshake_load_0_data_one_slot_break_r
+# -- Loading entity handshake_load_0_data_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_0
+# -- Compiling architecture arch of handshake_load_0
+# -- Loading entity handshake_load_0_addr_one_slot_break_r
+# -- Loading entity handshake_load_0_data_one_slot_break_r
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_load_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_load_1_addr_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_load_1_addr_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_1_addr_one_slot_break_r
+# -- Compiling architecture arch of handshake_load_1_addr_one_slot_break_r
+# -- Loading entity handshake_load_1_addr_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_1_data_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_load_1_data_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_1_data_one_slot_break_r
+# -- Compiling architecture arch of handshake_load_1_data_one_slot_break_r
+# -- Loading entity handshake_load_1_data_one_slot_break_r_dataless
+# -- Compiling entity handshake_load_1
+# -- Compiling architecture arch of handshake_load_1
+# -- Loading entity handshake_load_1_addr_one_slot_break_r
+# -- Loading entity handshake_load_1_data_one_slot_break_r
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_muli_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_muli_0_join_and_n
+# -- Compiling architecture arch of handshake_muli_0_join_and_n
+# -- Compiling entity handshake_muli_0_join
+# -- Compiling architecture arch of handshake_muli_0_join
+# -- Loading entity handshake_muli_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_muli_0_valid_buffer
+# -- Compiling architecture arch of handshake_muli_0_valid_buffer
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_muli_0
+# -- Compiling architecture arch of handshake_muli_0
+# -- Loading entity handshake_muli_0_join
+# -- Loading entity handshake_muli_0_valid_buffer
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_shli_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_shli_0_join_and_n
+# -- Compiling architecture arch of handshake_shli_0_join_and_n
+# -- Compiling entity handshake_shli_0_join
+# -- Compiling architecture arch of handshake_shli_0_join
+# -- Loading entity handshake_shli_0_join_and_n
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_shli_0
+# -- Compiling architecture arch of handshake_shli_0
+# -- Loading entity handshake_shli_0_join
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_sink_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_sink_0
+# -- Compiling architecture arch of handshake_sink_0
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_sink_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_sink_1
+# -- Compiling architecture arch of handshake_sink_1
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_source_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_source_0
+# -- Compiling architecture arch of handshake_source_0
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_store_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_store_0
+# -- Compiling architecture arch of handshake_store_0
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_trunci_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_trunci_0
+# -- Compiling architecture arch of handshake_trunci_0
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_trunci_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Compiling entity handshake_trunci_1
+# -- Compiling architecture arch of handshake_trunci_1
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/mem_to_bram_32_14.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram_32_14
+# -- Compiling architecture arch of mem_to_bram_32_14
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/mem_to_bram_32_7.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity mem_to_bram_32_7
+# -- Compiling architecture arch of mem_to_bram_32_7
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/types.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling package types
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_join.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/simpackage.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_control_merge_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_control_merge_0_merge
+# -- Compiling architecture arch of handshake_control_merge_0_merge
+# -- Compiling entity handshake_control_merge_0_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_control_merge_0_one_slot_break_r_dataless
+# -- Compiling entity handshake_control_merge_0_one_slot_break_r
+# -- Compiling architecture arch of handshake_control_merge_0_one_slot_break_r
+# -- Loading entity handshake_control_merge_0_one_slot_break_r_dataless
+# -- Compiling entity handshake_control_merge_0_fork_or_n
+# -- Compiling architecture arch of handshake_control_merge_0_fork_or_n
+# -- Compiling entity handshake_control_merge_0_fork_regblock
+# -- Compiling architecture arch of handshake_control_merge_0_fork_regblock
+# -- Compiling entity handshake_control_merge_0_fork
+# -- Compiling architecture arch of handshake_control_merge_0_fork
+# -- Loading entity handshake_control_merge_0_fork_or_n
+# -- Loading entity handshake_control_merge_0_fork_regblock
+# -- Loading package types
+# -- Compiling entity handshake_control_merge_0
+# -- Compiling architecture arch of handshake_control_merge_0
+# -- Loading entity handshake_control_merge_0_merge
+# -- Loading entity handshake_control_merge_0_one_slot_break_r
+# -- Loading entity handshake_control_merge_0_fork
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_10.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_10_inner_or_n
+# -- Compiling architecture arch of handshake_fork_10_inner_or_n
+# -- Compiling entity handshake_fork_10_inner_regblock
+# -- Compiling architecture arch of handshake_fork_10_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_10_inner
+# -- Compiling architecture arch of handshake_fork_10_inner
+# -- Loading entity handshake_fork_10_inner_or_n
+# -- Loading entity handshake_fork_10_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_10
+# -- Compiling architecture arch of handshake_fork_10
+# -- Loading entity handshake_fork_10_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_1_inner_or_n
+# -- Compiling architecture arch of handshake_fork_1_inner_or_n
+# -- Compiling entity handshake_fork_1_inner_regblock
+# -- Compiling architecture arch of handshake_fork_1_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_1_inner
+# -- Compiling architecture arch of handshake_fork_1_inner
+# -- Loading entity handshake_fork_1_inner_or_n
+# -- Loading entity handshake_fork_1_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_1
+# -- Compiling architecture arch of handshake_fork_1
+# -- Loading entity handshake_fork_1_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_3.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_3_inner_or_n
+# -- Compiling architecture arch of handshake_fork_3_inner_or_n
+# -- Compiling entity handshake_fork_3_inner_regblock
+# -- Compiling architecture arch of handshake_fork_3_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_3_inner
+# -- Compiling architecture arch of handshake_fork_3_inner
+# -- Loading entity handshake_fork_3_inner_or_n
+# -- Loading entity handshake_fork_3_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_3
+# -- Compiling architecture arch of handshake_fork_3
+# -- Loading entity handshake_fork_3_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_4.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_4_inner_or_n
+# -- Compiling architecture arch of handshake_fork_4_inner_or_n
+# -- Compiling entity handshake_fork_4_inner_regblock
+# -- Compiling architecture arch of handshake_fork_4_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_4_inner
+# -- Compiling architecture arch of handshake_fork_4_inner
+# -- Loading entity handshake_fork_4_inner_or_n
+# -- Loading entity handshake_fork_4_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_4
+# -- Compiling architecture arch of handshake_fork_4
+# -- Loading entity handshake_fork_4_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_5.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_5_inner_or_n
+# -- Compiling architecture arch of handshake_fork_5_inner_or_n
+# -- Compiling entity handshake_fork_5_inner_regblock
+# -- Compiling architecture arch of handshake_fork_5_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_5_inner
+# -- Compiling architecture arch of handshake_fork_5_inner
+# -- Loading entity handshake_fork_5_inner_or_n
+# -- Loading entity handshake_fork_5_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_5
+# -- Compiling architecture arch of handshake_fork_5
+# -- Loading entity handshake_fork_5_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_6.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_6_inner_or_n
+# -- Compiling architecture arch of handshake_fork_6_inner_or_n
+# -- Compiling entity handshake_fork_6_inner_regblock
+# -- Compiling architecture arch of handshake_fork_6_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_6_inner
+# -- Compiling architecture arch of handshake_fork_6_inner
+# -- Loading entity handshake_fork_6_inner_or_n
+# -- Loading entity handshake_fork_6_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_6
+# -- Compiling architecture arch of handshake_fork_6
+# -- Loading entity handshake_fork_6_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_7.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_7_inner_or_n
+# -- Compiling architecture arch of handshake_fork_7_inner_or_n
+# -- Compiling entity handshake_fork_7_inner_regblock
+# -- Compiling architecture arch of handshake_fork_7_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_7_inner
+# -- Compiling architecture arch of handshake_fork_7_inner
+# -- Loading entity handshake_fork_7_inner_or_n
+# -- Loading entity handshake_fork_7_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_7
+# -- Compiling architecture arch of handshake_fork_7
+# -- Loading entity handshake_fork_7_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_8.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_8_inner_or_n
+# -- Compiling architecture arch of handshake_fork_8_inner_or_n
+# -- Compiling entity handshake_fork_8_inner_regblock
+# -- Compiling architecture arch of handshake_fork_8_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_8_inner
+# -- Compiling architecture arch of handshake_fork_8_inner
+# -- Loading entity handshake_fork_8_inner_or_n
+# -- Loading entity handshake_fork_8_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_8
+# -- Compiling architecture arch of handshake_fork_8
+# -- Loading entity handshake_fork_8_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_fork_9.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity handshake_fork_9_inner_or_n
+# -- Compiling architecture arch of handshake_fork_9_inner_or_n
+# -- Compiling entity handshake_fork_9_inner_regblock
+# -- Compiling architecture arch of handshake_fork_9_inner_regblock
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_fork_9_inner
+# -- Compiling architecture arch of handshake_fork_9_inner
+# -- Loading entity handshake_fork_9_inner_or_n
+# -- Loading entity handshake_fork_9_inner_regblock
+# -- Loading package types
+# -- Compiling entity handshake_fork_9
+# -- Compiling architecture arch of handshake_fork_9
+# -- Loading entity handshake_fork_9_inner
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_0_control
+# -- Compiling architecture arch of handshake_mem_controller_0_control
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_priority
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_0.vhd(122): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_0_write_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter_data
+# -- Compiling entity handshake_mem_controller_0_write_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_0_write_arbiter
+# -- Loading entity handshake_mem_controller_0_write_arbiter_priority
+# -- Loading entity handshake_mem_controller_0_write_arbiter_addressing
+# -- Loading entity handshake_mem_controller_0_write_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_0_write_arbiter_data
+# -- Compiling entity handshake_mem_controller_0
+# -- Compiling architecture arch of handshake_mem_controller_0
+# -- Loading entity handshake_mem_controller_0_write_arbiter
+# -- Loading entity handshake_mem_controller_0_control
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_1_control
+# -- Compiling architecture arch of handshake_mem_controller_1_control
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_priority
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_1.vhd(118): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_1_read_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_1_read_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_1_read_arbiter
+# -- Loading entity handshake_mem_controller_1_read_arbiter_priority
+# -- Loading entity handshake_mem_controller_1_read_arbiter_addressing
+# -- Loading entity handshake_mem_controller_1_read_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_1_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_1
+# -- Compiling architecture arch of handshake_mem_controller_1
+# -- Loading entity handshake_mem_controller_1_read_arbiter
+# -- Loading entity handshake_mem_controller_1_control
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_2.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mem_controller_2_control
+# -- Compiling architecture arch of handshake_mem_controller_2_control
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_priority
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_priority
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mem_controller_2.vhd(118): (vcom-1246) Range 1 to 0 is null.
+# -- Loading package types
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_addressing
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_addressing
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_addressReady
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_addressReady
+# -- Compiling entity handshake_mem_controller_2_read_arbiter_data
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_2_read_arbiter
+# -- Compiling architecture arch of handshake_mem_controller_2_read_arbiter
+# -- Loading entity handshake_mem_controller_2_read_arbiter_priority
+# -- Loading entity handshake_mem_controller_2_read_arbiter_addressing
+# -- Loading entity handshake_mem_controller_2_read_arbiter_addressReady
+# -- Loading entity handshake_mem_controller_2_read_arbiter_data
+# -- Compiling entity handshake_mem_controller_2
+# -- Compiling architecture arch of handshake_mem_controller_2
+# -- Loading entity handshake_mem_controller_2_read_arbiter
+# -- Loading entity handshake_mem_controller_2_control
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_0.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mux_0_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_mux_0_one_slot_break_r_dataless
+# -- Compiling entity handshake_mux_0_one_slot_break_r
+# -- Compiling architecture arch of handshake_mux_0_one_slot_break_r
+# -- Loading entity handshake_mux_0_one_slot_break_r_dataless
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity handshake_mux_0
+# -- Compiling architecture arch of handshake_mux_0
+# -- Loading entity handshake_mux_0_one_slot_break_r
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/handshake_mux_1.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity handshake_mux_1_one_slot_break_r_dataless
+# -- Compiling architecture arch of handshake_mux_1_one_slot_break_r_dataless
+# -- Compiling entity handshake_mux_1_one_slot_break_r
+# -- Compiling architecture arch of handshake_mux_1_one_slot_break_r
+# -- Loading entity handshake_mux_1_one_slot_break_r_dataless
+# -- Loading package MATH_REAL
+# -- Loading package types
+# -- Compiling entity handshake_mux_1
+# -- Compiling architecture arch of handshake_mux_1
+# -- Loading entity handshake_mux_1_one_slot_break_r
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matvec
+# -- Compiling architecture behavioral of matvec
+# -- Loading entity handshake_fork_0
+# -- Loading package types
+# -- Loading entity handshake_mem_controller_0
+# -- Loading entity handshake_mem_controller_1
+# -- Loading entity handshake_mem_controller_2
+# -- Loading entity handshake_constant_0
+# -- Loading package instance float_pkg
+# -- Loading package fixed_float_types
+# -- Loading package float_generic_pkg
+# -- Loading package fixed_generic_pkg
+# -- Loading package instance fixed_pkg
+# -- Loading package MATH_REAL
+# -- Loading package body fixed_generic_pkg
+# -- Loading package body float_generic_pkg
+# -- Loading entity handshake_extui_0
+# -- Loading entity handshake_mux_0
+# -- Loading entity handshake_buffer_0
+# -- Loading entity handshake_fork_1
+# -- Loading entity handshake_control_merge_0
+# -- Loading entity handshake_fork_2
+# -- Loading entity handshake_fork_3
+# -- Loading entity handshake_extui_1
+# -- Loading entity handshake_buffer_1
+# -- Loading entity handshake_fork_4
+# -- Loading entity handshake_buffer_2
+# -- Loading entity handshake_extui_2
+# -- Loading entity handshake_extui_3
+# -- Loading entity handshake_constant_1
+# -- Loading entity handshake_buffer_3
+# -- Loading entity handshake_mux_1
+# -- Loading entity handshake_extui_4
+# -- Loading entity handshake_fork_5
+# -- Loading entity handshake_fork_6
+# -- Loading entity handshake_source_0
+# -- Loading entity handshake_constant_2
+# -- Loading entity handshake_constant_3
+# -- Loading entity handshake_constant_4
+# -- Loading entity handshake_load_0
+# -- Loading entity handshake_shli_0
+# -- Loading entity handshake_trunci_0
+# -- Loading entity handshake_addi_0
+# -- Loading entity handshake_buffer_4
+# -- Loading entity handshake_load_1
+# -- Loading entity handshake_buffer_5
+# -- Loading entity handshake_muli_0
+# -- Loading entity handshake_buffer_6
+# -- Loading entity handshake_buffer_7
+# -- Loading entity handshake_buffer_8
+# -- Loading entity handshake_addi_1
+# -- Loading entity handshake_addi_2
+# -- Loading entity handshake_fork_7
+# -- Loading entity handshake_trunci_1
+# -- Loading entity handshake_constant_5
+# -- Loading entity handshake_cmpi_0
+# -- Loading entity handshake_buffer_9
+# -- Loading entity handshake_fork_8
+# -- Loading entity handshake_cond_br_0
+# -- Loading entity handshake_sink_0
+# -- Loading entity handshake_buffer_10
+# -- Loading entity handshake_cond_br_1
+# -- Loading entity handshake_buffer_11
+# -- Loading entity handshake_buffer_12
+# -- Loading entity handshake_cond_br_2
+# -- Loading entity handshake_fork_9
+# -- Loading entity handshake_constant_6
+# -- Loading entity handshake_buffer_13
+# -- Loading entity handshake_store_0
+# -- Loading entity handshake_buffer_14
+# -- Loading entity handshake_fork_10
+# -- Loading entity handshake_sink_1
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/matvec_wrapper.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matvec_wrapper
+# -- Compiling architecture behavioral of matvec_wrapper
+# -- Loading entity mem_to_bram_32_14
+# -- Loading entity mem_to_bram_32_7
+# -- Loading entity matvec
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/two_port_RAM.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/single_argument.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+QuestaSim> # vcom -work work -2008 -explicit -vopt -stats=none /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd
+# QuestaSim-64 vcom 10.7b_1 Compiler 2018.07 Jul 26 2018
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity tb
+# -- Compiling architecture behavior of tb
+# ** Warning: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd(92): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity matvec
+# -- Loading entity two_port_RAM
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+QuestaSim> # 71 compiles, 0 failed with no errors.
+# vsim tb 
+# Start time: 14:04:47 on Oct 29,2026
+# ** Note: (vsim-3812) Design is being optimized...
+# ** Warning: License feature 'msimhdlsim' will expire in 2 days.
+# Loading std.standard
+# Loading std.textio(body)
+# Loading ieee.std_logic_1164(body)
+# Loading ieee.std_logic_arith(body)
+# Loading ieee.std_logic_unsigned(body)
+# Loading ieee.std_logic_textio(body)
+# Loading ieee.numeric_std(body)
+# Loading work.sim_package(body)
+# Loading work.tb(behavior)#1
+# Loading work.types
+# Loading ieee.fixed_float_types
+# Loading ieee.math_real(body)
+# Loading ieee.fixed_generic_pkg(body)
+# Loading ieee.float_generic_pkg(body)
+# Loading ieee.fixed_pkg
+# Loading ieee.float_pkg
+# Loading work.matvec(behavioral)#1
+# Loading work.handshake_fork_0(arch)#1
+# Loading work.handshake_mem_controller_0(arch)#1
+# Loading work.handshake_mem_controller_0_write_arbiter(arch)#1
+# Loading work.handshake_mem_controller_1(arch)#1
+# Loading work.handshake_mem_controller_2(arch)#1
+# Loading work.handshake_mux_0(arch)#1
+# Loading work.handshake_fork_1(arch)#1
+# Loading work.handshake_control_merge_0(arch)#1
+# Loading work.handshake_control_merge_0_one_slot_break_r(arch)#1
+# Loading work.handshake_control_merge_0_fork(arch)#1
+# Loading work.handshake_fork_2(arch)#1
+# Loading work.handshake_fork_3(arch)#1
+# Loading work.handshake_fork_4(arch)#1
+# Loading work.handshake_mux_1(arch)#1
+# Loading work.handshake_fork_5(arch)#1
+# Loading work.handshake_fork_6(arch)#1
+# Loading work.handshake_shli_0_join(arch)#1
+# Loading work.handshake_addi_0_join(arch)#1
+# Loading work.handshake_muli_0_join(arch)#1
+# Loading work.handshake_addi_1_join(arch)#1
+# Loading work.handshake_addi_2_join(arch)#1
+# Loading work.handshake_fork_7(arch)#1
+# Loading work.handshake_cmpi_0_join(arch)#1
+# Loading work.handshake_fork_8(arch)#1
+# Loading work.handshake_cond_br_0_inner_join(arch)#1
+# Loading work.handshake_cond_br_1_inner_join(arch)#1
+# Loading work.handshake_cond_br_2_join(arch)#1
+# Loading work.handshake_fork_9(arch)#1
+# Loading work.handshake_fork_10(arch)#1
+# Loading work.tb_join(arch)#1
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/cmpi1
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/cmpi0
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli2
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli1
+# ** Warning: NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/shli0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 0  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/cmpi1
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/cmpi0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 1  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."<": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/cmpi0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 2  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux3
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux4
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 0 fs  Iteration: 3  Instance: /tb/duv_inst/mux0
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 3  Instance: /tb/duv_inst/mux1
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 4  Instance: /tb/duv_inst/mux2
+# ** Warning: NUMERIC_STD."=": metavalue detected, returning FALSE
+#    Time: 2 ns  Iteration: 4  Instance: /tb/duv_inst/mux2
+# ** Note: Simulation done! Latency = 20106 cycles
+#    Time: 80434 ns  Iteration: 1  Instance: /tb
+# ** Failure: NORMAL EXIT (note: failure is to force the simulator to stop)
+#    Time: 80458 ns  Iteration: 1  Process: /tb/generate_sim_done_proc File: /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd
+# Break in Process generate_sim_done_proc at /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd line 381
+# Stopped at /home/amherz/dynamatic/integration-test/matvec/out/sim/HDL_SRC/tb_matvec.vhd line 381
+# End time: 14:04:50 on Oct 29,2026, Elapsed time: 0:00:03
+# Errors: 1, Warnings: 42
+===-------------------------------------------------------------------------===
+                         Miscellaneous Ungrouped Timers
+===-------------------------------------------------------------------------===
+
+   ---User Time---   --System Time--   --User+System--   ---Wall Time---  --- Name ---
+   0.0003 (100.0%)   0.0000 (100.0%)   0.0003 (100.0%)  16.4604 (100.0%)  Simulator runtime
+   0.0003 (100.0%)   0.0000 (100.0%)   0.0003 (100.0%)  16.4604 (100.0%)  Total
+
+Comparison of [m] : Pass
+Comparison of [v] : Pass
+Comparison of [out] : Pass
+Comparison of [out0] : Pass
+[INFO  HLS_VERIFIER] C and VHDL outputs match

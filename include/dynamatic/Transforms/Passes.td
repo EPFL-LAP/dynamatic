@@ -312,6 +312,11 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     Option<"ftd", "ftd", "bool", "false",
     "If true, use FTD-specific CFDFC extraction and backedge "
     "identification.">,
+
+    Option<"onlyInnermostCFDFCs", "only-innermost-cfdfcs", "bool", "false",
+    "If true, CFDFCs that strictly contains another CFDFC in the original CFG "
+    "do not contribute to the throughput objective.">,
+
     Option<"calculatePathDelays", "calculate-path-delays", "bool", "false",
     "After buffer placement, re-run the MILP with the buffering decisions "
     "locked in to calculate the path delays the MILP believes are present in "

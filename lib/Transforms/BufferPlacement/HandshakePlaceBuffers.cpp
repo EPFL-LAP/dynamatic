@@ -169,6 +169,14 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   namer.nameAllUnnamedOps();
 
+  // Only the fpga20 and fpl22 MILPs can exclude BBs from their objective
+  if (onlyInnermostCFDFCs && algorithm != FPGA20 && algorithm != FPL22) {
+    modOp->emitError() << "option 'only-innermost-cfdfcs' is only supported "
+                          "by the 'fpga20' and 'fpl22' algorithms, not '"
+                       << algorithm << "'";
+    return signalPassFailure();
+  }
+
   // The MILP solving the buffer placement happens here:
   if (algorithm == ON_MERGES) {
     if (failed(placeWithoutUsingMILP()))
@@ -259,6 +267,25 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
     // All extracted CFDFCs must be optimized
     for (CFDFC &cf : cfdfcs)
       info.cfdfcs[&cf] = true;
+
+    // Leave outer loops out of the throughput objective. Their
+    // throughput constraints are kept
+    if (onlyInnermostCFDFCs) {
+      for (CFDFC &outer : cfdfcs) {
+        if (llvm::none_of(cfdfcs, [&](const CFDFC &inner) {
+              return outer.strictlyContains(inner);
+            })) {
+              LLVM_DEBUG(llvm::errs() << "Ignoring a CFDFC";);
+              continue;
+            }   
+        info.excludedFromObjective.insert(&outer);
+        LLVM_DEBUG({
+          llvm::errs() << "Excluding CFDFC ";
+          llvm::interleave(outer.cycle, llvm::errs(), " -> ");
+          llvm::errs() << " from the throughput objective\n";
+        });
+      }
+    }
 
     // Create a new map for the cfdfc extraction
     llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
@@ -382,6 +409,12 @@ static void logFuncInfo(FuncInfo &info) {
     for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i)
       os << cf->cycle[i] << " -> ";
     os << cf->cycle.back() << "\n";
+
+    if (info.excludedFromObjective.contains(cf)) 
+      os << "Excluded from total throughput" << "\n" ;
+    else
+      os << "Included in total throughput" << "\n" ;
+      
     os.indent();
     os << "- Number of executions: " << cf->numExecs << "\n";
     os << "- Number of units: " << cf->units.size() << "\n";

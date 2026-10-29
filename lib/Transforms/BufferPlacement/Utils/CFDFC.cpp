@@ -324,6 +324,14 @@ bool CFDFC::isCFGCompliant(unsigned srcBB, unsigned dstBB) const {
   return false;
 }
 
+bool CFDFC::strictlyContains(const CFDFC &other) const {
+  // Strict containment requires this cycle to be larger
+  if (other.cycle.size() >= cycle.size())
+    return false;
+  return llvm::all_of(other.cycle,
+                      [&](unsigned bb) { return cycle.contains(bb); });
+}
+
 bool CFDFC::isCFDFCBackedge(Value val) {
   // A CFDFC backedge is a backedge
   if (!isBackedge(val))

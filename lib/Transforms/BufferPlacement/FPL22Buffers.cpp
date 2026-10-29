@@ -397,7 +397,15 @@ void CFDFCUnionBuffers::setup() {
   // Add the MILP objective and mark the MILP ready to be optimized
   std::vector<Value> allChannels;
   llvm::copy(cfUnion.channels, std::back_inserter(allChannels));
-  addMaxThroughputObjective(allChannels, cfUnion.cfdfcs);
+  // Only CFDFCs that are optimized (and thus have MILP variables) and not
+  // excluded by the pass contribute to the throughput objective
+  SmallVector<CFDFC *> objectiveCFDFCs;
+  llvm::copy_if(cfUnion.cfdfcs, std::back_inserter(objectiveCFDFCs),
+                [&](CFDFC *cf) {
+                  return funcInfo.cfdfcs.lookup(cf) &&
+                         !funcInfo.excludedFromObjective.contains(cf);
+                });
+  addMaxThroughputObjective(allChannels, objectiveCFDFCs);
   markReadyToOptimize();
 }
 

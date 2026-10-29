@@ -1,0 +1,5 @@
+set-src dynamatic/integration-test/matvec/matvec.c
+
+compile --buffer-algorithm fpga20 --only-innermost-cfdfcs           
+
+exit

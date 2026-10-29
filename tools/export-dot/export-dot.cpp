@@ -123,6 +123,9 @@ static std::string getPrettyNodeLabel(Operation *op) {
       // handshake operations
       .Case<handshake::ConstantOp>(
           [&](handshake::ConstantOp cstOp) -> std::string {
+            // TODO [amos]: Here if we have unsigned 2 in the kernel we 
+            //    represent it as 0b10::i2 which however gets interpreted as 
+            //    -2 (since 0b10 is -2 in two's complement) 
             ChannelType cstType = cstOp.getResult().getType();
             TypedAttr valueAttr = cstOp.getValueAttr();
             if (auto intType = dyn_cast<IntegerType>(cstType.getDataType())) {
