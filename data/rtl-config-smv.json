@@ -136,14 +136,16 @@
   {
     "name": "handshake.addf",
     "parameters": [
+      { "name": "LATENCY", "type": "unsigned" },
       { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t addf --abstract-data -p latency=12 is_double=$IS_DOUBLE",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t addf --abstract-data -p latency=$LATENCY is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.addf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t addf --abstract-data -p latency=9 is_double=$IS_DOUBLE",
+    "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t addf --abstract-data -p latency=$LATENCY is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
@@ -175,24 +177,28 @@
   {
     "name": "handshake.divf",
     "parameters": [
+      { "name": "LATENCY", "type": "unsigned" },
       { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divf --abstract-data -p latency=36 is_double=$IS_DOUBLE",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divf --abstract-data -p latency=$LATENCY is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.divf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divf --abstract-data -p latency=29 is_double=$IS_DOUBLE",
+    "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divf --abstract-data -p latency=$LATENCY is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.divsi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divsi --abstract-data -p latency=35 bitwidth=$BITWIDTH",
+    "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divsi --abstract-data -p latency=$LATENCY bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.divui",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divui --abstract-data -p latency=35 bitwidth=$BITWIDTH",
+    "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divui --abstract-data -p latency=$LATENCY bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -212,7 +218,8 @@
   },
   {
     "name": "handshake.fptosi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t fptosi --abstract-data -p latency=5 bitwidth=$BITWIDTH",
+    "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t fptosi --abstract-data -p latency=$LATENCY bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -227,12 +234,14 @@
   },
   {
     "name": "handshake.mulf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t mulf --abstract-data -p latency=4 is_double=$IS_DOUBLE",
+    "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t mulf --abstract-data -p latency=$LATENCY is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.muli",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t muli --abstract-data -p latency=4 bitwidth=$BITWIDTH",
+    "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t muli --abstract-data -p latency=$LATENCY bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -267,20 +276,23 @@
   },
   {
     "name": "handshake.sitofp",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sitofp --abstract-data -p latency=5 bitwidth=$BITWIDTH",
+    "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sitofp --abstract-data -p latency=$LATENCY bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.subf",
     "parameters": [
+      { "name": "LATENCY", "type": "unsigned" },
       { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t subf --abstract-data -p latency=12 is_double=$IS_DOUBLE",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t subf --abstract-data -p latency=$LATENCY is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.subf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t subf --abstract-data -p latency=9 is_double=$IS_DOUBLE",
+    "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t subf --abstract-data -p latency=$LATENCY is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
