@@ -55,4 +55,4 @@ metals.sbt
 /ext
 
 # modelsim.ini, created if simulation is run from inside /dynamatic
-/modelsim.ini
+*/modelsim.ini
