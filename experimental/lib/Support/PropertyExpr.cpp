@@ -50,31 +50,37 @@ struct OpSpelling {
   StringLiteral smv;
 };
 
+// clang-format off
 constexpr OpSpelling<UnaryExpr::Op> UNARY_SPELLINGS[] = {
-    {UnaryExpr::Not, "not", "!"}, {UnaryExpr::ToInt, "toint", "toint"},
-    {UnaryExpr::AG, "AG", "AG"},  {UnaryExpr::AF, "AF", "AF"},
-    {UnaryExpr::AX, "AX", "AX"},  {UnaryExpr::EG, "EG", "EG"},
-    {UnaryExpr::EF, "EF", "EF"},  {UnaryExpr::EX, "EX", "EX"},
+    {UnaryExpr::Not,   "not",   "!"},
+    {UnaryExpr::ToInt, "toint", "toint"},
+    {UnaryExpr::AG,    "AG",    "AG"},
+    {UnaryExpr::AF,    "AF",    "AF"},
+    {UnaryExpr::AX,    "AX",    "AX"},
+    {UnaryExpr::EG,    "EG",    "EG"},
+    {UnaryExpr::EF,    "EF",    "EF"},
+    {UnaryExpr::EX,    "EX",    "EX"},
 };
 
 constexpr OpSpelling<BinaryExpr::Op> BINARY_SPELLINGS[] = {
     {BinaryExpr::Implies, "implies", "->"},
-    {BinaryExpr::Iff, "iff", "<->"},
-    {BinaryExpr::Sub, "sub", "-"},
-    {BinaryExpr::Mul, "mul", "*"},
-    {BinaryExpr::Eq, "eq", "="},
-    {BinaryExpr::Lt, "lt", "<"},
-    {BinaryExpr::Le, "le", "<="},
-    {BinaryExpr::Gt, "gt", ">"},
-    {BinaryExpr::Ge, "ge", ">="},
+    {BinaryExpr::Iff,     "iff",     "<->"},
+    {BinaryExpr::Sub,     "sub",     "-"},
+    {BinaryExpr::Mul,     "mul",     "*"},
+    {BinaryExpr::Eq,      "eq",      "="},
+    {BinaryExpr::Lt,      "lt",      "<"},
+    {BinaryExpr::Le,      "le",      "<="},
+    {BinaryExpr::Gt,      "gt",      ">"},
+    {BinaryExpr::Ge,      "ge",      ">="},
 };
 
 constexpr OpSpelling<NaryExpr::Op> NARY_SPELLINGS[] = {
-    {NaryExpr::And, "and", "&"},
-    {NaryExpr::Or, "or", "|"},
-    {NaryExpr::Add, "add", "+"},
+    {NaryExpr::And,   "and",   "&"},
+    {NaryExpr::Or,    "or",    "|"},
+    {NaryExpr::Add,   "add",   "+"},
     {NaryExpr::Count, "count", "count"},
 };
+// clang-format on
 
 // Kinds of the leaves in JSON
 constexpr StringLiteral STATE_KIND = "state";

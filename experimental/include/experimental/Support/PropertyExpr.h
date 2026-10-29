@@ -95,12 +95,17 @@ public:
     assert(this->namer && "state without a namer");
   }
 
-  /// Copies `namer`.
-  template <typename Namer, typename = std::enable_if_t<std::is_base_of_v<
-                                handshake::InternalStateNamer, Namer>>>
-  State(const Namer &namer, std::optional<int32_t> constraint = std::nullopt)
+  /// Constructs a state from a copy of `namer`. This is equivalent to writing
+  /// out one plain constructor per namer, i.e., State(const EagerForkSentNamer
+  /// &namer, ...), State(const BufferSlotFullNamer &namer, ...), etc. The
+  /// template only exists for the subclasses of `InternalStateNamer`
+  /// (`is_base_of`).
+  template <typename NamerType, typename = std::enable_if_t<std::is_base_of_v<
+                                    handshake::InternalStateNamer, NamerType>>>
+  State(const NamerType &namer,
+        std::optional<int32_t> constraint = std::nullopt)
       : State(std::shared_ptr<handshake::InternalStateNamer>(
-                  std::make_shared<Namer>(namer)),
+                  std::make_shared<NamerType>(namer)),
               constraint) {}
 
   const std::shared_ptr<handshake::InternalStateNamer> &getNamer() const {

@@ -146,42 +146,22 @@ constexpr StringLiteral EXIT_TOKEN_NO_ANCESTORS = "ExitTokenNoAncestors";
 // The generators in the order in which they run by default. The generator of
 // ExitTokenOrder also generates the ExitTokenNoAncestors invariants, as both
 // are derived from the same paths.
+// clang-format off
 const HandshakeAnnotatePropertiesPass::GeneratorEntry
     HandshakeAnnotatePropertiesPass::GENERATORS[] = {
-        {FormalProperty::ABSENCE_OF_BACKPRESSURE,
-         &HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure,
-         /*isInvariant=*/false},
-        {FormalProperty::VALID_EQUIVALENCE,
-         &HandshakeAnnotatePropertiesPass::annotateValidEquivalence,
-         /*isInvariant=*/false},
-        {EAGER_FORK_NOT_ALL_OUTPUT_SENT,
-         &HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent,
-         /*isInvariant=*/true},
-        {COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL,
-         &HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks,
-         /*isInvariant=*/true},
-        {EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE,
-         &HandshakeAnnotatePropertiesPass::annotateEagerForkPath,
-         /*isInvariant=*/true},
-        {RECONVERGENT_PATH_FLOW,
-         &HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow,
-         /*isInvariant=*/true},
-        {IOG_SINGLE_TOKEN,
-         &HandshakeAnnotatePropertiesPass::annotateIOGSingleToken,
-         /*isInvariant=*/true},
-        {IOG_CONSECUTIVE_TOKENS,
-         &HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens,
-         /*isInvariant=*/true},
-        {ENTRY_TOKEN_ORDER,
-         &HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder,
-         /*isInvariant=*/true},
-        {SINGLE_ENTRY_TOKEN,
-         &HandshakeAnnotatePropertiesPass::annotateSingleEntryToken,
-         /*isInvariant=*/true},
-        {EXIT_TOKEN_ORDER,
-         &HandshakeAnnotatePropertiesPass::annotateExitTokenOrder,
-         /*isInvariant=*/true},
+    {FormalProperty::ABSENCE_OF_BACKPRESSURE,   &HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure,     /*isInvariant=*/false},
+    {FormalProperty::VALID_EQUIVALENCE,         &HandshakeAnnotatePropertiesPass::annotateValidEquivalence,          /*isInvariant=*/false},
+    {EAGER_FORK_NOT_ALL_OUTPUT_SENT,            &HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent, /*isInvariant=*/true},
+    {COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL,     &HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks,     /*isInvariant=*/true},
+    {EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE, &HandshakeAnnotatePropertiesPass::annotateEagerForkPath,             /*isInvariant=*/true},
+    {RECONVERGENT_PATH_FLOW,                    &HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow,      /*isInvariant=*/true},
+    {IOG_SINGLE_TOKEN,                          &HandshakeAnnotatePropertiesPass::annotateIOGSingleToken,            /*isInvariant=*/true},
+    {IOG_CONSECUTIVE_TOKENS,                    &HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens,      /*isInvariant=*/true},
+    {ENTRY_TOKEN_ORDER,                         &HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder,           /*isInvariant=*/true},
+    {SINGLE_ENTRY_TOKEN,                        &HandshakeAnnotatePropertiesPass::annotateSingleEntryToken,          /*isInvariant=*/true},
+    {EXIT_TOKEN_ORDER,                          &HandshakeAnnotatePropertiesPass::annotateExitTokenOrder,            /*isInvariant=*/true},
 };
+// clang-format on
 
 bool isChannelToBeChecked(OpResult res) {
   // The channel connected to EndOp, MemoryControllerOp, and LSQOp don't appear

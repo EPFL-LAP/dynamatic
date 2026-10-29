@@ -72,7 +72,7 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(ModuleOp modO
 }
 ```
 
-Then add the generator to the `GENERATORS` table of the pass, under the name with which it is selected in the `annotate-list` option. Nothing else needs to change: `export-rtl` prints the formula of any property, choosing between `INVAR`, `INVARSPEC`, and `CTLSPEC` depending on the tag and on whether the formula is temporal.
+Then add the generator to the `GENERATORS` table of the pass, under the name with which it is selected in the `annotate-list` option. Nothing else needs to change, as `export-rtl` prints the formula of any property. It prints an `INVAR` property as an `INVAR` constraint, and an `OPT` property as an `INVARSPEC` whenever possible, since invariant checking is faster than CTL model checking. It uses `CTLSPEC` only if the formula contains a temporal operator.
 
 ### Expose the Internal State in the Model
 
