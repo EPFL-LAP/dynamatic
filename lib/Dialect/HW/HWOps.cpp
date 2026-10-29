@@ -952,7 +952,8 @@ template <typename ModuleTy>
 static void printModuleOp(OpAsmPrinter &p, ModuleTy mod) {
   p << ' ';
   // Print the visibility of the module.
-  StringRef visibilityAttrName = SymbolTable::getVisibilityAttrName();
+  StringRef visibilityAttrName =
+      mlir::SymbolOpInterface::getDefaultVisibilityAttrName();
   if (auto visibility = mod.getOperation()->template getAttrOfType<StringAttr>(
           visibilityAttrName))
     p << visibility.getValue() << ' ';
@@ -2637,7 +2638,7 @@ void UnionExtractOp::print(OpAsmPrinter &printer) {
 
 LogicalResult UnionExtractOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> loc, ValueRange operands,
-    DictionaryAttr attrs, mlir::OpaqueProperties properties,
+    DictionaryAttr attrs, ::mlir::PropertyRef properties,
     mlir::RegionRange regions, SmallVectorImpl<Type> &results) {
   Adaptor adaptor(operands, attrs, properties, regions);
   auto unionElements =

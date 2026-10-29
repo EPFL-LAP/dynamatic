@@ -493,7 +493,7 @@ parseFuncOpArgs(OpAsmParser &parser,
                 SmallVectorImpl<Type> &resTypes,
                 SmallVectorImpl<DictionaryAttr> &resAttrs) {
   bool isVariadic;
-  if (mlir::function_interface_impl::parseFunctionSignature(
+  if (mlir::function_interface_impl::parseFunctionSignatureWithArguments(
           parser, /*allowVariadic=*/true, entryArgs, isVariadic, resTypes,
           resAttrs)
           .failed())
@@ -550,7 +550,7 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
                              result.attributes) ||
       parseFuncOpArgs(parser, args, resTypes, resAttributes))
     return failure();
-  mlir::function_interface_impl::addArgAndResultAttrs(
+  mlir::call_interface_impl::addArgAndResultAttrs(
       builder, result, args, resAttributes,
       handshake::FuncOp::getArgAttrsAttrName(result.name),
       handshake::FuncOp::getResAttrsAttrName(result.name));
@@ -621,7 +621,7 @@ bool ConditionalBranchOp::isControl() {
 
 LogicalResult ConstantOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, mlir::OpaqueProperties properties,
+    DictionaryAttr attributes, ::mlir::PropertyRef properties,
     mlir::RegionRange regions,
     SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   ConstantOp::Adaptor adaptor(operands, attributes, properties, regions);
@@ -1899,7 +1899,7 @@ void UnbundleOp::print(OpAsmPrinter &p) {
 
 LogicalResult UnbundleOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, mlir::OpaqueProperties properties,
+    DictionaryAttr attributes, ::mlir::PropertyRef properties,
     mlir::RegionRange regions,
     SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
 
@@ -1933,7 +1933,7 @@ LogicalResult UnbundleOp::verify() {
 LogicalResult
 CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          ValueRange operands, DictionaryAttr attributes,
-                         mlir::OpaqueProperties properties,
+                         ::mlir::PropertyRef properties,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
@@ -1955,7 +1955,7 @@ CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
 LogicalResult
 CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          ValueRange operands, DictionaryAttr attributes,
-                         mlir::OpaqueProperties properties,
+                         ::mlir::PropertyRef properties,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);

@@ -12,7 +12,10 @@ from lit.llvm import llvm_config
 # name: The name of this test suite.
 config.name = "DynamaticExperimental"
 
-config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
+# Run the RUN lines with lit's internal shell rather than an external one (e.g.,
+# bash): lit deprecates the external shell as of LLVM 23 and removes it in
+# LLVM 24
+config.test_format = lit.formats.ShTest(execute_external=False)
 
 # suffixes: A list of file extensions to treat as test files.
 config.suffixes = [".mlir"]

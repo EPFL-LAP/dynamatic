@@ -170,6 +170,11 @@ public:
     return transferFns<ast::StructuredForStatement>();
   }
 
+  TransferFnArray<ast::IfElseStatement>
+  getIfElseStatementTransferFns() override {
+    return transferFns<ast::IfElseStatement>();
+  }
+
   bool discardScalarType(const ast::ScalarType &scalarType,
                          const TypingContext &context) {
     return terminal(scalarType, context);
@@ -256,6 +261,10 @@ public:
 
   bool discardStructuredForStatement(const TypingContext &context) {
     return nonTerminal<ast::StructuredForStatement>(context);
+  }
+
+  bool discardIfElseStatement(const TypingContext &context) {
+    return nonTerminal<ast::IfElseStatement>(context);
   }
 
   ProbabilityTable<AbstractTypeSystem::ExpressionKey>

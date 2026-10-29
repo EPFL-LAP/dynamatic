@@ -113,6 +113,9 @@ private:
   std::optional<std::pair<ast::StructuredForStatement, OpaqueContext>>
   generateStructuredForStatement(OpaqueContext &&context);
 
+  std::optional<std::pair<ast::IfElseStatement, OpaqueContext>>
+  generateIfElseStatement(OpaqueContext &&context);
+
   Randomly &random;
   std::optional<ast::ReturnType> maybeReturnType;
   std::vector<ast::ScalarParameter> scalarParameters;
@@ -124,7 +127,7 @@ private:
 
   [[nodiscard]] auto pushNewScope() {
     localVariableStack.emplace_back();
-    return llvm::make_scope_exit([&] { localVariableStack.pop_back(); });
+    return llvm::scope_exit([&] { localVariableStack.pop_back(); });
   }
 
   void addVariable(ast::ScalarType type, std::string name) {

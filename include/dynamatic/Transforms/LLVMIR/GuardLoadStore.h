@@ -5,7 +5,8 @@
 
 namespace dynamatic {
 
-struct GuardLoadStorePass : public llvm::PassInfoMixin<GuardLoadStorePass> {
+struct GuardLoadStorePass
+    : public llvm::OptionalPassInfoMixin<GuardLoadStorePass> {
   llvm::PreservedAnalyses run(llvm::Function &f,
                               llvm::FunctionAnalysisManager &);
 };
