@@ -8,161 +8,75 @@ The infrastructure introduces a compiler pass called `annotate-properties`, whic
 
 ## Properties
 
-Properties are defined as derived classes of `FormalProperty`. The `FormalProperty` class contains the base information common to all properties and should not be modified when introducing new kinds of properties.
+A property (`FormalProperty` in `experimental/include/experimental/Support/FormalProperty.h`) is a record with the following fields:
+- `id`: Unique identifier, which also names the property in the SMV model.
+- `kind`: What the property describes (e.g., `AbsenceOfBackpressure`, `EagerForkNotAllOutputSent`).
+- `tag`: Purpose of the property: `OPT` for a property whose outcome decides an optimization, `INVAR` for an invariant that holds by construction and is assumed when checking the other properties.
+- `check`: Outcome of formal verification (`true`, `false`, or `null` if unchecked).
+- `expr`: The formula of the property (see below).
 
-The base fields are:
-- `type`: Categorizes the formal property (currently: aob, veq).
-- `tag`: Purpose of the property (e.g., opt for optimization, invar for invariants).
-- `check`: Outcome of formal verification (true, false, or unchecked).
+The formula is a `PropertyExpr` (`experimental/include/experimental/Support/PropertyExpr.h`), a container of any of the following nodes:
+- `State`: the internal state of a unit (an `InternalStateNamer`, e.g., whether a buffer slot is full or a fork output is in the sent state), optionally constrained to the value of the token it holds.
+- `Signal`: the valid or ready signal of an operand or result port of a unit (e.g., `fork0.outs_0_valid`). The properties that a downstream pass acts upon identify their channels through the valid signals of result ports (e.g., rigidification removes the ready signal of the channel of an `AbsenceOfBackpressure` property that holds).
+- `Constant`: an integer or boolean constant.
+- `UnaryExpr`: `!`, `toint`, and the CTL operators `AG`, `AF`, `AX`, `EG`, `EF`, `EX`.
+- `BinaryExpr`: `->`, `<->`, `-`, `*`, and comparisons.
+- `NaryExpr`: `&`, `|`, `+`, and `count`.
 
-Any additional fields required for specific property types can—and should—be implemented in the derived classes. We intentionally allow complete freedom in defining these extra fields, as the range of possible properties is broad and they often require different types of information.
-
-The only design principle when adding these extra fields is that they must be as complete as possible. The `annotate-properties` pass should be the only place in the code where the MLIR is analyzed to create properties. No further analysis should be needed by downstream tools to understand a property; they should only need to assemble the information already provided by the property object.
+The `annotate-properties` pass is the only place in the code where the MLIR is analyzed to create properties: the formula must be complete, so that downstream tools only need to print it. Invariants cannot contain temporal operators, as they are assumed in every state.
 
 Formal properties are stored in a shared JSON database, with each property entry following this schema:
 
 ```
 {
-  "check": "unchecked",              // Model checker result: "true", "false", or "unchecked"
-  "id": 0,                           // Unique property identifier
-  "info": {                          // Property-specific information for RTL/SMV generation
-    "owner": "fork0",
-    "owner_channel": "outs_0",
-    "owner_index": 0,
-    "user": "constant0",
-    "user_channel": "ctrl",
-    "user_index": 0
+  "check": null,
+  "expr": {
+    "op": "implies",
+    "operands": [
+      { "op": "signal", "signal": "valid", "unit": "fork0", "side": "result", "index": 0, "port": "outs_0" },
+      { "op": "signal", "signal": "ready", "unit": "constant0", "side": "operand", "index": 0, "port": "ctrl" }
+    ]
   },
-  "tag": "opt",                      // Property tag: "opt", "invar", "error", etc.
-  "type": "aob"                      // Type: "aob" (absence of back-pressure), "veq" (valid equivalence), ...
+  "id": 0,
+  "kind": "AbsenceOfBackpressure",
+  "tag": "OPT"
 }
 ```
 
 ## Adding a New Property
 
+To illustrate how a new property can be integrated, we take an example from the paper [Automatic Inductive Invariant Generation for Scalable Dataflow Circuit Verification](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2023/10/Xu_IWLS23_Inductive_Invariants.pdf): "for any fork, the number of outputs that are in the sent state must be smaller than the total number of fork outputs".
 
-The main goal of this infrastructure is to support the integration of as many formal properties as possible, so we have designed the process to be as simple and extensible as possible.
+### Write a Generator in the `annotate-properties` Pass
 
-To illustrate how a new property can be integrated, we take an example from the paper [Automatic Inductive Invariant Generation for Scalable Dataflow Circuit Verification](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2023/10/Xu_IWLS23_Inductive_Invariants.pdf).
-
-> [!NOTE]
->  This is intended as a conceptual illustration of how to add new properties to the system, not a step-by-step tutorial. Many implementation details are intentionally left out. The design decisions presented here are meant for illustration purposes, not necessarily as the optimal solution for this particular problem.
-
-In this example, we want to introduce a new invariant that states:
-"for any fork the number of outptus that are sent state must be saller than the total number of fork outputs".
-
-As is often the case with new properties, this one introduces requirements not previously encountered. Specifically, it refers to a state variable named "sent" inside an operation, which is not represented in the IR at all. We'll now explore one possible approach to handling this scenario.
-
-> [!NOTE]
-> If you decide to implement this or a different approach, please remember to update this documentation accordingly.
-
-
-### Define Your Derived Class
-
-At this stage, you should define all the information needed for downstream tools to fully understand and process the property. It might be difficult at first to determine all the required fields, but that’s okay — you can always revise the class later by adding or removing fields as needed.
-
-```
-class MyNewInvariant : public FormalProperty {
-public:
-  // Basic getters
-  std::string getOperation() { return operation; }
-  unsigned getSize() { return size; }
-  std::string getSignalName( unsigned idx ) { return signalNames[i]; }
-
-  // Serializer and deserializer declarations
-  llvm::json::Value extraInfoToJSON() const override;
-  static std::unique_ptr<MyNewInvariant> fromJSON(const llvm::json::Value &value,
-                                               llvm::json::Path path);
-  // Default constructor and destructor
-  MyNewInvariant() = default;
-  ~MyNewInvariant() = default;
-
-  // Standard function used to recognize the type during downcasting
-  static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::MY_NEW_TYPE;
-  }
-
-  // New fields
-private:
-  std::string operation;
-  unisgned size;
-  std::vector<std::string> signalNames;
-};
-```
-
-### Implement Serialization and Deserialization Methods
-
-Serialization and deserialization methods should be easy to implement once the fields for the derived class are decided. For our example they will look like this:
-
-```
-llvm::json::Value MyNewInvariant::extraInfoToJSON() const {
-    llvm::json::Array namesArray;
-    for (const auto &item : namesArray) {
-        namesArray.push_back(item);
-    } 
-    
-    return llvm::json::Object({{"operation", operation},
-                             {"size", size},
-                             {"signal_names", namesArray}});
-}
-```
-
-```
-std::unique_ptr<MyNewInvariant>
-MyNewInvariant::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
-  auto prop = std::make_unique<MyNewInvariant>();
-
-  auto info = prop->parseBaseAndExtractInfo(value, path);
-  llvm::json::ObjectMapper mapper(info, path);
-
-  if (!mapper || !mapper.mapOptional("operation", prop->operation) ||
-      !mapper.mapOptional("size", prop->size) ||
-      !mapper.mapOptional("signal_names", namesArray))
-    return nullptr;
-
-  // parse namesArray to a vector of strings
-
-  return prop;
-}
-```
-### Implement the Constructor
-
-This is the most important method of your formal porperty class. The contructor is responsible for creating the property and extracting the information from MLIR so that it can be easily assembled by any downstream tool later. For our example the constructur will look like this:
-
-```
-MyNewInvariant::MyNewInvariant(unsigned long id, TAG tag, const Operation& op)
-    : FormalProperty(id, tag, TYPE::MY_NEW_TYPE) {
-  handshake::PortNamer namer1(&op);
-
-  operation = getUniqueName(&op).str();
-  size = op->getSize();
-  for (int i = 0; i < size; i++)
-    signalNames.push_back("sent_" + to_string(i));
-}
-```
-
-### Update the `annotate-properties` Pass to Add Your Property
-
-Define your annotation function and add it to the `runOnOperation` method:
+A generator walks the circuit and adds one property per instance with `addProperty`, building its formula from the internal states and signals of the units:
 
 ```
 LogicalResult
-HandshakeAnnotatePropertiesPass::annotateMyNewInvariant(ModuleOp modOp){
-
-  for ( /* every fork in the circuit */ ){
-    // do something to the fork
-
-    // create your property
-    MyNewInvariant p(uid, FormalProperty::TAG::INVAR, op);
-    propertyTable.push_back(p.toJSON());
-          uid++;
+HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(ModuleOp modOp) {
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+        // count(fork0.outs_0_sent, fork0.outs_1_sent) < 2
+        std::vector<EagerForkSentNamer> sents =
+            forkOp.getInternalSentStateNamers();
+        PropertyExpr expr =
+            BinaryExpr(NaryExpr(NaryExpr::Count, getStates(sents)),
+                       BinaryExpr::Lt, Constant::integer(sents.size()));
+        addProperty(EAGER_FORK_NOT_ALL_OUTPUT_SENT, FormalProperty::TAG::INVAR,
+                    expr);
+      }
+    }
   }
-
   return success();
 }
 ```
 
-Accessing a state in SMV that doesn't exist is obviously impossible. Therefore one approach could be to add an hardware parameter that will inform the SMV generator to define a state called `sent` so that it can be accessible outside of the operation.
+Then add the generator to the `GENERATORS` table of the pass, under the name with which it is selected in the `annotate-list` option. Nothing else needs to change: `export-rtl` prints the formula of any property, choosing between `INVAR`, `INVARSPEC`, and `CTLSPEC` depending on the tag and on whether the formula is temporal.
+
+### Expose the Internal State in the Model
+
+A formula can only refer to state that the SMV model of the unit exposes. If a new property refers to a state that is not yet exposed (e.g., the `sent` state of a fork output), the SMV generator of the unit must define it so that it is accessible outside of the unit, and an `InternalStateNamer` must name it.
 
 For example the generated SMV code will look like this:
 
@@ -173,26 +87,6 @@ MODULE fork (ins_0, ins_0_valid, outs_0_ready, outs_1_ready)
 
   DEFINE sent_0 := ...;
   DEFINE sent_1 := ...;
-```
-
-
-### Update the Backend With Your New Property
-
-Now it's time to define how the property will be written to the output file. In the `export-rtl.cpp` file we need to modify the `createProperties` function to take into consideration our new properties when reading the database:
-
-```
-if (llvm::isa<MyNewInvariant>(property.get())) {
-      auto *p = llvm::cast<MyNewInvariant>(property.get());
-
-      // assemble the property
-      std::string s = p->getOperation + "." + p.getSignalName(0);
-      for (int i = 1: i < p->getSize(); i++){
-        s += " + " + p->getOperation + "." + p.getSignalName(0);
-      }
-      s += " < " + to_string(p->getSize());
-
-      data.properties[p->getId()] = {s, propertyTag};
-    }
 ```
 
 ## FAQs

@@ -8,7 +8,6 @@
 #include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/JSON.h"
 #include <bitset>
 #include <variant>
 
@@ -28,54 +27,6 @@
 namespace dynamatic {
 namespace handshake {
 
-// IndexTracker is used to represent flow variables that, instead of tracking
-// any token, only track tokens of a specific index. It is automatically added
-// for channel lambdas using IndexChannelAnalysis to determine if the channel
-// deals with indices.
-struct IndexTracker {
-  // numValues is the number of index values that are possible for this token.
-  // For example, if the token is used as the select input of a mux with 3 data
-  // inputs, numValues will be 3. The indices are always assumed to range from
-  // (0 .. numValues - 1), so all possible tokens would be {0, 1, 2} in the
-  // example.
-  // Note that this is slightly more information than simply the bit width of a
-  // channel: In the example, the bit width of the channel is 2 bits, but one of
-  // the 4 resulting options is invalid.
-  size_t numValues;
-  // Which token value does this variable track?
-  // e.g. 1 to only count tokens with value 1
-  // If trackedValue has no value, any value (0..numValues) is tracked
-  std::optional<size_t> trackedValue;
-
-  IndexTracker(size_t numValues) : numValues(numValues) {}
-  inline bool operator==(const IndexTracker &other) const {
-    return numValues == other.numValues && trackedValue == other.trackedValue;
-  }
-
-  inline llvm::json::Value toJSON() const {
-    return llvm::json::Object(
-        {{NUM_VALUES_LIT, numValues}, {SINGLE_VALUE_LIT, trackedValue}});
-  }
-
-  inline IndexTracker static fromJSON(const llvm::json::Value &value,
-                                      llvm::json::Path path) {
-    size_t numValues;
-    std::optional<size_t> singleValue;
-    llvm::json::ObjectMapper mapper(value, path);
-    if (!mapper || !mapper.map(NUM_VALUES_LIT, numValues) ||
-        !mapper.map(SINGLE_VALUE_LIT, singleValue)) {
-      llvm::report_fatal_error("json parsing of failed");
-    }
-
-    IndexTracker ret(numValues);
-    ret.trackedValue = singleValue;
-    return ret;
-  }
-
-  inline static const StringLiteral NUM_VALUES_LIT = "num_values";
-  inline static const StringLiteral SINGLE_VALUE_LIT = "single_value";
-};
-
 // IndexTokenTracker is used to represent flow variables that, instead of
 // tracking any token, only track tokens of specific indices. It is
 // automatically added for channel lambdas using IndexChannelAnalysis to
@@ -89,13 +40,6 @@ struct IndexTokenTracker {
   IndexTokenTracker(TrackerBitSet trackedValues)
       : trackedValues(trackedValues) {}
   IndexTokenTracker(size_t numValues);
-  inline llvm::json::Value toJSON() const {
-    return llvm::json::Object({{TRACKED_VALUES_LIT, trackedValues.to_ulong()}});
-  }
-
-  IndexTokenTracker static fromJSON(const llvm::json::Value &value,
-                                    llvm::json::Path path);
-
   inline void only(size_t value) { trackedValues &= (1 << value); }
 
   size_t getSingleValue() const {
@@ -114,8 +58,6 @@ struct IndexTokenTracker {
   inline bool operator!=(const IndexTokenTracker &other) const {
     return trackedValues != other.trackedValues;
   }
-
-  inline static const StringLiteral TRACKED_VALUES_LIT = "tracked_values";
 };
 
 struct ChannelLambda {
@@ -265,15 +207,7 @@ struct FlowExpression {
   FlowExpression() = default;
   FlowExpression(const FlowVariable &v);
 
-  llvm::json::Value toJSON() const;
-  static FlowExpression fromJSON(const llvm::json::Value &value,
-                                 llvm::json::Path path);
-
   std::string debug() const;
-
-  inline static const StringLiteral COEFFICIENT_LIT = "coefficient";
-  inline static const StringLiteral STATE_LIT = "state";
-  inline static const StringLiteral CONSTRAINT_LIT = "constraint";
 };
 
 FlowExpression operator-(FlowExpression expr);
@@ -366,8 +300,6 @@ struct FlowSystem {
   VariableRegistry registry;
   size_t nLambdas;
   MatIntType matrix;
-
-  FlowExpression getRowAsExpression(size_t row) const;
 
   FlowSystem() = default;
   FlowSystem(const std::vector<FlowExpression> &exprs);

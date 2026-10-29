@@ -12,17 +12,6 @@ IndexTokenTracker::IndexTokenTracker(size_t numValues) {
   }
 }
 
-IndexTokenTracker IndexTokenTracker::fromJSON(const llvm::json::Value &value,
-                                              llvm::json::Path path) {
-  llvm::json::ObjectMapper mapper(value, path);
-  unsigned long x;
-  if (!mapper || !mapper.map(TRACKED_VALUES_LIT, x)) {
-    llvm::report_fatal_error("json parsing of Token Tracker failed");
-  }
-  TrackerBitSet trackedValues = x;
-  return IndexTokenTracker(trackedValues);
-}
-
 // --------------------
 // --- FlowVariable ---
 // --------------------
@@ -131,55 +120,6 @@ FlowExpression::FlowExpression(const FlowVariable &v) {
     terms[v] = 1;
   }
 };
-
-llvm::json::Value FlowExpression::toJSON() const {
-  std::vector<llvm::json::Value> jsonTerms{};
-  for (auto &[key, value] : terms) {
-    auto *state = std::get_if<FlowInternalState>(&key.variable);
-    assert(state);
-    std::optional<llvm::json::Value> constraintJson;
-    if (key.indexTokenTracker) {
-      constraintJson = key.indexTokenTracker->toJSON();
-    } else {
-      constraintJson = nullptr;
-    }
-    // int pm = key.pm;
-    jsonTerms.emplace_back(
-        llvm::json::Object({{STATE_LIT, state->namer},
-                            {COEFFICIENT_LIT, value},
-                            {CONSTRAINT_LIT, constraintJson}}));
-  }
-  return llvm::json::Array(jsonTerms);
-}
-
-FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
-                                        llvm::json::Path path) {
-  FlowExpression expr;
-  const llvm::json::Array *arr = value.getAsArray();
-  assert(arr && "FlowExpression JSON is not an array");
-  for (const llvm::json::Value &termJSON : *arr) {
-    llvm::json::ObjectMapper mapper(termJSON, path);
-    std::unique_ptr<InternalStateNamer> namer;
-    int coef;
-    if (!mapper || !mapper.map(STATE_LIT, namer) ||
-        !mapper.map(COEFFICIENT_LIT, coef))
-      llvm::report_fatal_error("Failed FlowExpression term mapping");
-    std::shared_ptr<InternalStateNamer> sharedNamer = std::move(namer);
-    FlowVariable var = FlowVariable(FlowInternalState(sharedNamer));
-
-    auto *obj = termJSON.getAsObject();
-    const llvm::json::Value *constraint = obj->get(CONSTRAINT_LIT);
-    assert(constraint && "FlowExpression does not contain CONSTRAINT_LIT");
-    if (auto n = constraint->getAsNull()) {
-      assert(!var.indexTokenTracker);
-    } else {
-      var.indexTokenTracker = IndexTokenTracker::fromJSON(*constraint, path);
-    }
-
-    expr.terms[var] = coef;
-  }
-  return expr;
-}
 
 std::string FlowExpression::debug() const {
   std::string ret;
@@ -720,17 +660,6 @@ LogicalResult FlowEquationExtractor::extractStoreOp(StoreOp storeOp) {
 // ------------------
 // --- FlowSystem ---
 // ------------------
-FlowExpression FlowSystem::getRowAsExpression(size_t row) const {
-  FlowExpression ret;
-  for (size_t col = 0; col < registry.size(); ++col) {
-    int coef = matrix(row, col);
-    if (coef != 0) {
-      ret += coef * registry.getVar(col);
-    }
-  }
-  return ret;
-}
-
 FlowSystem::FlowSystem(const std::vector<FlowExpression> &exprs) {
   // give lower indices to variables that cannot be annotated
   for (auto &expr : exprs) {

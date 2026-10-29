@@ -53,6 +53,7 @@
 #include <system_error>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 using namespace llvm;
 using namespace mlir;
@@ -245,9 +246,8 @@ struct WriteModData {
   SmallVector<Value> inputs;
   /// List of SSA values feeding the module's output ports.
   SmallVector<Value> outputs;
-  /// Maps each property ID to the corresponding property and tag
-  std::unordered_map<long unsigned, std::pair<std::string, FormalProperty::TAG>>
-      properties;
+  /// The formal properties of the module, in the order of the database
+  std::vector<const FormalProperty *> properties;
 
   /// Constructs from the module being exported and from the stream to write the
   /// RTL implementation to.
@@ -276,9 +276,7 @@ struct WriteModData {
   /// the implementation's internal signals.
   void writeSignalAssignments(SignalAssignmentWriter writeAssignment);
 
-  using PropertyWriter = void (*)(const unsigned long &id,
-                                  const std::string &property,
-                                  FormalProperty::TAG tag,
+  using PropertyWriter = void (*)(const FormalProperty &property,
                                   raw_indented_ostream &os);
 
   /// Writes properties
@@ -613,9 +611,8 @@ void WriteModData::writeSignalAssignments(
 }
 
 void WriteModData::writeProperties(PropertyWriter writeProperty) {
-  for (auto const &[id, property] : properties) {
-    writeProperty(id, property.first, property.second, os);
-  }
+  for (const FormalProperty *property : properties)
+    writeProperty(*property, os);
 }
 
 RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
@@ -1236,208 +1233,15 @@ LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
 }
 
 LogicalResult SMVWriter::createProperties(WriteModData &data) const {
-  for (const auto &property : propertyInfo.table.getProperties()) {
-
-    FormalProperty::TAG propertyTag = property->getTag();
-
-    if (auto *p = llvm::dyn_cast<AbsenceOfBackpressure>(property.get())) {
-      std::string validSignal =
-          p->getOwner() + "." + p->getOwnerChannel() + "_valid";
-      std::string readySignal =
-          p->getUser() + "." + p->getUserChannel() + "_ready";
-
-      data.properties[p->getId()] = {validSignal + " -> " + readySignal,
-                                     propertyTag};
-    } else if (auto *p = llvm::dyn_cast<ValidEquivalence>(property.get())) {
-      std::string validSignal1 =
-          p->getOwner() + "." + p->getOwnerChannel() + "_valid";
-      std::string validSignal2 =
-          p->getTarget() + "." + p->getTargetChannel() + "_valid";
-
-      data.properties[p->getId()] = {validSignal1 + " <-> " + validSignal2,
-                                     propertyTag};
-    } else if (auto *p =
-                   llvm::dyn_cast<EagerForkNotAllOutputSent>(property.get())) {
-      auto sentStates = p->getSentStateNamers();
-      unsigned numOut = sentStates.size();
-      std::vector<std::string> outNames{numOut};
-      for (unsigned i = 0; i < numOut; ++i) {
-        outNames[i] = sentStates[i].getSMVName();
-      }
-      std::string propertyString =
-          llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
-              .str();
-      // e.g. count(fork0.sent_0, fork0.sent_1) < 2
-      // for operation "fork0" with 2 eager outputs
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<CopiedSlotsOfActiveForkAreFull>(
-                   property.get())) {
-      std::vector<std::string> forkOutNames(0);
-      for (auto [i, sentState] : llvm::enumerate(p->getSentStateNamers())) {
-        forkOutNames.push_back(sentState.getSMVName());
-      }
-      auto &copiedSlot = p->getCopiedSlot();
-      std::string bufferFull = copiedSlot.getSMVName();
-      std::string propertyString =
-          llvm::formatv("({0}) -> {1}", llvm::join(forkOutNames, " | "),
-                        bufferFull)
-              .str();
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<EagerForkPathTokenCopiedMaximumOnce>(
-                   property.get())) {
-      std::string channelName =
-          llvm::formatv("{0}.{1}_valid", p->getValidOp(), p->getValidChannel());
-      auto sentStates = p->getSentStateNamers();
-      std::vector<std::string> forkOutNames{sentStates.size()};
-      for (unsigned i = 0; i < sentStates.size(); ++i) {
-        forkOutNames[i] = sentStates[i].getSMVName();
-      }
-      std::string propertyString = llvm::formatv(
-          "({0}) -> {1}", llvm::join(forkOutNames, " | "), channelName);
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<ReconvergentPathFlow>(property.get())) {
-      std::vector<std::string> eqs{};
-      for (auto &eq : p->getEquations()) {
-        std::vector<std::string> terms;
-        for (auto &[key, value] : eq.terms) {
-          auto annotater = key.getAnnotater();
-          assert(annotater != nullptr &&
-                 "variable without annotater in final equation");
-          std::string t =
-              llvm::formatv("toint({0}) * {1}", annotater->getSMVName(), value);
-          terms.push_back(t);
-        }
-        std::string equationString =
-            llvm::formatv("({0} = 0)", llvm::join(terms, " + ")).str();
-        eqs.push_back(equationString);
-      }
-      std::string propertyString = llvm::join(eqs, " & ");
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<IOGSingleToken>(property.get())) {
-      // count(slot1, slot2, ...) = 1 + count(fork1, fork2, ...)
-      std::vector<std::string> smvSlots(0);
-      smvSlots.reserve(p->slots.size());
-      for (auto &slot : p->slots) {
-        smvSlots.push_back(slot->getSMVName());
-      }
-      // smvSlots cannot be empty, as each IOG contains at least the entry slot
-
-      std::vector<std::string> smvForks(0);
-      smvForks.reserve(p->forks.size());
-      for (auto &fork : p->forks) {
-        smvForks.push_back(fork.getSMVName());
-      }
-      std::string rhs;
-      if (smvForks.empty()) {
-        rhs = "1";
-      } else {
-        rhs = llvm::formatv("1 + count({0})", llvm::join(smvForks, ", "));
-      }
-
-      std::string propertyString =
-          llvm::formatv("count({0}) = {1}", llvm::join(smvSlots, ", "), rhs);
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<IOGConsecutiveTokens>(property.get())) {
-      // buffer1.slotted_token_count > 0 & buffer2.slotted_token_count > 0 ->
-      // fork3.outs1_sent | fork4.outs0_sent
-      std::string right;
-      if (p->sents.empty()) {
-        right = "FALSE";
-      } else {
-        std::vector<std::string> sentNames;
-        sentNames.reserve(p->sents.size());
-        for (auto &sent : p->sents) {
-          sentNames.push_back(sent.getSMVName());
-        }
-        right = llvm::join(sentNames, " | ");
-      }
-      std::string propertyString =
-          llvm::formatv("(({0} > 0) & ({1} > 0)) -> ({2})",
-                        p->slot1.getSMVName(), p->slot2.getSMVName(), right);
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<EntryTokenOrder>(property.get())) {
-      std::vector<std::string> ends{};
-      const auto &slots = p->getSlots();
-      assert(slots.size() >= 2);
-
-      for (auto start = slots.begin(); start != slots.end(); ++start) {
-        std::string entryToken = start->constrain(p->getValue())->getSMVName();
-        std::vector<std::string> laterSlots{};
-        for (auto later = start + 1; later != slots.end(); ++later) {
-          // Any later slot must not be full
-          laterSlots.emplace_back(llvm::formatv("!({0})", later->getSMVName()));
-        }
-        // if laterSlots is empty, there is nothing to annotate with this
-        // starting slot
-        if (laterSlots.empty()) {
-          continue;
-        }
-
-        ends.push_back(llvm::formatv("(({0}) -> ({1}))", entryToken,
-                                     llvm::join(laterSlots, " & ")));
-      }
-      // This holds because every EntryTokenOrder slot path contains at least
-      // two slots
-      assert(!ends.empty());
-      std::string propertyString = llvm::join(ends, " & ");
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<SingleEntryToken>(property.get())) {
-      std::vector<std::string> cmStrs;
-      for (const auto &x : p->getCmPath()) {
-        cmStrs.push_back(x.getSMVName());
-      }
-      std::vector<std::string> ecStrs;
-      for (const auto &x : p->getEcPath()) {
-        ecStrs.push_back(x.getSMVName());
-      }
-      std::string propertyString =
-          llvm::formatv("count({0}) > 0 -> count({1}) = 0",
-                        llvm::join(cmStrs, ", "), llvm::join(ecStrs, ", "));
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<ExitTokenOrder>(property.get())) {
-      // (buffer3.full & buffer3.data = exit) -> (!buffer1.full & !buffer2.full)
-      const auto &slots = p->getSlots();
-      assert(slots.size() >= 2);
-      std::vector<std::string> earlierSlots;
-      std::vector<std::string> ends{};
-      earlierSlots.push_back(
-          llvm::formatv("!({0})", slots.begin()->getSMVName()));
-      for (auto start = slots.begin() + 1; start != slots.end(); ++start) {
-        std::string exitToken = start->constrain(p->getValue())->getSMVName();
-        ends.push_back(llvm::formatv("(({0}) -> ({1}))", exitToken,
-                                     llvm::join(earlierSlots, " & ")));
-        earlierSlots.push_back(llvm::formatv("!({0})", start->getSMVName()));
-      }
-
-      std::string propertyString = llvm::join(ends, " & ");
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<ExitTokenNoAncestors>(property.get())) {
-      const auto &exitSlots = p->getExitSlots();
-      int32_t exitValue = p->getValue();
-      std::vector<std::string> exitFulls;
-      exitFulls.reserve(exitSlots.size());
-      for (const auto &exitSlot : exitSlots) {
-        auto name = exitSlot->tryConstrain(exitValue)->getSMVName();
-        exitFulls.push_back(name);
-      }
-      std::string left =
-          llvm::formatv("count({0}) > 0", llvm::join(exitFulls, ", "));
-
-      const auto &ancestors = p->getAncestors();
-      std::vector<std::string> ancestorSlots;
-      ancestorSlots.reserve(ancestors.size());
-      for (const auto &slot : ancestors) {
-        auto name = slot.getSMVName();
-        ancestorSlots.push_back(name);
-      }
-      std::string right =
-          llvm::formatv("count({0}) = 0", llvm::join(ancestorSlots, ", "));
-      std::string propertyString = llvm::formatv("({0}) -> ({1})", left, right);
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else {
-      llvm::errs() << "Formal property Type not known\n";
+  for (const FormalProperty &property : propertyInfo.table.getProperties()) {
+    // Invariants are assumed in every state, so they cannot be temporal
+    if (property.tag == FormalProperty::TAG::INVAR &&
+        property.expr.isTemporal()) {
+      llvm::errs() << "Invariant " << property.id
+                   << " contains a temporal operator\n";
       return failure();
     }
+    data.properties.push_back(&property);
   }
   return success();
 }
@@ -1550,21 +1354,28 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
 
   writeModuleInstantiations(data);
   os << "\n-- properties\n";
-  data.writeProperties([](const unsigned long &id, const std::string &property,
-                          FormalProperty::TAG tag, raw_indented_ostream &os) {
-    if (verifyInvariants) {
-      if (tag == FormalProperty::TAG::INVAR) {
-        os << "INVARSPEC NAME invariant" << id << " := " << property << ";\n";
-      }
-    } else {
-      if (tag == FormalProperty::TAG::OPT)
-        os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
-      else if (tag == FormalProperty::TAG::INVAR) {
-        os << "-- invariant" << id << "\n";
-        os << "INVAR " << property << ";\n";
-      }
-    }
-  });
+  data.writeProperties(
+      [](const FormalProperty &property, raw_indented_ostream &os) {
+        std::string expr = property.expr.toSMV();
+        // Properties to check are CTL formulas if they contain a temporal
+        // operator, and invariants otherwise
+        StringRef specKeyword =
+            property.expr.isTemporal() ? "CTLSPEC" : "INVARSPEC";
+        if (verifyInvariants) {
+          if (property.tag == FormalProperty::TAG::INVAR) {
+            os << "INVARSPEC NAME invariant" << property.id << " := " << expr
+               << ";\n";
+          }
+        } else {
+          if (property.tag == FormalProperty::TAG::OPT)
+            os << specKeyword << " NAME p" << property.id << " := " << expr
+               << ";\n";
+          else if (property.tag == FormalProperty::TAG::INVAR) {
+            os << "-- invariant" << property.id << "\n";
+            os << "INVAR " << expr << ";\n";
+          }
+        }
+      });
 
   return success();
 }

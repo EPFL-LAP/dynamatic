@@ -15,6 +15,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
@@ -22,23 +23,36 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
+#include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
+#include "experimental/Support/FlowExpression.h"
 #include "experimental/Support/FormalProperty.h"
 #include "experimental/Support/IOG.h"
+#include "experimental/Support/PropertyExpr.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/raw_ostream.h"
+#include <cstdint>
 #include <fstream>
+#include <memory>
+#include <optional>
 #include <ostream>
 #include <unordered_set>
+#include <utility>
+#include <variant>
+#include <vector>
 
 using namespace llvm;
 using namespace mlir;
@@ -67,12 +81,30 @@ struct HandshakeAnnotatePropertiesPass
   void runOnOperation() override;
 
 private:
-  unsigned int uid;
-  json::Array propertyTable;
+  /// Identifier of the next property
+  uint64_t uid = 0;
+  std::vector<FormalProperty> propertyTable;
+  /// The IOGs of the module, computed once for all properties derived from
+  /// them
+  std::vector<IOG> iogs;
 
-  LogicalResult annotateProperty(ModuleOp modOp, const std::vector<IOG> &iogs,
-                                 FormalProperty::TYPE t);
-  LogicalResult annotateQueriedProperties(const std::vector<IOG> &iogs);
+  /// Generates the properties of one or more kinds over the whole module.
+  using Generator =
+      LogicalResult (HandshakeAnnotatePropertiesPass::*)(ModuleOp);
+  struct GeneratorEntry {
+    /// The name with which the generator is selected in `annotate-list`
+    StringLiteral name;
+    Generator generator;
+    /// Whether the generator produces invariants (`annotate-invariants`) or
+    /// properties to check (`annotate-properties`)
+    bool isInvariant;
+  };
+  static const GeneratorEntry GENERATORS[];
+
+  /// Adds a property to the table under the next identifier.
+  void addProperty(StringRef kind, FormalProperty::TAG tag, PropertyExpr expr);
+
+  LogicalResult annotateQueriedProperties();
   LogicalResult annotateAbsenceOfBackpressure(ModuleOp modOp);
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
@@ -86,13 +118,69 @@ private:
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
   LogicalResult annotateEagerForkPath(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
-  LogicalResult annotateIOGSingleToken(const IOG &iog);
-  LogicalResult annotateIOGConsecutiveTokens(const IOG &iog);
+  LogicalResult annotateIOGSingleToken(ModuleOp modOp);
+  LogicalResult annotateIOGConsecutiveTokens(ModuleOp modOp);
+  void annotateIOGConsecutiveTokensOf(const IOG &iog);
   LogicalResult annotateEntryTokenOrderPaths(ControlMergeOp cmerge,
                                              int32_t entryValue);
   LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
   LogicalResult annotateSingleEntryToken(ModuleOp modOp);
-  LogicalResult annotateExitTokenOrder(const std::vector<IOG> &iog);
+  LogicalResult annotateExitTokenOrder(ModuleOp modOp);
+};
+
+// Kinds of the invariants
+constexpr StringLiteral EAGER_FORK_NOT_ALL_OUTPUT_SENT =
+    "EagerForkNotAllOutputSent";
+constexpr StringLiteral COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL =
+    "CopiedSlotsOfActiveForksAreFull";
+constexpr StringLiteral EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE =
+    "EagerForkPathTokenCopiedMaximumOnce";
+constexpr StringLiteral RECONVERGENT_PATH_FLOW = "ReconvergentPathFlow";
+constexpr StringLiteral IOG_SINGLE_TOKEN = "IOGSingleToken";
+constexpr StringLiteral IOG_CONSECUTIVE_TOKENS = "IOGConsecutiveTokens";
+constexpr StringLiteral ENTRY_TOKEN_ORDER = "EntryTokenOrder";
+constexpr StringLiteral SINGLE_ENTRY_TOKEN = "SingleEntryToken";
+constexpr StringLiteral EXIT_TOKEN_ORDER = "ExitTokenOrder";
+constexpr StringLiteral EXIT_TOKEN_NO_ANCESTORS = "ExitTokenNoAncestors";
+
+// The generators in the order in which they run by default. The generator of
+// ExitTokenOrder also generates the ExitTokenNoAncestors invariants, as both
+// are derived from the same paths.
+const HandshakeAnnotatePropertiesPass::GeneratorEntry
+    HandshakeAnnotatePropertiesPass::GENERATORS[] = {
+        {FormalProperty::ABSENCE_OF_BACKPRESSURE,
+         &HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure,
+         /*isInvariant=*/false},
+        {FormalProperty::VALID_EQUIVALENCE,
+         &HandshakeAnnotatePropertiesPass::annotateValidEquivalence,
+         /*isInvariant=*/false},
+        {EAGER_FORK_NOT_ALL_OUTPUT_SENT,
+         &HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent,
+         /*isInvariant=*/true},
+        {COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL,
+         &HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks,
+         /*isInvariant=*/true},
+        {EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE,
+         &HandshakeAnnotatePropertiesPass::annotateEagerForkPath,
+         /*isInvariant=*/true},
+        {RECONVERGENT_PATH_FLOW,
+         &HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow,
+         /*isInvariant=*/true},
+        {IOG_SINGLE_TOKEN,
+         &HandshakeAnnotatePropertiesPass::annotateIOGSingleToken,
+         /*isInvariant=*/true},
+        {IOG_CONSECUTIVE_TOKENS,
+         &HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens,
+         /*isInvariant=*/true},
+        {ENTRY_TOKEN_ORDER,
+         &HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder,
+         /*isInvariant=*/true},
+        {SINGLE_ENTRY_TOKEN,
+         &HandshakeAnnotatePropertiesPass::annotateSingleEntryToken,
+         /*isInvariant=*/true},
+        {EXIT_TOKEN_ORDER,
+         &HandshakeAnnotatePropertiesPass::annotateExitTokenOrder,
+         /*isInvariant=*/true},
 };
 
 bool isChannelToBeChecked(OpResult res) {
@@ -116,6 +204,42 @@ bool isChannelToBeChecked(OpResult res) {
 }
 } // namespace
 
+/// The `kind` signal of the result port of the unit producing `res` that `res`
+/// leaves through.
+static Signal getResultSignal(Signal::Kind kind, OpResult res) {
+  Operation *op = res.getOwner();
+  return Signal(kind, getUniqueName(op), Signal::Result, res.getResultNumber(),
+                cast<handshake::NamedIOInterface>(op).getResultName(
+                    res.getResultNumber()));
+}
+
+/// The `kind` signal of the operand port of the unit using `operand` that
+/// `operand` enters through.
+static Signal getOperandSignal(Signal::Kind kind, OpOperand &operand) {
+  Operation *op = operand.getOwner();
+  return Signal(kind, getUniqueName(op), Signal::Operand,
+                operand.getOperandNumber(),
+                cast<handshake::NamedIOInterface>(op).getOperandName(
+                    operand.getOperandNumber()));
+}
+
+/// State leaves for each of `namers`.
+template <typename Namer>
+static std::vector<PropertyExpr> getStates(const std::vector<Namer> &namers) {
+  std::vector<PropertyExpr> states;
+  states.reserve(namers.size());
+  for (const Namer &namer : namers)
+    states.emplace_back(State(namer));
+  return states;
+}
+
+void HandshakeAnnotatePropertiesPass::addProperty(StringRef kind,
+                                                  FormalProperty::TAG tag,
+                                                  PropertyExpr expr) {
+  propertyTable.push_back({/*id=*/uid++, /*kind=*/kind.str(), /*tag=*/tag,
+                           /*check=*/std::nullopt, /*expr=*/std::move(expr)});
+}
+
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
     Operation &op1, Operation &op2) {
@@ -125,10 +249,13 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
       // each pair of signals when the Ops are the same
       if ((&op1 != &op2 || i < j) && isChannelToBeChecked(res1) &&
           isChannelToBeChecked(res2)) {
-        ValidEquivalence p(uid, FormalProperty::TAG::OPT, res1, res2);
-
-        propertyTable.push_back(p.toJSON());
-        uid++;
+        // The two channels are valid in the same cycles, e.g.:
+        //   (fork0.outs_0_valid <-> fork0.outs_2_valid)
+        PropertyExpr expr =
+            BinaryExpr(getResultSignal(Signal::Valid, res1), BinaryExpr::Iff,
+                       getResultSignal(Signal::Valid, res2));
+        addProperty(FormalProperty::VALID_EQUIVALENCE, FormalProperty::TAG::OPT,
+                    expr);
       }
     }
   return success();
@@ -153,10 +280,13 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
       for (auto [resIndex, res] : llvm::enumerate(op.getResults()))
         if (isChannelToBeChecked(res)) {
 
-          AbsenceOfBackpressure p(uid, FormalProperty::TAG::OPT, res);
-
-          propertyTable.push_back(p.toJSON());
-          uid++;
+          // Whenever the channel is valid, its user is ready, e.g.:
+          //   (mux0.outs_valid -> fork2.ins_ready)
+          OpOperand &use = *res.getUses().begin();
+          PropertyExpr expr = implies(getResultSignal(Signal::Valid, res),
+                                      getOperandSignal(Signal::Ready, use));
+          addProperty(FormalProperty::ABSENCE_OF_BACKPRESSURE,
+                      FormalProperty::TAG::OPT, expr);
         }
     }
   }
@@ -169,10 +299,15 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent(
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
       if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
-        EagerForkNotAllOutputSent p(uid, FormalProperty::TAG::INVAR, forkOp);
-
-        propertyTable.push_back(p.toJSON());
-        uid++;
+        // Not all outputs are in the sent state at the same time, e.g.:
+        //   (count(fork1.outs_0_sent, fork1.outs_1_sent) < 2)
+        std::vector<EagerForkSentNamer> sents =
+            forkOp.getInternalSentStateNamers();
+        PropertyExpr expr =
+            BinaryExpr(NaryExpr(NaryExpr::Count, getStates(sents)),
+                       BinaryExpr::Lt, Constant::integer(sents.size()));
+        addProperty(EAGER_FORK_NOT_ALL_OUTPUT_SENT, FormalProperty::TAG::INVAR,
+                    expr);
       }
     }
   }
@@ -190,21 +325,23 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlotsRec(
   }
   visitedSet.insert(id);
 
-  // If this operation contains a slot, the copied slot has been found and can
-  // be annotated
+  // If this operation contains a slot, the copied slot (i.e., the last slot of
+  // the operation) has been found: if any output of the fork is in the sent
+  // state, the copied slot holds the token being copied, e.g.:
+  //   ((fork4.outs_0_sent | fork4.outs_1_sent) -> buffer8.full)
+  auto annotateCopiedSlot = [&](const PropertyExpr &copiedSlot) {
+    PropertyExpr anySent =
+        disjunction(getStates(originFork.getInternalSentStateNamers()));
+    addProperty(COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL,
+                FormalProperty::TAG::INVAR, implies(anySent, copiedSlot));
+  };
   if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(curOp)) {
-    CopiedSlotsOfActiveForkAreFull p(uid, FormalProperty::TAG::INVAR, bufferOp,
-                                     originFork);
-    propertyTable.push_back(p.toJSON());
-    uid++;
+    annotateCopiedSlot(State(bufferOp.getInternalSlotStateNamers().back()));
     return success();
   }
 
   if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(curOp)) {
-    CopiedSlotsOfActiveForkAreFull p(uid, FormalProperty::TAG::INVAR, latencyOp,
-                                     originFork);
-    propertyTable.push_back(p.toJSON());
-    uid++;
+    annotateCopiedSlot(State(latencyOp.getPipelineSlots().back()));
     return success();
   }
 
@@ -255,11 +392,17 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkPath(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
       if (auto forkOp = dyn_cast<ForkOp>(op)) {
-        EagerForkPathTokenCopiedMaximumOnce p(uid, FormalProperty::TAG::INVAR,
-                                              forkOp);
-
-        propertyTable.push_back(p.toJSON());
-        uid++;
+        // If any output of the fork is in the sent state, the input of the
+        // fork is valid (see the description of the invariant in the
+        // documentation), e.g.:
+        //   ((fork1.outs_0_sent | fork1.outs_1_sent) -> fork1.ins_valid)
+        PropertyExpr anySent =
+            disjunction(getStates(forkOp.getInternalSentStateNamers()));
+        // A fork has a single operand
+        addProperty(EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE,
+                    FormalProperty::TAG::INVAR,
+                    implies(anySent, getOperandSignal(Signal::Valid,
+                                                      op.getOpOperand(0))));
       }
     }
   }
@@ -301,16 +444,32 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       continue;
     }
 
-    FlowExpression expr = indices.getRowAsExpression(row);
-    if (expr.terms.size() == 0) {
+    // The row is an equation over internal states only: the sum of the
+    // internal states weighted by the coefficients of the row is 0, e.g.:
+    //   (((toint(fork4.outs_0_sent) * 1) + (toint(fork4.outs_1_sent) * -1)
+    //     + (toint((fork5.outs_0_sent & (fork5.ins = TRUE))) * -1)) = 0)
+    // The terms are in column order, which is the same in every run.
+    std::vector<PropertyExpr> terms;
+    for (size_t col = indices.nLambdas; col < indices.registry.size(); ++col) {
+      int coef = matrix(row, col);
+      if (coef == 0)
+        continue;
+      const FlowVariable &var = indices.registry.getVar(col);
+      auto *state = std::get_if<FlowInternalState>(&var.variable);
+      assert(state && "annotatable flow variable without internal state");
+      // A variable that tracks the tokens of one value only counts the state
+      // when it holds a token of that value
+      std::optional<int32_t> constraint;
+      if (var.indexTokenTracker)
+        constraint = var.indexTokenTracker->getSingleValue();
+      terms.emplace_back(BinaryExpr(
+          UnaryExpr(UnaryExpr::ToInt, State(state->namer, constraint)),
+          BinaryExpr::Mul, Constant::integer(coef)));
+    }
+    if (terms.empty())
       continue;
-    }
-    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
-    p.addEquation(expr);
-    if (p.getEquations().size() > 0) {
-      uid++;
-      propertyTable.push_back(p.toJSON());
-    }
+    addProperty(RECONVERGENT_PATH_FLOW, FormalProperty::TAG::INVAR,
+                BinaryExpr(sum(terms), BinaryExpr::Eq, Constant::integer(0)));
   }
   return success();
 }
@@ -365,39 +524,52 @@ findCopiedSents(const IOG &iog, Operation *startSlot, Operation *endSlot) {
 } // namespace
 
 LogicalResult
-HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(const IOG &iog) {
-  std::vector<std::unique_ptr<InternalStateNamer>> slots(0);
-
-  // We model the entry node as a buffer that initially has one token.
-  slots.push_back(std::make_unique<EntrySlotNamer>(iog.entry));
-  std::vector<EagerForkSentNamer> forks(0);
-  // Collecting the slots and sents inside the IOG. The invariant relation of
-  // num(slots) = 1 + num(eager fork sents)
-  for (auto &op : iog.units) {
-    for (auto &slot : getAllSlotsOfOperation(op)) {
-      slots.push_back(std::move(slot));
-    }
-    if (auto forkOp = dyn_cast<EagerForkLikeOpInterface>(op)) {
-      auto forkSlots = forkOp.getInternalSentStateNamers();
-      int count = 0;
-      for (auto [i, channel] : llvm::enumerate(forkOp->getResults())) {
-        if (iog.contains(channel)) {
-          forks.push_back(forkSlots[i]);
-          count += 1;
-        }
+HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(ModuleOp modOp) {
+  for (const IOG &iog : iogs) {
+    // We model the entry node as a buffer that initially has one token.
+    std::vector<PropertyExpr> slots{
+        State(std::make_shared<EntrySlotNamer>(iog.entry))};
+    std::vector<PropertyExpr> forks;
+    // Collecting the slots and sents inside the IOG. The invariant relation of
+    // num(slots) = 1 + num(eager fork sents), e.g.:
+    //   (count(start_valid, testbench.end_full)
+    //    = (1 + count(fork0.outs_1_sent)))
+    for (auto &op : iog.units) {
+      for (auto &slot : getAllSlotsOfOperation(op)) {
+        slots.emplace_back(State(std::move(slot)));
       }
-      assert(count == 1);
+      if (auto forkOp = dyn_cast<EagerForkLikeOpInterface>(op)) {
+        auto forkSlots = forkOp.getInternalSentStateNamers();
+        // Only read by the assertion
+        [[maybe_unused]] int count = 0;
+        for (auto [i, channel] : llvm::enumerate(forkOp->getResults())) {
+          if (iog.contains(channel)) {
+            forks.emplace_back(State(forkSlots[i]));
+            count += 1;
+          }
+        }
+        assert(count == 1);
+      }
     }
+    PropertyExpr tokens = Constant::integer(1);
+    if (!forks.empty())
+      tokens = sum({tokens, NaryExpr(NaryExpr::Count, forks)});
+    addProperty(
+        IOG_SINGLE_TOKEN, FormalProperty::TAG::INVAR,
+        BinaryExpr(NaryExpr(NaryExpr::Count, slots), BinaryExpr::Eq, tokens));
   }
-  auto p = IOGSingleToken(uid, FormalProperty::TAG::INVAR, std::move(slots),
-                          std::move(forks));
-  uid++;
-  propertyTable.push_back(p.toJSON());
   return success();
 }
 
 LogicalResult
-HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
+HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(ModuleOp modOp) {
+  for (const IOG &iog : iogs)
+    annotateIOGConsecutiveTokensOf(iog);
+  return success();
+}
+
+void HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokensOf(
+    const IOG &iog) {
   std::vector<std::pair<Operation *, TokenCountNamer>> slotOps;
   for (auto &op : iog.units) {
     auto slotCountNamer = getTokenCountNamerOfOperation(op);
@@ -429,13 +601,21 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
       // means that both slots cannot be occupied at the same time, as there is
       // only (at most) one token in the IOG
 
-      auto p = IOGConsecutiveTokens(uid, FormalProperty::TAG::INVAR,
-                                    slot1->second, slot2->second, copiedSents);
-      uid++;
-      propertyTable.push_back(p.toJSON());
+      // If both slots hold a token, one of the forks copied it, e.g.:
+      //   (((count(buffer1.full) > 0) & (count(buffer0.outs_valid_i) > 0))
+      //    -> (fork2.outs_2_sent | fork4.outs_0_sent))
+      // or, if no fork can copy the token between the two slots:
+      //   (((count(buffer14.full) > 0) & (count(testbench.end_full) > 0))
+      //    -> FALSE)
+      auto isOccupied = [](const TokenCountNamer &slot) {
+        return BinaryExpr(State(slot), BinaryExpr::Gt, Constant::integer(0));
+      };
+      PropertyExpr bothOccupied =
+          conjunction({isOccupied(slot1->second), isOccupied(slot2->second)});
+      addProperty(IOG_CONSECUTIVE_TOKENS, FormalProperty::TAG::INVAR,
+                  implies(bothOccupied, disjunction(getStates(copiedSents))));
     }
   }
-  return success();
 }
 namespace {
 
@@ -585,8 +765,26 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
       // The regex of this invariant trivially holds for any path of length 1
       continue;
     }
-    EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path, entryValue);
-    propertyTable.push_back(p.toJSON());
+    // If a slot holds the entry token, all later slots on the path are empty,
+    // e.g., for the path control_merge0 -> buffer3 -> buffer4 (2 slots) and the
+    // entry token FALSE:
+    //   (((control_merge0.slot_full & (control_merge0.data = FALSE) & ...)
+    //     -> ((! buffer3.outs_valid_i) & (! buffer4.b0.full)
+    //         & (! buffer4.b1.full)))
+    //    & ((buffer3.outs_valid_i & (buffer3.data = FALSE))
+    //       -> ((! buffer4.b0.full) & (! buffer4.b1.full)))
+    //    & ((buffer4.b0.full & (buffer4.b0.reg = FALSE)) -> (!
+    //    buffer4.b1.full)))
+    std::vector<PropertyExpr> implications;
+    for (auto start = path.begin(); start + 1 != path.end(); ++start) {
+      std::vector<PropertyExpr> laterSlotsEmpty;
+      for (auto later = start + 1; later != path.end(); ++later)
+        laterSlotsEmpty.push_back(!State(*later));
+      implications.push_back(
+          implies(State(*start, entryValue), conjunction(laterSlotsEmpty)));
+    }
+    addProperty(ENTRY_TOKEN_ORDER, FormalProperty::TAG::INVAR,
+                conjunction(implications));
   }
   return success();
 }
@@ -612,8 +810,18 @@ HandshakeAnnotatePropertiesPass::annotateSingleEntryToken(ModuleOp modOp) {
     for (BlockArgument arg : funcOp.getRegion().getArguments()) {
       for (const auto &ec : findEntryCMergePaths(arg)) {
         for (const auto &cm : findCMergeMuxPaths(ec.cmerge)) {
-          SingleEntryToken p(uid++, FormalProperty::TAG::INVAR, ec.slots, cm);
-          propertyTable.push_back(p.toJSON());
+          // If the path from the control merge to the mux holds a token, the
+          // path from the entry to the control merge is empty, e.g.:
+          //   ((count((control_merge0.slot_full & !fork3.outs_0_sent)) > 0)
+          //    -> (count((start_valid & !fork0.outs_2_sent)) = 0))
+          PropertyExpr cmOccupied =
+              BinaryExpr(NaryExpr(NaryExpr::Count, getStates(cm)),
+                         BinaryExpr::Gt, Constant::integer(0));
+          PropertyExpr ecEmpty =
+              BinaryExpr(NaryExpr(NaryExpr::Count, getStates(ec.slots)),
+                         BinaryExpr::Eq, Constant::integer(0));
+          addProperty(SINGLE_ENTRY_TOKEN, FormalProperty::TAG::INVAR,
+                      implies(cmOccupied, ecEmpty));
         }
       }
     }
@@ -833,9 +1041,11 @@ findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
 
 } // namespace
 
-LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
-    const std::vector<IOG> &iogs) {
-  llvm::DenseMap<ConditionalBranchOp, int32_t> exitBranches;
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
+  // Map vectors iterate in insertion order, so that the invariants are
+  // annotated in the same order in every run
+  llvm::MapVector<ConditionalBranchOp, int32_t> exitBranches;
   for (const auto &iog : iogs) {
     for (auto *op : iog.units) {
       if (auto branch = dyn_cast<ConditionalBranchOp>(op)) {
@@ -845,7 +1055,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
       }
     }
   }
-  llvm::DenseMap<Operation *, int32_t> deciders;
+  llvm::MapVector<Operation *, int32_t> deciders;
   for (auto [branch, exitValue] : exitBranches) {
     Operation *dec = *getDecider(branch);
     deciders.insert({dec, exitValue});
@@ -858,9 +1068,24 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
         // Invariant is trivially true
         continue;
       }
-      ExitTokenOrder p(uid++, FormalProperty::TAG::INVAR, slots.started,
-                       exitValue);
-      propertyTable.push_back(p.toJSON());
+      // If a slot holds the exit token, all earlier slots on the path are
+      // empty, e.g., for the path buffer9 -> buffer10 (2 slots) and the exit
+      // token FALSE:
+      //   (((buffer10.b0.full & (buffer10.b0.reg = FALSE))
+      //     -> (! buffer9.outs_valid_i))
+      //    & ((buffer10.b1.full & (buffer10.b1.reg = FALSE))
+      //       -> ((! buffer9.outs_valid_i) & (! buffer10.b0.full))))
+      std::vector<PropertyExpr> implications;
+      std::vector<PropertyExpr> earlierSlotsEmpty{
+          !State(slots.started.front())};
+      for (auto start = slots.started.begin() + 1; start != slots.started.end();
+           ++start) {
+        implications.push_back(
+            implies(State(*start, exitValue), conjunction(earlierSlotsEmpty)));
+        earlierSlotsEmpty.push_back(!State(*start));
+      }
+      addProperty(EXIT_TOKEN_ORDER, FormalProperty::TAG::INVAR,
+                  conjunction(implications));
     }
     // [END Enumerating ExitTokenOrder invariants]
 
@@ -893,14 +1118,24 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
           for (const auto &startSent : decPath.startSents) {
             ancestorPath.back().addCopiedSent(startSent);
           }
-          std::vector<std::shared_ptr<InternalStateNamer>> exitSlots;
-          exitSlots.reserve(decPath.started.size());
-          for (const auto &es : decPath.started) {
-            exitSlots.push_back(es.slot);
-          }
-          ExitTokenNoAncestors p(uid++, FormalProperty::TAG::INVAR, exitSlots,
-                                 ancestorPath, exitValue);
-          propertyTable.push_back(p.toJSON());
+          // If a slot on the path from the decider to the branch holds the
+          // exit token, the ancestors of the decider are empty, e.g.:
+          //   ((count((buffer9.outs_valid_i & (buffer9.data = FALSE)),
+          //           (buffer10.b0.full & (buffer10.b0.reg = FALSE)), ...) > 0)
+          //    -> (count(buffer7.outs_valid_i,
+          //              (buffer8.full & !fork4.outs_1_sent), ...) = 0))
+          std::vector<PropertyExpr> exitTokens;
+          exitTokens.reserve(decPath.started.size());
+          for (const auto &es : decPath.started)
+            exitTokens.emplace_back(State(es.slot, exitValue));
+          PropertyExpr anyExitToken =
+              BinaryExpr(NaryExpr(NaryExpr::Count, exitTokens), BinaryExpr::Gt,
+                         Constant::integer(0));
+          PropertyExpr ancestorsEmpty =
+              BinaryExpr(NaryExpr(NaryExpr::Count, getStates(ancestorPath)),
+                         BinaryExpr::Eq, Constant::integer(0));
+          addProperty(EXIT_TOKEN_NO_ANCESTORS, FormalProperty::TAG::INVAR,
+                      implies(anyExitToken, ancestorsEmpty));
         }
       }
     }
@@ -909,90 +1144,27 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
   return success();
 }
 
-LogicalResult HandshakeAnnotatePropertiesPass::annotateProperty(
-    ModuleOp modOp, const std::vector<IOG> &iogs, FormalProperty::TYPE t) {
-  switch (t) {
-  case FormalProperty::TYPE::AbsenceOfBackpressure:
-    return annotateAbsenceOfBackpressure(modOp);
-  case FormalProperty::TYPE::ValidEquivalence:
-    return annotateValidEquivalence(modOp);
-  case FormalProperty::TYPE::EagerForkNotAllOutputSent:
-    return annotateEagerForkNotAllOutputSent(modOp);
-  case FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull:
-    return annotateCopiedSlotsOfAllForks(modOp);
-  case FormalProperty::TYPE::EagerForkPathTokenCopiedMaximumOnce:
-    return annotateEagerForkPath(modOp);
-  case FormalProperty::TYPE::ReconvergentPathFlow:
-    return annotateReconvergentPathFlow(modOp);
-  case FormalProperty::TYPE::IOGSingleToken:
-    for (const auto &iog : iogs) {
-      if (failed(annotateIOGSingleToken(iog)))
-        return failure();
-    }
-    return success();
-  case FormalProperty::TYPE::IOGConsecutiveTokens:
-    for (const auto &iog : iogs) {
-      if (failed(annotateIOGConsecutiveTokens(iog)))
-        return failure();
-    }
-    return success();
-  case FormalProperty::TYPE::EntryTokenOrder:
-    return annotateEntryTokenOrder(modOp);
-  case FormalProperty::TYPE::SingleEntryToken:
-    return annotateSingleEntryToken(modOp);
-  case FormalProperty::TYPE::ExitTokenOrder:
-    return annotateExitTokenOrder(iogs);
-  case FormalProperty::TYPE::ExitTokenNoAncestors:
-    llvm::errs() << "ExitTokenNoAncestors is annotated with ExitTokenOrder\n";
-    return failure();
-  }
-  return failure();
-}
-
-LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
-    const std::vector<IOG> &iogs) {
+LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties() {
   ModuleOp modOp = getOperation();
-  LogicalResult res = success();
-  if (annotateList != "") {
-    for (auto &elem : llvm::split(annotateList, ',')) {
-      std::string typeStr = elem.trim().str();
-      if (auto t = FormalProperty::typeFromStr(typeStr)) {
-        if (failed(annotateProperty(modOp, iogs, *t)))
-          res = failure();
-      } else {
-        llvm::errs() << typeStr << " is not a property\n";
+  if (!annotateList.empty()) {
+    LogicalResult res = success();
+    for (StringRef name : llvm::split(annotateList, ',')) {
+      name = name.trim();
+      const GeneratorEntry *entry = llvm::find_if(
+          GENERATORS, [&](const GeneratorEntry &e) { return e.name == name; });
+      if (entry == std::end(GENERATORS)) {
+        llvm::errs() << name << " is not a property\n";
+        res = failure();
+      } else if (failed((this->*entry->generator)(modOp))) {
         res = failure();
       }
     }
     return res;
   }
-  if (annotateProperties) {
-    if (failed(annotateAbsenceOfBackpressure(modOp)))
-      return failure();
-    if (failed(annotateValidEquivalence(modOp)))
-      return failure();
-  }
-  if (annotateInvariants) {
-    if (failed(annotateEagerForkNotAllOutputSent(modOp)))
-      return failure();
-    if (failed(annotateCopiedSlotsOfAllForks(modOp)))
-      return failure();
-    if (failed(annotateEagerForkPath(modOp)))
-      return failure();
-    if (failed(annotateReconvergentPathFlow(modOp)))
-      return failure();
 
-    for (const auto &iog : iogs) {
-      if (failed(annotateIOGSingleToken(iog)))
-        return failure();
-      if (failed(annotateIOGConsecutiveTokens(iog)))
-        return failure();
-    }
-    if (failed(annotateEntryTokenOrder(modOp)))
-      return failure();
-    if (failed(annotateSingleEntryToken(modOp)))
-      return failure();
-    if (failed(annotateExitTokenOrder(iogs)))
+  for (const GeneratorEntry &entry : GENERATORS) {
+    bool selected = entry.isInvariant ? annotateInvariants : annotateProperties;
+    if (selected && failed((this->*entry.generator)(modOp)))
       return failure();
   }
   return success();
@@ -1006,8 +1178,10 @@ void HandshakeAnnotatePropertiesPass::runOnOperation() {
     return signalPassFailure();
 
   ModuleOp modOp = getOperation();
-  auto iogs = findAllIOGs(modOp);
-  llvm::DenseSet<SinkOp> sinks;
+  iogs = findAllIOGs(modOp);
+  // Ordered by insertion, so that the dead buffers replacing the sinks are
+  // named in the same order in every run
+  llvm::SetVector<SinkOp> sinks;
   for (auto &iog : iogs) {
     for (Operation *unit : iog.units) {
       if (auto sinkOp = dyn_cast<SinkOp>(unit)) {
@@ -1023,14 +1197,14 @@ void HandshakeAnnotatePropertiesPass::runOnOperation() {
     sink.erase();
     for (auto &iog : iogs) {
       if (iog.contains(sink)) {
-        iog.units.erase(sink);
+        iog.units.remove(sink);
         iog.units.insert(deadBuffer);
       }
     }
   }
   namer.nameAllUnnamedOps();
 
-  if (failed(annotateQueriedProperties(iogs))) {
+  if (failed(annotateQueriedProperties())) {
     return signalPassFailure();
   }
 
