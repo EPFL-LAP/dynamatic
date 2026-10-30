@@ -14,6 +14,7 @@
 #include "Utils/Gaussian.h"
 #include "Utils/IOG.h"
 #include "Utils/IndexChannelAnalysis.h"
+#include "Utils/TraversalUtils.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
@@ -602,74 +603,33 @@ struct EntryCMergePath {
 // the path. It is used in the annotation of the entry token order invariant and
 // single entry token invariant
 std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
-  struct PartialPath {
-    std::vector<EffectiveSlotNamer> slots;
-    mlir::Value cur;
-  };
-  std::vector<EntryCMergePath> ret;
-  std::vector<PartialPath> stack;
-  PartialPath start = {
-      .slots = {},
-      .cur = startChannel,
-  };
-  start.slots.emplace_back(std::make_unique<EntrySlotNamer>(startChannel));
-  stack.push_back(start);
-  while (!stack.empty()) {
-    PartialPath path = std::move(stack.back());
-    stack.pop_back();
+  // The entry is modeled as a slot that initially holds one token
+  std::vector<EffectiveSlotNamer> entrySlot;
+  entrySlot.emplace_back(std::make_unique<EntrySlotNamer>(startChannel));
+  std::vector<SlotPath> paths =
+      findSlotPaths(startChannel, std::move(entrySlot), [](OpOperand &operand) {
+        Operation *op = operand.getOwner();
+        if (isa<ControlMergeOp>(op))
+          return PathStep::End;
+        if (isa<BufferOp, ForkOp>(op))
+          return PathStep::Traverse;
+        // The entry token reaches another unit before any control merge, so
+        // the path does not lead to an entry control merge
+        return PathStep::Drop;
+      });
 
-    Operation *next = *path.cur.getUsers().begin();
-    if (auto cmerge = dyn_cast<ControlMergeOp>(next)) {
-      // Path is terminated by ControlMergeOp, so this is the end of the path
-
-      // CMerge uses the following logic to generate index token:
-      // - When a CMerge receives a token from the i-th data input channel, it
-      // sends a token with value i to the index channel Here, if the path to
-      // CMerge ends at the 0-th channel, then an entry token will cause the
-      // CMerge to emit a token carrying a value = 0 to the index channel. This
-      // function determines the actual entry value of the index channel.
-      auto getEntryValue = [&](ControlMergeOp cmerge, Value entryChannel) {
-        for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
-          if (input == entryChannel) {
-            return (int32_t)i;
-          }
-        }
-        llvm::report_fatal_error(
-            "entryChannel is not a data operand of cmerge");
-      };
-      EntryCMergePath retPath = {
-          .slots = path.slots,
-          .cmerge = cmerge,
-          .entryValue = getEntryValue(cmerge, path.cur),
-      };
-      ret.push_back(retPath);
-    } else if (auto buffer = dyn_cast<BufferOp>(next)) {
-      // Add the slots of this buffer to the list of effective slot (copied
-      // sents will be added later)
-      for (auto &slot : buffer.getInternalSlotStateNamers()) {
-        path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
-      }
-      path.cur = buffer.getResult();
-      stack.push_back(std::move(path));
-    } else if (auto fork = dyn_cast<ForkOp>(next)) {
-      // Branch into multiple paths, and add the sent state of the selected
-      // channel as a copied sent for the last slot
-      // Note: This last slot always exists, as the entry contains a
-      // slot
-      auto sents = fork.getInternalSentStateNamers();
-      for (auto [i, channel] : llvm::enumerate(next->getResults())) {
-        PartialPath nextPath = {
-            .slots = path.slots,
-            .cur = channel,
-        };
-        assert(!nextPath.slots.empty());
-        EffectiveSlotNamer &back = nextPath.slots.back();
-        back.copiedSents.push_back(sents[i]);
-        stack.push_back(nextPath);
-      }
-    }
+  std::vector<EntryCMergePath> entryPaths;
+  for (SlotPath &path : paths) {
+    // When a control merge receives a token from its i-th input, it sends a
+    // token with value i to its index output: the entry value is the index of
+    // the input that the path ends at. A control merge only has data operands,
+    // so this is the operand number.
+    entryPaths.push_back(
+        {/*slots=*/std::move(path.slots),
+         /*cmerge=*/cast<ControlMergeOp>(path.end->getOwner()),
+         /*entryValue=*/(int32_t)path.end->getOperandNumber()});
   }
-  return ret;
+  return entryPaths;
 }
 
 // This function finds any path from a control merge to a mux operation. Note
@@ -677,56 +637,24 @@ std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
 // of the CMerge to multiple muxes.
 std::vector<std::vector<EffectiveSlotNamer>>
 findCMergeMuxPaths(ControlMergeOp cmerge) {
-  struct PartialPath {
-    std::vector<EffectiveSlotNamer> slots;
-    mlir::Value cur;
-  };
-  std::vector<std::vector<EffectiveSlotNamer>> ret{};
-  std::vector<PartialPath> stack;
-  EffectiveSlotNamer mergeSlot(std::make_unique<BufferSlotFullNamer>(
+  // The paths start at the slot of the control merge, which holds the index
+  std::vector<EffectiveSlotNamer> mergeSlot;
+  mergeSlot.emplace_back(std::make_unique<BufferSlotFullNamer>(
       cmerge.getInternalSlotStateNamers()[0]));
-  PartialPath start = {
-      .slots = {},
-      .cur = cmerge.getIndex(),
-  };
-  start.slots.push_back(mergeSlot);
-  stack.push_back(start);
-  while (!stack.empty()) {
-    PartialPath path = stack.back();
-    stack.pop_back();
+  std::vector<SlotPath> paths = findSlotPaths(
+      cmerge.getIndex(), std::move(mergeSlot), [](OpOperand &operand) {
+        Operation *op = operand.getOwner();
+        if (isa<MuxOp>(op))
+          return PathStep::End;
+        if (isa<BufferOp, ForkOp>(op))
+          return PathStep::Traverse;
+        return PathStep::Unexpected;
+      });
 
-    Operation *next = *path.cur.getUsers().begin();
-    if (auto mux = dyn_cast<MuxOp>(next)) {
-      // Path is terminated by MuxOp, so this is the end of the path
-      ret.push_back(std::move(path.slots));
-    } else if (auto buffer = dyn_cast<BufferOp>(next)) {
-      // Add the slots of this buffer to the list of effective slot (copied
-      // sents will be added later)
-      for (auto &slot : buffer.getInternalSlotStateNamers()) {
-        path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
-      }
-      path.cur = buffer.getResult();
-      stack.push_back(std::move(path));
-    } else if (auto fork = dyn_cast<ForkOp>(next)) {
-      // Branch into multiple paths, and add the sent state of the selected
-      // channel as a copied sent for the last slot
-      // Note: This last slot always exists, as the initial control merge
-      // contains a slot
-      auto sents = fork.getInternalSentStateNamers();
-      for (auto [i, channel] : llvm::enumerate(next->getResults())) {
-        PartialPath nextPath = {
-            .slots = path.slots,
-            .cur = channel,
-        };
-        EffectiveSlotNamer &back = nextPath.slots.back();
-        back.copiedSents.push_back(sents[i]);
-        stack.push_back(nextPath);
-      }
-    } else {
-      llvm::report_fatal_error("unexpected op detected");
-    }
-  }
-  return ret;
+  std::vector<std::vector<EffectiveSlotNamer>> slotPaths;
+  for (SlotPath &path : paths)
+    slotPaths.push_back(std::move(path.slots));
+  return slotPaths;
 }
 } // namespace
 
