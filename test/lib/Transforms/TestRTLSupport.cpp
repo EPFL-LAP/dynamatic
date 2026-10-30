@@ -13,30 +13,25 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/RTL/RTL.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
+
+// [START Boilerplate code for the MLIR pass]
+#include "test/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace test {
+#define GEN_PASS_DEF_TESTRTLSUPPORT
+#include "test/Transforms/Passes.h.inc"
+} // namespace test
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;
 
 namespace {
 
-struct TestRTLSupportOptions {
-  std::string rtlConfigPath;
-};
-
 struct TestRTLSupport
-    : public PassWrapper<TestRTLSupport, OperationPass<mlir::ModuleOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestRTLSupport)
-  using Base = PassWrapper<TestRTLSupport, OperationPass<mlir::ModuleOp>>;
-
-  TestRTLSupport() : Base() {};
-  TestRTLSupport(const TestRTLSupport &other) : Base(other) {};
-
-  StringRef getArgument() const final { return "test-rtl-support"; }
-
-  StringRef getDescription() const final {
-    return "Test RTL support (RTL configuration file parsing)";
-  }
+    : public dynamatic::test::impl::TestRTLSupportBase<TestRTLSupport> {
+  using TestRTLSupportBase::TestRTLSupportBase;
 
   void runOnOperation() override {
     RTLConfiguration config;
@@ -51,21 +46,5 @@ struct TestRTLSupport
       }
     }
   }
-
-  TestRTLSupport(const TestRTLSupportOptions &options) : TestRTLSupport() {
-    rtlConfigPath = options.rtlConfigPath;
-  }
-
-protected:
-  Pass::Option<std::string> rtlConfigPath{
-      *this, "rtl-config-path",
-      ::llvm::cl::desc("Pass to JSON-formatted RTL configuration"),
-      ::llvm::cl::init("")};
 };
 } // namespace
-
-namespace dynamatic {
-namespace test {
-void registerTestRTLSuppport() { PassRegistration<TestRTLSupport>(); }
-} // namespace test
-} // namespace dynamatic

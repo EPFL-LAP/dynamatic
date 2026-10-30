@@ -28,4 +28,8 @@ add_lit_testsuites(Dynamatic ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${DYNAMATIC_TEST_DEPENDS}
   )
 
+include_directories(include)
+include_directories(${DYNAMATIC_BINARY_DIR}/test/include)
+
+add_subdirectory(include/test/Transforms)
 add_subdirectory(lib)
