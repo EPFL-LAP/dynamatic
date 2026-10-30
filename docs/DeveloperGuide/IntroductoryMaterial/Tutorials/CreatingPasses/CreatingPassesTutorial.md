@@ -2,7 +2,7 @@
 
 This tutorial will walk you through the creation of a simple transformation pass for Dynamatic that simplifies merge-like operations in *Handshake*-level IR. We'll look at the process of declaring a pass in TableGen format, including the auto-generated pass code in our C++ files, and implementing the transformation as part of an `mlir::OperationPass`. Then, we'll look at how to use a greedy pattern rewriter to make our pass easier to write and able to optimize the IR in more situations.
  
-This tutorial assumes basic knowledge of C++, MLIR, and of the theory behind dataflow circuits. For a basic introduction to MLIR and its related jargon, see [the MLIR primer](../../../CompilerIntrinsics/MLIRPrimer.md). The full (runnable!) source code for this tutorial is located in `tutorials/include/tutorials/CreatingPasses` (headers) as well as in `tutorials/lib/CreatingPasses` (sources), and is built alongside the rest of the project by default.
+This tutorial assumes basic knowledge of C++, MLIR, and of the theory behind dataflow circuits. For a basic introduction to MLIR and its related jargon, see [the MLIR primer](../../../CompilerIntrinsics/MLIRPrimer.md). The full (runnable!) source code for this tutorial is located in `tutorials/CreatingPasses/include/tutorials/CreatingPasses` (headers) as well as in `tutorials/CreatingPasses/lib/CreatingPasses` (sources), and is built alongside the rest of the project by default.
 
 This tutorial is divided in the following chapters:
 
