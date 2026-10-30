@@ -93,14 +93,14 @@ private:
   /// memory ports. An empty list of inputs for the MC indicates that no MC is
   /// necessary for the recorded ports. The same is true for the LSQ.
   struct InterfaceInputs {
-    /// Inputs for the MC.
-    SmallVector<Value> mcInputs;
-    /// List of basic block IDs for the MC.
-    SmallVector<unsigned> mcBlocks;
-    /// Inputs for the LSQ.
-    SmallVector<Value> lsqInputs;
-    /// List of group sizes for the MC.
-    SmallVector<unsigned> lsqGroupSizes;
+    /// Inputs for the MC, by kind.
+    SmallVector<Value> mcCtrl, mcLdAddr, mcStAddr, mcStData;
+    /// Basic blocks of the MC, with their control port and accesses.
+    SmallVector<Attribute> mcGroups;
+    /// Inputs for the LSQ, by kind.
+    SmallVector<Value> lsqCtrl, lsqLdAddr, lsqStAddr, lsqStData;
+    /// Groups of the LSQ, with their accesses.
+    SmallVector<Attribute> lsqGroups;
   };
 
   /// Groups a list of memory access ports by their group, which is a basic
