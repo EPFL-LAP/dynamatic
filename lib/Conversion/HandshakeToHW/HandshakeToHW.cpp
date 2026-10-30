@@ -841,26 +841,60 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         // Basically the control ports and load/store ports are grouped by BBs,
         // and this is very complex to encode. SMV backend doesn't know the
         // order of the ports. This passes the order directly to the SMV backend
+        //
+        // The order must match the instantiation by export-rtl, which groups
+        // the indexed ports of the same base name into one array port (e.g.,
+        // ctrl_0 and ctrl_1 into ctrl), in the order of the first port of each
+        // array, and lists the data signals of an array before its valid
+        // signals, e.g., for two groups of a control port and a store:
+        //   ctrl_0, ctrl_1, ctrl_0_valid, ctrl_1_valid, stAddr_0, stAddr_1, ...
         std::string smvInputSymbolNames;
         llvm::raw_string_ostream os(smvInputSymbolNames);
         SmallVector<std::string> smvInputSymbols{"loadData"};
         auto mcOp = dyn_cast<handshake::MemoryControllerOp>(op);
+        // The array port of a port name: the base name of an indexed port
+        // (<base>_<index>), as in RTLComponent::portNameIsIndexed, or the
+        // port name itself
+        auto getArrayName = [](StringRef portName) -> StringRef {
+          auto [base, index] = portName.rsplit('_');
+          unsigned arrayIdx;
+          if (!index.empty() && !index.getAsInteger(10, arrayIdx))
+            return base;
+          return portName;
+        };
+        // The signals of each array port, and the array ports in the order of
+        // their first use
+        llvm::StringMap<SmallVector<std::string>> arraySignals;
+        SmallVector<std::string> arrayOrder;
+        auto addSignal = [&](const std::string &arrayName,
+                             const std::string &signal) {
+          auto [it, inserted] = arraySignals.try_emplace(arrayName);
+          if (inserted)
+            arrayOrder.push_back(arrayName);
+          it->second.push_back(signal);
+        };
         for (unsigned i = 0; i < op->getNumOperands(); i++) {
           Value operand = op->getOperand(i);
+          std::string portName = mcOp.getOperandName(i);
+          std::string arrayName = getArrayName(portName).str();
           if (isa<handshake::ChannelType>(operand.getType())) {
-            smvInputSymbols.push_back(mcOp.getOperandName(i));
-            smvInputSymbols.push_back(mcOp.getOperandName(i) + "_valid");
+            addSignal(arrayName, portName);
+            addSignal(arrayName + "_valid", portName + "_valid");
           } else if (isa<handshake::ControlType>(operand.getType())) {
-            smvInputSymbols.push_back(mcOp.getOperandName(i) + "_valid");
+            addSignal(arrayName + "_valid", portName + "_valid");
           }
         }
         for (unsigned i = 0; i < op->getNumResults(); i++) {
           Value res = op->getResult(i);
           if (isa<handshake::ChannelType, handshake::ControlType>(
                   res.getType())) {
-            smvInputSymbols.push_back(mcOp.getResultName(i) + "_ready");
+            std::string portName = mcOp.getResultName(i);
+            addSignal(getArrayName(portName).str() + "_ready",
+                      portName + "_ready");
           }
         }
+        for (const std::string &arrayName : arrayOrder)
+          llvm::append_range(smvInputSymbols, arraySignals[arrayName]);
         llvm::interleaveComma(smvInputSymbols, os);
         os.flush();
         addString("SMV_INPUT_SYMBOLS", smvInputSymbolNames);
