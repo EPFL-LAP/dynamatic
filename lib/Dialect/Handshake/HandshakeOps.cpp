@@ -101,10 +101,9 @@ static void printSimpleControl(OpAsmPrinter &, Operation *, Type) {
 }
 
 /// Parser for the `custom<MemGroups>` Tablegen directive: the groups of a
-/// memory interface, each with its accesses in program order, e.g.:
-///   bb0: [load(%la0)], bb1 %c0: [store(%sa0, %sd0), load(%la1)]
-/// A group starts with its basic block (if any) and its control port (if any).
-/// The operands of the accesses go to the segment of their kind.
+/// memory interface, each with its accesses in program order. A group starts
+/// with its basic block (if any) and its control port (if any).
+/// Example: `bb0: [load(%la0)], bb1 %c0: [store(%sa0, %sd0), load(%la1)]`
 static ParseResult
 parseMemGroups(OpAsmParser &parser,
                SmallVectorImpl<OpAsmParser::UnresolvedOperand> &ctrl,
@@ -114,8 +113,11 @@ parseMemGroups(OpAsmParser &parser,
                ArrayAttr &groups) {
   MLIRContext *ctx = parser.getContext();
   SmallVector<Attribute> groupAttrs;
+  // A group, separated by commas
+  // Example: `bb1 %c0: [store(%sa0, %sd0), load(%la1)]`
   do {
-    // The basic block, written as a single keyword (e.g., bb3)
+    // The basic block (if any)
+    // Example: `bb1`
     std::optional<unsigned> block;
     StringRef blockKeyword;
     if (succeeded(parser.parseOptionalKeyword(&blockKeyword))) {
@@ -127,7 +129,8 @@ parseMemGroups(OpAsmParser &parser,
       block = blockID;
     }
 
-    // The control port
+    // The control port (if any)
+    // Example: `%c0`
     OpAsmParser::UnresolvedOperand ctrlOperand;
     OptionalParseResult hasCtrl = parser.parseOptionalOperand(ctrlOperand);
     if (hasCtrl.has_value()) {
@@ -146,15 +149,22 @@ parseMemGroups(OpAsmParser &parser,
           MemGroupAttr::get(ctx, block, hasCtrl.has_value(), accesses));
       continue;
     }
+    // An access, separated by commas. Its operands go to the segments of its
+    // kind
+    // Example: `store(%sa0, %sd0)`
     do {
+      // The access kind
+      // Example: `store`
       StringRef kind;
       if (parser.parseKeyword(&kind) || parser.parseLParen())
         return failure();
       if (kind == "load") {
+        // Example: `%la1`
         if (parser.parseOperand(ldAddr.emplace_back()))
           return failure();
         accesses.push_back(MemAccessKind::Load);
       } else if (kind == "store") {
+        // Example: `%sa0, %sd0`
         if (parser.parseOperand(stAddr.emplace_back()) || parser.parseComma() ||
             parser.parseOperand(stData.emplace_back()))
           return failure();
@@ -178,12 +188,13 @@ parseMemGroups(OpAsmParser &parser,
 }
 
 /// Printer for the `custom<MemGroups>` Tablegen directive (see
-/// `parseMemGroups`). The n-th load (store) of all groups is the n-th operand
-/// of the load (store) segments.
+/// `parseMemGroups`).
 static void printMemGroups(OpAsmPrinter &printer, Operation * /*op*/,
                            OperandRange ctrl, OperandRange ldAddr,
                            OperandRange stAddr, OperandRange stData,
                            ArrayAttr groups) {
+  // The n-th load (store) over all groups is the n-th operand of the load
+  // (store) segments
   unsigned ctrlIdx = 0, loadIdx = 0, storeIdx = 0;
   auto printAccess = [&](MemAccessKind kind) {
     if (kind == MemAccessKind::Load) {
@@ -207,14 +218,19 @@ static void printMemGroups(OpAsmPrinter &printer, Operation * /*op*/,
 }
 
 /// Parser for the `custom<LSQMemory>` Tablegen directive: the memory of an LSQ
-/// that talks to it (e.g., `%mem : memref<4xi32>`), or `MC` for an LSQ that
-/// forwards its accesses to a memory controller.
+/// that talks to it, or `MC` for an LSQ that forwards its accesses to a memory
+/// controller.
+/// Example: `%mem : memref<4xi32>`
 static ParseResult
 parseLSQMemory(OpAsmParser &parser,
                std::optional<OpAsmParser::UnresolvedOperand> &memref,
                Type &memrefType) {
+  // An LSQ connected to an MC
+  // Example: `MC`
   if (succeeded(parser.parseOptionalKeyword("MC")))
     return success();
+  // An LSQ connected to the memory
+  // Example: `%mem : memref<4xi32>`
   memref.emplace();
   return failure(parser.parseOperand(*memref) || parser.parseColon() ||
                  parser.parseType(memrefType));
@@ -231,9 +247,8 @@ static void printLSQMemory(OpAsmPrinter &printer, Operation * /*op*/,
 }
 
 /// Parser for the `custom<LSQTypes>` Tablegen directive: the address and data
-/// types of an LSQ, e.g., `<i2>, <i32>`. All addresses (data) have the same
-/// type, the numbers of operands of each kind come from the groups, and the
-/// signals to the memory or to an MC are present depending on the LSQ's memory.
+/// types of an LSQ. All addresses (data) have the same type.
+/// Example: `<i2>, <i32>`
 static ParseResult parseLSQTypes(
     OpAsmParser &parser, ArrayAttr groups,
     std::optional<OpAsmParser::UnresolvedOperand> ownMemRef,
@@ -242,12 +257,15 @@ static ParseResult parseLSQTypes(
     SmallVectorImpl<Type> &ldDataTypes, Type &ownMemStartType,
     Type &ldDataFromMCType, Type &ownCtrlEndType, Type &ldAddrToMCType,
     Type &stAddrToMCType, Type &stDataToMCType, Type &ownMemEndType) {
+  // The address and data types
+  // Example: `<i2>, <i32>`
   Type addrType, dataType;
   if (parseHandshakeType(parser, addrType) || parser.parseComma() ||
       parseHandshakeType(parser, dataType))
     return failure();
 
-  // The verifier checks that every group has a control port
+  // The numbers of operands of each kind come from the groups. The verifier
+  // checks that every group has a control port
   unsigned numCtrls = 0, numLoads = 0, numStores = 0;
   for (MemGroupAttr group : groups.getAsRange<MemGroupAttr>()) {
     numCtrls += group.getHasCtrl();
@@ -260,6 +278,7 @@ static ParseResult parseLSQTypes(
   ldDataTypes.append(numLoads, dataType);
   stAddrTypes.append(numStores, addrType);
   stDataTypes.append(numStores, dataType);
+  // The signals to the memory or to an MC, depending on the LSQ's memory
   if (ownMemRef) {
     ownMemStartType = ownCtrlEndType = ownMemEndType = controlType;
   } else {
@@ -292,8 +311,8 @@ static void printLSQTypes(OpAsmPrinter &printer, Operation * /*op*/,
 
 /// Parser for the `custom<MemTypes>` Tablegen directive: the address and data
 /// types of a memory interface, followed by the control type if it has control
-/// ports, e.g., `<i2>, <i32>, <i32>`. All addresses (data) have the same type,
-/// and the numbers of operands of each kind come from the groups.
+/// ports. All addresses (data) have the same type.
+/// Example: `<i2>, <i32>, <i32>`
 static ParseResult parseMemTypes(
     OpAsmParser &parser, ArrayAttr groups,
     std::optional<OpAsmParser::UnresolvedOperand> lsqLdAddr,
@@ -301,17 +320,22 @@ static ParseResult parseMemTypes(
     SmallVectorImpl<Type> &stAddrTypes, SmallVectorImpl<Type> &stDataTypes,
     SmallVectorImpl<Type> &ldDataTypes, Type &lsqLdAddrType,
     Type &lsqStAddrType, Type &lsqStDataType, Type &lsqLdDataType) {
+  // The address and data types
+  // Example: `<i2>, <i32>`
   Type addrType, dataType;
   if (parseHandshakeType(parser, addrType) || parser.parseComma() ||
       parseHandshakeType(parser, dataType))
     return failure();
 
+  // The numbers of operands of each kind come from the groups
   unsigned numCtrls = 0, numLoads = 0, numStores = 0;
   for (MemGroupAttr group : groups.getAsRange<MemGroupAttr>()) {
     numCtrls += group.getHasCtrl();
     numLoads += group.getNumAccesses(MemAccessKind::Load);
     numStores += group.getNumAccesses(MemAccessKind::Store);
   }
+  // The control type (if there are control ports)
+  // Example: `<i32>`
   if (numCtrls > 0) {
     Type ctrlType;
     if (parser.parseComma() || parseHandshakeType(parser, ctrlType))
