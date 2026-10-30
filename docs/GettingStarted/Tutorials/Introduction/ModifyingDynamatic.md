@@ -125,7 +125,7 @@ struct HandshakeMuxToMergePass
     // Run a greedy pattern rewriter on the entire IR under the top-level module
     // operation
     mlir::GreedyRewriteConfig config;
-    if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config))) {
+    if (failed(applyPatternsGreedily(mod, std::move(patterns), config))) {
       // If the greedy pattern rewriter fails, the pass must also fail
       return signalPassFailure();
     }
@@ -135,12 +135,12 @@ struct HandshakeMuxToMergePass
     if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
       return signalPassFailure();
     markAnalysesPreserved<NameAnalysis>();
-  };
+  }
 };
-}; // namespace
+} // namespace
 ```
 
-The boilerplate block at the top of this file includes the code that TableGen generated for our pass, including the base class our struct inherits from and the `createHandshakeMuxToMerge()` function, which returns an instance of the struct. The struct---do not mind the slightly convoluted struct declaration, which showcases the [*curiously recurring template pattern*](https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern) C++ idiom that is used extensively throuhgout MLIR/Dynamatic---whose single method `runOnOperation` defines what happens when the pass is called. Before and after transforming the IR, the method checks that all operation names are unique using Dynamatic's `NameAnalysis`, names any operation created by the pass, and marks the analysis as preserved so that subsequent passes can reuse it. In our case, we want to leverage MLIR's greedy pattern rewriter infrastructure to match on all muxes in the IR and replace them with merges with identical data inputs. If you would like to know more about how greedy pattern rewriting works, feel free to check out MLIR's [official documentation](https://mlir.llvm.org/docs/) on the subject. For this simple pass, you do not need to understand exactly how it works, just that it can match and try to rewrite certain operations inside the IR based on a set of user-provided rewrite patterns. Speaking of rewrite patterns, let's add our own to the file just above the `HandshakeMuxToMergePass` struct definition. Paste the following into the file.
+The boilerplate block at the top of this file includes the code that TableGen generated for our pass, including the base class our struct inherits from and the `createHandshakeMuxToMerge()` function, which returns an instance of the struct. The struct---do not mind the slightly convoluted struct declaration, which showcases the [*curiously recurring template pattern*](https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern) C++ idiom that is used extensively throughout MLIR/Dynamatic---whose single method `runOnOperation` defines what happens when the pass is called. Before and after transforming the IR, the method checks that all operation names are unique using Dynamatic's `NameAnalysis`, names any operation created by the pass, and marks the analysis as preserved so that subsequent passes can reuse it. In our case, we want to leverage MLIR's greedy pattern rewriter infrastructure to match on all muxes in the IR and replace them with merges with identical data inputs. If you would like to know more about how greedy pattern rewriting works, feel free to check out MLIR's [official documentation](https://mlir.llvm.org/docs/) on the subject. For this simple pass, you do not need to understand exactly how it works, just that it can match and try to rewrite certain operations inside the IR based on a set of user-provided rewrite patterns. Speaking of rewrite patterns, let's add our own to the file just above the `HandshakeMuxToMergePass` struct definition. Paste the following into the file.
 
 ```cpp
 /// Rewrite pattern that will match on all muxes in the IR and replace each of
@@ -169,7 +169,7 @@ struct ReplaceMuxWithMerge : public OpRewritePattern<handshake::MuxOp> {
 };
 ```
 
-This rewrite pattern, called `ReplaceMuxWithMerge`, matches on operations of type `handshake::MuxOp` (the mux operation is part of the *Handshake* dialect) as indicated by its declaration. Eahc time the greedy pattern rewriter finds a mux in the IR, it will call the pattern's `matchAndRewrite` method, providing it with the particular operation it matched on as well as with a `PatternRewriter` object to allow us to modify the IR. For this simple pass, we want to transform *all* muxes into merges so the rewrite pattern is very short:
+This rewrite pattern, called `ReplaceMuxWithMerge`, matches on operations of type `handshake::MuxOp` (the mux operation is part of the *Handshake* dialect) as indicated by its declaration. Each time the greedy pattern rewriter finds a mux in the IR, it will call the pattern's `matchAndRewrite` method, providing it with the particular operation it matched on as well as with a `PatternRewriter` object to allow us to modify the IR. For this simple pass, we want to transform *all* muxes into merges so the rewrite pattern is very short:
 - First, we extract the mux's data inputs.
 - Then, we create a merge operation at the same location in the IR and with the same data inputs.
 - Finally, we tell the rewriter to replace the mux with the merge. This "rewires" the IR by making users of the mux's output channel use the merge's output channel instead, and deleted the original mux.
@@ -185,7 +185,7 @@ Congratulations! You have now implemented your first Dynamatic pass. We just hav
 
 ### Adding our Pass to the Build Process
 
-We need to make the build process aware of the new source file we just wrote. Navigate to `lib/Transforms/CMakeLists.txt` and add the name of thefile you created in the previous section next to other `.cpp` files in the `add_dynamatic_library` statement.
+We need to make the build process aware of the new source file we just wrote. Navigate to `lib/Transforms/CMakeLists.txt` and add the name of the file you created in the previous section next to other `.cpp` files in the `add_dynamatic_library` statement.
 
 ```cmake
 add_dynamatic_library(DynamaticTransforms
@@ -206,16 +206,16 @@ Now that the pass is part of the project's source code, we just have to partiall
 cd build && ninja && cd ..
 ```
 
-If you see `Build successfull` printed on the terminal, then everything worked and the pass is now part of Dynamatic. Let's go modify our compilation script---which is called by the frontend's `compile` command---to run it as part of the normal synthesis flow.
+If you see `Build successful!` printed on the terminal, then everything worked and the pass is now part of Dynamatic. Let's go modify our compilation script---which is called by the frontend's `compile` command---to run it as part of the normal synthesis flow.
 
-Open `tools/dynamatic/scripts/compile.sh` and locate the following call to Dynamatic's optimizer:
+Open `tools/dynamatic/scripts/compile.sh` and locate the following call to Dynamatic's optimizer, in the branch that runs when the straight-to-queue technique is disabled (the default):
 
 ```sh
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  --handshake-minimize-lsq-usage \
-  --handshake-concretize-index-type="width=32" \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
+  --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
+  --handshake-remove-unused-memrefs \
+  --handshake-optimize-bitwidths \
   --handshake-materialize --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"    
 exit_on_fail "Failed to apply transformations to handshake" \
@@ -228,9 +228,9 @@ This is a compilation step where we apply a number of optimizations/transformati
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
   --handshake-mux-to-merge \
-  --handshake-minimize-lsq-usage \
-  --handshake-concretize-index-type="width=32" \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
+  --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
+  --handshake-remove-unused-memrefs \
+  --handshake-optimize-bitwidths \
   --handshake-materialize --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"    
 exit_on_fail "Failed to apply transformations to handshake" \
