@@ -1,78 +1,28 @@
 #include "IOG.h"
+#include "TraversalUtils.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "llvm/ADT/TypeSwitch.h"
+
+using namespace dynamatic::handshake;
 
 namespace dynamatic {
-IOGPathSet IOG::findAllPaths(Operation *startOp, Operation *endOp) const {
-  IOGPathSet paths = IOGPathSet(startOp, endOp);
-  std::vector<Operation *> stack;
-  stack.push_back(paths.start);
-  std::unordered_set<Operation *> forward;
-  // Find all operations reachable by going forward from the start without going
-  // through the end operation
-  while (!stack.empty()) {
-    Operation *op = stack.back();
-    stack.pop_back();
-
-    if (forward.find(op) != forward.end()) {
-      continue;
-    }
-
-    forward.insert(op);
-
-    if (op == paths.end) {
-      continue;
-    }
-
-    for (auto channel : op->getResults()) {
-      if (!contains(channel)) {
-        continue;
-      }
-      Operation *next = channel.getUses().begin()->getOwner();
-      assert(contains(next));
-      stack.push_back(next);
-    }
-  }
-
-  stack.push_back(paths.end);
-  std::unordered_set<Operation *> back;
-
-  // Find all operations reachable by going backwards from the end without going
-  // through the start operation (i.e. all operations that can reach the end
-  // going forward without going through start)
-  while (!stack.empty()) {
-    Operation *op = stack.back();
-    stack.pop_back();
-
-    if (back.find(op) != back.end()) {
-      continue;
-    }
-
-    back.insert(op);
-
-    if (op == paths.start) {
-      continue;
-    }
-
-    for (auto channel : op->getOperands()) {
-      if (!contains(channel)) {
-        continue;
-      }
-      Operation *next = channel.getDefiningOp();
-      if (next == nullptr) {
-        continue;
-      }
-      assert(contains(next));
-      stack.push_back(next);
-    }
-  }
-
-  // Any operation that can be reached from the start, and that can reach the
-  // end, is part of a path from start to end
-  for (Operation *op : forward) {
-    if (back.find(op) != back.end()) {
+IOGPathSet IOG::findUnitsOnPaths(Operation *startOp, Operation *endOp) const {
+  IOGPathSet paths(startOp, endOp);
+  auto inIOG = [&](Value channel) { return contains(channel); };
+  // The units reachable from the start without going through the end, and the
+  // units that reach the end without going through the start
+  llvm::SetVector<Operation *> forward = reachForward(
+      SmallVector<Value>(startOp->getResults()),
+      [&](Operation *op) { return op == endOp; }, inIOG);
+  forward.insert(startOp);
+  llvm::SetVector<Operation *> backward = reachBackward(
+      SmallVector<Value>(endOp->getOperands()),
+      [&](Operation *op) { return op == startOp; }, inIOG);
+  backward.insert(endOp);
+  // The units on a path from the start to the end are both
+  for (Operation *op : forward)
+    if (backward.contains(op))
       paths.units.insert(op);
-    }
-  }
   return paths;
 }
 
@@ -80,11 +30,11 @@ std::optional<int32_t>
 IOG::isExitBranch(handshake::ConditionalBranchOp branch) const {
   assert(contains(branch));
   Operation *opTrue = *branch.getTrueResult().getUsers().begin();
-  auto paths = findAllPaths(opTrue, branch);
+  auto paths = findUnitsOnPaths(opTrue, branch);
   bool trueLoop = !(paths.units.find(branch) == paths.units.end());
 
   Operation *opFalse = *branch.getFalseResult().getUsers().begin();
-  paths = findAllPaths(opFalse, branch);
+  paths = findUnitsOnPaths(opFalse, branch);
   bool falseLoop = !(paths.units.find(branch) == paths.units.end());
 
   if (trueLoop == falseLoop) {
@@ -93,6 +43,116 @@ IOG::isExitBranch(handshake::ConditionalBranchOp branch) const {
 
   int32_t exitValue = trueLoop ? 0 : 1;
   return exitValue;
+}
+
+namespace {
+/// The ways in which a unit can be part of an IOG. An IOG holds exactly one of
+/// the input groups and one of the output groups of each of its units (none
+/// for a unit without outputs, e.g., a sink), and no other channel of the
+/// unit. For example:
+/// - fork: inputs = {{in}}, outputs = {{out0}, {out1}, ...}
+/// - mux: inputs = {{data0, data1, ...}, {select}}, outputs = {{result}}
+/// - control merge: inputs = {{data0, data1, ...}}, outputs = {{outs},
+///   {index}}
+/// - conditional branch: inputs = {{data}, {condition}}, outputs = {{true,
+///   false}}
+/// - join (e.g., addi): inputs = {{lhs}, {rhs}}, outputs = {{result}}
+/// - sink: inputs = {{in}}, outputs = {}
+struct IOGPortGroups {
+  /// The input groups, each a set of operands.
+  SmallVector</*group=*/SmallVector<Value>> inputs;
+  /// The output groups, each a set of results.
+  SmallVector</*group=*/SmallVector<Value>> outputs;
+};
+} // namespace
+
+/// One group per channel, i.e., exactly one of the channels.
+static SmallVector<SmallVector<Value>> eachOf(ValueRange channels) {
+  SmallVector<SmallVector<Value>> groups;
+  for (Value channel : channels)
+    groups.push_back({channel});
+  return groups;
+}
+
+/// A single group of all the channels.
+static SmallVector<SmallVector<Value>> allOf(ValueRange channels) {
+  return {SmallVector<Value>(channels)};
+}
+
+/// The groups of the channels of `op` (see `IOGPortGroups`), or std::nullopt if
+/// no IOG contains `op`.
+///
+/// The groups follow from what an IOG is for: the number of tokens in the IOG
+/// only changes when a fork copies a token, so that it can be counted from the
+/// sent states of the forks. Each unit therefore turns one token of the IOG
+/// into one token of the IOG, or keeps it (e.g., a sink).
+static std::optional<IOGPortGroups> getIOGPortGroups(Operation *op) {
+  using Groups = std::optional<IOGPortGroups>;
+  return llvm::TypeSwitch<Operation *, Groups>(op)
+      .Case<EndOp>([](EndOp endOp) -> Groups {
+        // The end joins one token from each result of the function, so the IOG
+        // takes one of them, as the other tokens are not counted by the IOG
+        return IOGPortGroups{eachOf(endOp->getOperands()), {}};
+      })
+      .Case<BufferOp>([](BufferOp bufOp) -> Groups {
+        return IOGPortGroups{allOf(bufOp->getOperands()),
+                             allOf(bufOp->getResults())};
+      })
+      .Case<ConditionalBranchOp>([](ConditionalBranchOp condBr) -> Groups {
+        // A branch joins the data with the condition, so the IOG takes one of
+        // them, and sends the token to one of its outputs, which can be any, so
+        // the IOG takes both
+        return IOGPortGroups{
+            {{condBr.getDataOperand()}, {condBr.getConditionOperand()}},
+            allOf(condBr->getResults())};
+      })
+      .Case<ForkOp>([](ForkOp forkOp) -> Groups {
+        // A fork copies the token to all its outputs, so the IOG takes one of
+        // them, as the other copies leave the IOG
+        return IOGPortGroups{allOf(forkOp->getOperands()),
+                             eachOf(forkOp->getResults())};
+      })
+      .Case<MuxOp>([](MuxOp muxOp) -> Groups {
+        // A mux passes on a token from one of its data inputs, which can be
+        // any, and joins it with the select, so the IOG takes either all the
+        // data inputs or the select
+        SmallVector<SmallVector<Value>> inputs = allOf(muxOp.getDataOperands());
+        inputs.push_back({muxOp.getSelectOperand()});
+        return IOGPortGroups{inputs, allOf(muxOp->getResults())};
+      })
+      .Case<ControlMergeOp>([](ControlMergeOp cmerge) -> Groups {
+        // A control merge passes on a token from one of its inputs, which can
+        // be any, so the IOG takes all of them, and copies it to its two
+        // outputs, so the IOG takes one of them
+        return IOGPortGroups{allOf(cmerge.getDataOperands()),
+                             eachOf(cmerge->getResults())};
+      })
+      .Case<SinkOp, DeadBufferOp>([](Operation *sink) -> Groups {
+        // A sink is the end of the IOG. The annotation replaces the sinks of
+        // the IOGs by dead buffers, which keep the token
+        return IOGPortGroups{allOf(sink->getOperands()), {}};
+      })
+      .Case<LoadOp>([](LoadOp loadOp) -> Groups {
+        // The round trip through the memory interface is collapsed, as in the
+        // flow edges of the load (see `getFlowSuccessors`)
+        return IOGPortGroups{{{loadOp.getAddress()}},
+                             {{loadOp.getDataResult()}}};
+      })
+      .Case<StoreOp, SourceOp, MemoryControllerOp>([](Operation *) -> Groups {
+        // A token leaves the circuit through a store and enters it through a
+        // source, so the number of tokens in the IOG would not be fixed. The
+        // memory controllers are only reached by control signals, which give
+        // trivial IOGs that can be skipped
+        return std::nullopt;
+      })
+      .Default([](Operation *op) -> Groups {
+        // An arithmetic unit joins one token from each operand, so the IOG
+        // takes one of them, as the other tokens are not counted by the IOG
+        if (isa<ArithOpInterface>(op))
+          return IOGPortGroups{eachOf(op->getOperands()), {{op->getResult(0)}}};
+        op->emitError("unhandled case in IOG finding");
+        return std::nullopt;
+      });
 }
 
 namespace {
@@ -191,7 +251,6 @@ struct IOGCandidate {
   }
 };
 
-using namespace dynamatic::handshake;
 class IOGFinder {
 public:
   IOGFinder(BlockArgument entry) {
@@ -235,77 +294,36 @@ public:
     handleUnit(candidate, op);
   }
 
-  // Handles an operation for a specific IOG candidate by:
-  //
-  // 1. Inserting the unit into the IOG
-  // 2. Marking necessary edges as followed (e.g. all merge inputs)
-  // 3. Splitting into multiple potential candidates if necessary: For example,
-  // only a single fork output can be followed, so there is a different possible
-  // IOG for each output
+  // Handles an operation for a specific IOG candidate: the candidate is split
+  // into one candidate per way in which the unit can be part of the IOG (see
+  // `getIOGPortGroups`), and the candidates that contradict the channels
+  // already decided are discarded
   void handleUnit(IOGCandidate candidate, Operation *op) {
     candidate.iog.units.insert(op);
-    if (auto endOp = dyn_cast<EndOp>(op)) {
-      followSingle(candidate, endOp.getOperands());
-    } else if (auto bufOp = dyn_cast<BufferOp>(op)) {
-      candidate.markFollowed(bufOp.getOperand());
-      candidate.markFollowed(bufOp.getResult());
-      candidates.push_back(candidate);
-    } else if (auto condBr = dyn_cast<ConditionalBranchOp>(op)) {
-      candidate.markFollowed(condBr.getTrueResult());
-      candidate.markFollowed(condBr.getFalseResult());
-      followSingle(candidate, condBr.getOperands());
-    } else if (auto forkOp = dyn_cast<ForkOp>(op)) {
-      candidate.markFollowed(forkOp.getOperand());
-      followSingle(candidate, forkOp.getResults());
-    } else if (auto muxOp = dyn_cast<MuxOp>(op)) {
-      // Either all data inputs, or the select input. Output always
-      candidate.markFollowed(muxOp.getResult());
-      auto dataFollower = candidate;
-      auto selectFollower = candidate;
-      for (auto data : muxOp.getDataOperands()) {
-        dataFollower.markFollowed(data);
-        selectFollower.markIllegal(data);
+    std::optional<IOGPortGroups> groups = getIOGPortGroups(op);
+    if (!groups)
+      return;
+    // A unit without outputs in the IOG (e.g., a sink) takes no output group
+    SmallVector<SmallVector<Value>> outputs = groups->outputs;
+    if (outputs.empty())
+      outputs.emplace_back();
+    for (const SmallVector<Value> &in : groups->inputs) {
+      for (const SmallVector<Value> &out : outputs) {
+        IOGCandidate next = candidate;
+        for (Value channel : in)
+          next.markFollowed(channel);
+        for (Value channel : out)
+          next.markFollowed(channel);
+        // The other channels of the unit are not part of the IOG
+        for (Value channel : op->getOperands())
+          if (!llvm::is_contained(in, channel))
+            next.markIllegal(channel);
+        for (Value channel : op->getResults())
+          if (!llvm::is_contained(out, channel))
+            next.markIllegal(channel);
+        if (!next.invalidIOG)
+          candidates.push_back(std::move(next));
       }
-
-      dataFollower.markIllegal(muxOp.getSelectOperand());
-      selectFollower.markFollowed(muxOp.getSelectOperand());
-
-      candidates.push_back(dataFollower);
-      candidates.push_back(selectFollower);
-    } else if (auto cmerge = dyn_cast<ControlMergeOp>(op)) {
-      for (auto data : cmerge.getDataOperands()) {
-        candidate.markFollowed(data);
-      }
-      followSingle(candidate, cmerge.getResults());
-    } else if (auto arithOp = dyn_cast<ArithOpInterface>(op)) {
-      candidate.markFollowed(arithOp->getResults()[0]);
-      followSingle(candidate, arithOp->getOperands());
-    } else if (isa<SinkOp, DeadBufferOp>(op)) {
-      // These act as terminating units, and no further edges need to be
-      // followed. The annotation replaces the sinks of the IOGs by dead
-      // buffers, which keep the token.
-      candidates.push_back(candidate);
-    } else if (isa<StoreOp>(op)) {
-      // A store passes the token on to the memory interface, where it leaves
-      // the circuit. No state keeps the token, so the number of tokens in the
-      // candidate is not fixed, and the candidate is discarded.
-    } else if (auto loadOp = dyn_cast<LoadOp>(op)) {
-      candidate.markFollowed(loadOp.getAddress());
-      // checkpoint.follow(loadOp.getAddressResult());
-      // checkpoint.follow(loadOp.getData());
-      candidate.markFollowed(loadOp.getDataResult());
-      candidates.push_back(candidate);
-    } else if (isa<SourceOp, MemoryControllerOp>(op)) {
-      // SourceOps can not be part of an IOG, as they act like entry nodes. This
-      // means that the partial IOGs looking at these operations can be
-      // discarded, so nothing needs to be done
-      //
-      // MemoryControllers are only accessed by control signals during this
-      // annotation, as the edges between loadOps/storeOps and the MC are not
-      // added to the IOG. These control signals usually grant trivial IOGs that
-      // can be skipped.
-    } else {
-      op->emitError("unhandled case in IOG finding");
     }
   }
 
@@ -317,62 +335,19 @@ public:
   }
 
 private:
-  // This function takes a checkpoint and a list of channels. For each channel
-  // c, it pushes the IOG where *only* channel c is taken, and all the rest are
-  // illegal. Used for forks (which only allow exactly one of its outputs) and
-  // join operations (which only allow exactly one of its inputs)
-  void followSingle(const IOGCandidate &checkpoint, ValueRange options) {
-    size_t n = 0;
-    mlir::Value singleTaken = nullptr;
-    for (mlir::Value channel : options) {
-      if (checkpoint.iog.contains(channel)) {
-        n += 1;
-        singleTaken = channel;
-      }
-    }
-    if (n == 1) {
-      IOGCandidate goHere = checkpoint;
-      // singleTaken is already part of the IOG, so no need to follow it
-      // goHere.follow(singleTaken);
-      for (mlir::Value other : options) {
-        if (other == singleTaken) {
-          continue;
-        }
-        goHere.markIllegal(other);
-      }
-      candidates.push_back(goHere);
-      return;
-    }
-    if (n > 1) {
-      // Multiple paths taken, but only single is allowed! => No IOGs from this
-      // branch
-      return;
-    }
-    for (mlir::Value channel : options) {
-      IOGCandidate goHere = checkpoint;
-      goHere.markFollowed(channel);
-      for (mlir::Value other : options) {
-        if (channel == other)
-          continue;
-        goHere.markIllegal(other);
-      }
-      candidates.push_back(goHere);
-    }
-  }
-
   std::vector<IOGCandidate> candidates;
   std::vector<IOG> finals;
 };
 
-std::vector<IOG> findAllIOGsWithEntry(BlockArgument entry) {
+} // namespace
+
+static std::vector<IOG> findAllIOGsWithEntry(BlockArgument entry) {
   IOGFinder finder(entry);
   while (!finder.isDone()) {
     finder.step();
   }
   return finder.getIOGs();
 }
-
-} // namespace
 
 std::vector<IOG> findAllIOGs(ModuleOp modOp) {
   std::vector<IOG> ret{};

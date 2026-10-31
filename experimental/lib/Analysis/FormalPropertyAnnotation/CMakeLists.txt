@@ -4,6 +4,7 @@ add_dynamatic_library(DynamaticFormalPropertyAnnotation
   Utils/Gaussian.cpp
   Utils/IndexChannelAnalysis.cpp
   Utils/IOG.cpp
+  Utils/TraversalUtils.cpp
 
   DEPENDS
   DynamaticExperimentalAnalysisPassIncGen
