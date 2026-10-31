@@ -163,7 +163,7 @@ LogicalResult ControlType::verify(function_ref<InFlightDiagnostic()> emitError,
 
 /// Parse the control type after "<[" is parsed.
 static Type parseControlAfterLSquare(AsmParser &odsParser) {
-  function_ref<InFlightDiagnostic()> emitError = [&]() {
+  auto emitError = [&]() {
     return odsParser.emitError(odsParser.getCurrentLocation());
   };
 
@@ -245,7 +245,7 @@ checkChannelData(function_ref<InFlightDiagnostic()> emitError, Type dataType) {
 static Type parseChannelAfterLess(AsmParser &odsParser) {
   FailureOr<Type> dataType;
 
-  function_ref<InFlightDiagnostic()> emitError = [&]() {
+  auto emitError = [&]() {
     return odsParser.emitError(odsParser.getCurrentLocation());
   };
 
