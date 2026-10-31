@@ -291,43 +291,40 @@ handshake.func @boundConj(%arg0: !handshake.channel<i32>, %arg2: !handshake.chan
 // -----
 
 // CHECK-LABEL:   handshake.func @test32(
-// CHECK-SAME:                           %[[VAL_0:.*]]: !handshake.channel<i16>,
-// CHECK-SAME:                           %[[VAL_1:.*]]: !handshake.channel<i8>,
-// CHECK-SAME:                           %[[VAL_2:.*]]: memref<32xi16>,
-// CHECK-SAME:                           %[[VAL_3:.*]]: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["arg0", "arg2", "arg3", "arg6"], resNames = ["out0", "out1", "out2", "out3"]} {
-// CHECK:           %[[VAL_4:.*]]:2 = lsq{{\[}}%[[VAL_2]] : memref<32xi16>] (%[[VAL_3]], %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]])  {groupSizes = [1 : i32, 1 : i32]} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i5>, !handshake.channel<i16>, !handshake.control<>, !handshake.channel<i5>, !handshake.control<>) -> (!handshake.channel<i16>, !handshake.control<>)
-// CHECK:           %[[VAL_11:.*]] = source : <>
-// CHECK:           %[[VAL_12:.*]] = constant %[[VAL_11]] {value = 0 : i8} : <>, <i8>
-// CHECK:           %[[VAL_13:.*]] = cmpi eq, %[[VAL_1]], %[[VAL_12]] : <i8>
-// CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = cond_br %[[VAL_13]], %[[VAL_0]] : <i1>, <i16>
-// CHECK:           %[[VAL_16:.*]], %[[VAL_17:.*]] = cond_br %[[VAL_13]], %[[VAL_3]] : <i1>, <>
-// CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = cond_br %[[VAL_13]], %[[VAL_13]] : <i1>, <i1>
-// CHECK:           %[[VAL_20:.*]] = mux %[[VAL_21:.*]] {{\[}}%[[VAL_15]], %[[VAL_22:.*]]] : <i1>, [<i16>, <i16>] to <i16>
-// CHECK:           %[[VAL_23:.*]] = mux %[[VAL_21]] {{\[}}%[[VAL_19]], %[[VAL_24:.*]]] : <i1>, [<i1>, <i1>] to <i1>
-// CHECK:           %[[VAL_5]], %[[VAL_21]] = control_merge {{\[}}%[[VAL_17]], %[[VAL_25:.*]]]  : [<>, <>] to <>, <i1>
-// CHECK:           %[[VAL_26:.*]] = constant %[[VAL_5]] {value = 0 : i16} : <>, <i16>
-// CHECK:           %[[VAL_27:.*]] = constant %[[VAL_5]] {value = 0 : i5} : <>, <i5>
-// CHECK:           %[[VAL_6]], %[[VAL_7]] = store{{\[}}%[[VAL_27]]] %[[VAL_26]] : <i5>, <i16>, <i5>, <i16>
-// CHECK:           %[[VAL_28:.*]], %[[VAL_22]] = cond_br %[[VAL_23]], %[[VAL_20]] : <i1>, <i16>
-// CHECK:           %[[VAL_29:.*]], %[[VAL_25]] = cond_br %[[VAL_23]], %[[VAL_5]] : <i1>, <>
-// CHECK:           %[[VAL_30:.*]], %[[VAL_24]] = cond_br %[[VAL_23]], %[[VAL_23]] : <i1>, <i1>
-// CHECK:           %[[VAL_31:.*]], %[[VAL_32:.*]] = control_merge {{\[}}%[[VAL_16]], %[[VAL_29]]]  : [<>, <>] to <>, <i1>
-// CHECK:           %[[VAL_33:.*]] = mux %[[VAL_34:.*]] {{\[}}%[[VAL_20]], %[[VAL_35:.*]]] : <i1>, [<i16>, <i16>] to <i16>
-// CHECK:           %[[VAL_36:.*]] = extui %[[VAL_33]] : <i16> to <i17>
-// CHECK:           %[[VAL_8]], %[[VAL_34]] = control_merge {{\[}}%[[VAL_31]], %[[VAL_37:.*]]]  : [<>, <>] to <>, <i1>
-// CHECK:           %[[VAL_38:.*]] = source : <>
-// CHECK:           %[[VAL_39:.*]] = constant %[[VAL_8]] {value = 0 : i5} : <>, <i5>
-// CHECK:           %[[VAL_9]], %[[VAL_40:.*]] = load{{\[}}%[[VAL_39]]] %[[VAL_4]]#0 : <i5>, <i16>, <i5>, <i16>
-// CHECK:           %[[VAL_41:.*]] = extsi %[[VAL_40]] : <i16> to <i17>
-// CHECK:           %[[VAL_42:.*]] = xori %[[VAL_36]], %[[VAL_41]] : <i17>
-// CHECK:           %[[VAL_43:.*]] = constant %[[VAL_38]] {value = 0 : i17} : <>, <i17>
-// CHECK:           %[[VAL_44:.*]] = cmpi eq, %[[VAL_42]], %[[VAL_43]] : <i17>
-// CHECK:           %[[VAL_35]], %[[VAL_45:.*]] = cond_br %[[VAL_44]], %[[VAL_33]] : <i1>, <i16>
-// CHECK:           %[[VAL_37]], %[[VAL_10]] = cond_br %[[VAL_44]], %[[VAL_8]] : <i1>, <>
-// CHECK:           end %[[VAL_11]], %[[VAL_3]], %[[VAL_3]], %[[VAL_3]] : <>, <>, <>, <>
+// CHECK-SAME:      %[[ARG0:.*]]: !handshake.channel<i16>, %[[ARG1:.*]]: !handshake.channel<i8>, %[[ARG2:.*]]: memref<32xi16>, %[[ARG3:.*]]: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["arg0", "arg2", "arg3", "arg6"], resNames = ["out0", "out1", "out2", "out3"]} {
+// CHECK:           %[[VAL_0:.*]], %[[VAL_1:.*]] = lsq{{\[}}%[[ARG2]] : memref<32xi16>] start(%[[ARG3]]) groups(%[[VAL_2:.*]]: [store(%[[VAL_3:.*]], %[[VAL_4:.*]])], %[[VAL_5:.*]]: [load(%[[VAL_6:.*]])]) end(%[[VAL_7:.*]]) : <i5>, <i16>
+// CHECK:           %[[VAL_8:.*]] = source : <>
+// CHECK:           %[[VAL_9:.*]] = constant %[[VAL_8]] {value = 0 : i8} : <>, <i8>
+// CHECK:           %[[VAL_10:.*]] = cmpi eq, %[[ARG1]], %[[VAL_9]] : <i8>
+// CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = cond_br %[[VAL_10]], %[[ARG0]] : <i1>, <i16>
+// CHECK:           %[[VAL_13:.*]], %[[VAL_14:.*]] = cond_br %[[VAL_10]], %[[ARG3]] : <i1>, <>
+// CHECK:           %[[VAL_15:.*]], %[[VAL_16:.*]] = cond_br %[[VAL_10]], %[[VAL_10]] : <i1>, <i1>
+// CHECK:           %[[VAL_17:.*]] = mux %[[VAL_18:.*]] {{\[}}%[[VAL_12]], %[[VAL_19:.*]]] : <i1>, [<i16>, <i16>] to <i16>
+// CHECK:           %[[VAL_20:.*]] = mux %[[VAL_18]] {{\[}}%[[VAL_16]], %[[VAL_21:.*]]] : <i1>, [<i1>, <i1>] to <i1>
+// CHECK:           %[[VAL_2]], %[[VAL_18]] = control_merge {{\[}}%[[VAL_14]], %[[VAL_22:.*]]]  : [<>, <>] to <>, <i1>
+// CHECK:           %[[VAL_23:.*]] = constant %[[VAL_2]] {value = 0 : i16} : <>, <i16>
+// CHECK:           %[[VAL_24:.*]] = constant %[[VAL_2]] {value = 0 : i5} : <>, <i5>
+// CHECK:           %[[VAL_3]], %[[VAL_4]] = store{{\[}}%[[VAL_24]]] %[[VAL_23]] : <i5>, <i16>, <i5>, <i16>
+// CHECK:           %[[VAL_25:.*]], %[[VAL_19]] = cond_br %[[VAL_20]], %[[VAL_17]] : <i1>, <i16>
+// CHECK:           %[[VAL_26:.*]], %[[VAL_22]] = cond_br %[[VAL_20]], %[[VAL_2]] : <i1>, <>
+// CHECK:           %[[VAL_27:.*]], %[[VAL_21]] = cond_br %[[VAL_20]], %[[VAL_20]] : <i1>, <i1>
+// CHECK:           %[[VAL_28:.*]], %[[VAL_29:.*]] = control_merge {{\[}}%[[VAL_13]], %[[VAL_26]]]  : [<>, <>] to <>, <i1>
+// CHECK:           %[[VAL_30:.*]] = mux %[[VAL_31:.*]] {{\[}}%[[VAL_17]], %[[VAL_32:.*]]] : <i1>, [<i16>, <i16>] to <i16>
+// CHECK:           %[[VAL_33:.*]] = extui %[[VAL_30]] : <i16> to <i17>
+// CHECK:           %[[VAL_5]], %[[VAL_31]] = control_merge {{\[}}%[[VAL_28]], %[[VAL_34:.*]]]  : [<>, <>] to <>, <i1>
+// CHECK:           %[[VAL_35:.*]] = source : <>
+// CHECK:           %[[VAL_36:.*]] = constant %[[VAL_5]] {value = 0 : i5} : <>, <i5>
+// CHECK:           %[[VAL_6]], %[[VAL_37:.*]] = load{{\[}}%[[VAL_36]]] %[[VAL_0]] : <i5>, <i16>, <i5>, <i16>
+// CHECK:           %[[VAL_38:.*]] = extsi %[[VAL_37]] : <i16> to <i17>
+// CHECK:           %[[VAL_39:.*]] = xori %[[VAL_33]], %[[VAL_38]] : <i17>
+// CHECK:           %[[VAL_40:.*]] = constant %[[VAL_35]] {value = 0 : i17} : <>, <i17>
+// CHECK:           %[[VAL_41:.*]] = cmpi eq, %[[VAL_39]], %[[VAL_40]] : <i17>
+// CHECK:           %[[VAL_32]], %[[VAL_42:.*]] = cond_br %[[VAL_41]], %[[VAL_30]] : <i1>, <i16>
+// CHECK:           %[[VAL_34]], %[[VAL_7]] = cond_br %[[VAL_41]], %[[VAL_5]] : <i1>, <>
+// CHECK:           end %[[VAL_8]], %[[ARG3]], %[[ARG3]], %[[ARG3]] : <>, <>, <>, <>
 // CHECK:         }
 handshake.func @test32(%arg0: !handshake.channel<i16>, %arg1: !handshake.channel<i8>, %arg2: memref<32xi16>, %arg4: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["arg0", "arg2", "arg3", "arg6"], resNames = ["out0", "out1", "out2", "out3"]} {
-  %0:2 = lsq[%arg2 : memref<32xi16>] (%arg4, %result, %addressResult, %dataResult, %result_12, %addressResult_14, %falseResult_19)  {groupSizes = [1 : i32, 1 : i32]} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i16>, !handshake.control<>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i16>, !handshake.control<>)
+  %0:2 = lsq[%arg2 : memref<32xi16>] start(%arg4) groups(%result: [store(%addressResult, %dataResult)], %result_12: [load(%addressResult_14)]) end(%falseResult_19) : <i32>, <i16>
   %1 = source : <>
   %2 = constant %1 {value = 0 : i8} : <>, <i8>
   %3 = cmpi eq, %arg1, %2 : <i8>

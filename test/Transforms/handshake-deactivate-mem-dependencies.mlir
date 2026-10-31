@@ -2,13 +2,13 @@
 
 // CHECK-LABEL:   handshake.func @test0(
 handshake.func @test0(%arg0: !handshake.channel<i32>, %arg4: memref<8xi32>, %arg5: memref<8xi8>, %arg6: !handshake.control<>, %arg7: !handshake.control<>, %arg8: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["var1", "var0", "var2", "var0_start", "var2_start", "start"], resNames = ["var0_end", "var2_end", "end"]} {
-  %0 = lsq[%arg5 : memref<8xi8>] (%arg7, %arg8, %addressResult_12, %dataResult_13, %arg8)  {groupSizes = [2 : i32], handshake.name = "lsq0"} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i8>, !handshake.control<>) -> !handshake.control<>
-  %1:2 = lsq[%arg4 : memref<8xi32>] (%arg6, %arg8, %addressResult_10, %addressResult_14, %dataResult_15, %arg8)  {groupSizes = [2 : i32], handshake.name = "lsq1"} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
+  %0 = lsq[%arg5 : memref<8xi8>] start(%arg7) groups(%arg8: [store(%addressResult_12, %dataResult_13)]) end(%arg8) {handshake.name = "lsq0"} : <i32>, <i8>
+  %1:2 = lsq[%arg4 : memref<8xi32>] start(%arg6) groups(%arg8: [load(%addressResult_10), store(%addressResult_14, %dataResult_15)]) end(%arg8) {handshake.name = "lsq1"} : <i32>, <i32>
   %22 = constant %arg8 {handshake.bb = 0 : ui32, handshake.name = "constant6", value = 0 : i32} : <>, <i32>
 
 // ^bb1:
 
-  // CHECK: load
+  // CHECK: = load[
   // CHECK-SAME: #handshake<deps[{
   // CHECK-SAME: dstAccess : "store3"
   // CHECK-SAME: isActive : true
@@ -24,9 +24,9 @@ handshake.func @test0(%arg0: !handshake.channel<i32>, %arg4: memref<8xi32>, %arg
 
 // CHECK-LABEL:   handshake.func @shrsi_giid(
 handshake.func @shrsi_giid(%arg0: !handshake.channel<i8>, %arg1: memref<2xi16>, %arg2: !handshake.control<>, %arg3: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>) attributes {argNames = ["var5", "var1", "var1_start", "start"], resNames = ["var1_end", "end"]} {
-  %0:2 = lsq[%arg1 : memref<2xi16>] (%arg2, %arg3, %addressResult, %addressResult_0, %dataResult_1, %arg3)  {groupSizes = [2 : i32], handshake.name = "lsq0"} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i16>, !handshake.control<>) -> (!handshake.channel<i16>, !handshake.control<>)
+  %0:2 = lsq[%arg1 : memref<2xi16>] start(%arg2) groups(%arg3: [load(%addressResult), store(%addressResult_0, %dataResult_1)]) end(%arg3) {handshake.name = "lsq0"} : <i32>, <i16>
   %1 = constant %arg3 {handshake.bb = 0 : ui32, handshake.name = "constant0", value = 0 : i32} : <>, <i32>
-  // CHECK: load
+  // CHECK: = load[
   // CHECK-SAME: #handshake<deps[{
   // CHECK-SAME: dstAccess : "store1"
   // CHECK-SAME: isActive : false
