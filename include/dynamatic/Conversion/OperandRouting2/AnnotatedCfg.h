@@ -14,9 +14,9 @@
 #ifndef EXPERIMENTAL_CONVERSION_OPERANDROUTING2_ANNOTATEDCFG_H
 #define EXPERIMENTAL_CONVERSION_OPERANDROUTING2_ANNOTATEDCFG_H
 
+#include "dynamatic/Conversion/OperandRouting2/BaseCfg.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Conversion/OperandRouting2/BaseCfg.h"
 #include "llvm/ADT/MapVector.h"
 #include <utility>
 

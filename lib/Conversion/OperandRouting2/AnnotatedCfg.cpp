@@ -481,9 +481,8 @@ static bool bypassBlock(Cfg &cfg) {
       Value liveOut = inEdge->getLiveOut(blockInputOfA)->liveOut;
 
       // Make the updated live-out
-      updatedLiveOutsOfPredA.push_back(
-          {/*liveOut=*/liveOut,
-           /*blockInput=*/liveOutOfA.blockInput});
+      updatedLiveOutsOfPredA.push_back({/*liveOut=*/liveOut,
+                                        /*blockInput=*/liveOutOfA.blockInput});
     }
 
     // replace the live-outs of pred of A
@@ -499,7 +498,5 @@ static bool bypassBlock(Cfg &cfg) {
 void dynamatic::experimental::operand_routing2::optimizeCfg(Cfg &cfg) {
   bool changed = true;
   while (changed)
-    changed = mergeSides(cfg) ||
-              removeSelfLoop(cfg) ||
-              bypassBlock(cfg);
+    changed = mergeSides(cfg) || removeSelfLoop(cfg) || bypassBlock(cfg);
 }

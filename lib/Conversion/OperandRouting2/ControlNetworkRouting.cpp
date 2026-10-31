@@ -118,7 +118,7 @@ static Selects buildControlNetwork(const Cfg &cfg,
                                    OpBuilder &builder) {
   Selects selects;
 
-  // control network doesn't correspond 
+  // control network doesn't correspond
   // to any specific part of the IR
   Location loc = builder.getUnknownLoc();
 
@@ -126,7 +126,7 @@ static Selects buildControlNetwork(const Cfg &cfg,
   // we need this to build dataless control units later
   Type controlType = handshake::ControlType::get(builder.getContext());
 
-  // the control network is only needed 
+  // the control network is only needed
   // if there will be multiplexers to control
   // multiplexers are placed when a basic block
   // has 2 or more predecessors, and block inputs arriving over them
@@ -146,7 +146,7 @@ static Selects buildControlNetwork(const Cfg &cfg,
 
   Cfg controlNetworkCfg = cfg;
 
-  // we add an additional edge to the cfg 
+  // we add an additional edge to the cfg
   // for the control network:
   // from the exit block to the entry block
   // which marks that the routing network only restarts
@@ -178,7 +178,7 @@ static Selects buildControlNetwork(const Cfg &cfg,
     // handle insertion point
     builder.setInsertionPointToStart(block);
 
-    // on the control network, 
+    // on the control network,
     // there is only one value into the basic block
     Value routedIn;
 
@@ -203,7 +203,7 @@ static Selects buildControlNetwork(const Cfg &cfg,
 
       // the control merge needs a temp producer in the IR
       // one for each live-out of this basic block input
-      // (each predecessor has one live-out that 
+      // (each predecessor has one live-out that
       // could become the input)
       for (ControlLiveOut liveOut : incomingLiveOuts) {
         temps[liveOut] = TempProd(builder, controlType);
@@ -224,12 +224,12 @@ static Selects buildControlNetwork(const Cfg &cfg,
 
       // the value in the basic block comes from the cmerge output
       routedIn = cmergeOp.getResult();
-    } else{
+    } else {
       llvm_unreachable(
           "every basic block in the control network has a predecessor");
     }
 
-    // the "straight data path" of the control network 
+    // the "straight data path" of the control network
     // is almost always just a wire
     Value sdpOut = routedIn;
     // but in the entry block, it's an init op
@@ -243,7 +243,7 @@ static Selects buildControlNetwork(const Cfg &cfg,
     // so the number of live-outs is the number of outgoing edges
     SmallVector<ControlLiveOut> outgoingLiveOuts =
         controlNetworkCfg.getOutEdges(block);
-    
+
     if (outgoingLiveOuts.size() == 1) {
       // if this basic block has one successor
       // the live-out comes directly from the straight data path
@@ -323,11 +323,11 @@ static void buildRouting(const Cfg &cfg, const BlockToCond &blockToCond,
 
     // entry block has no block inputs
     if (block == cfg.entry) {
-      if (!inEdges.empty()){
+      if (!inEdges.empty()) {
         llvm_unreachable("the entry block has no predecessors");
       }
     } else {
-      if (inEdges.empty()){
+      if (inEdges.empty()) {
         llvm_unreachable("non entry blocks must have a predecessor");
       }
       // get the live-outs from the first incoming cfg edge

@@ -56,8 +56,8 @@ static void mergeReturns(func::FuncOp funcOp, OpBuilder &builder) {
 
   // make the extra last basic block with one block-arg
   // per result the function returns
-  Block *exit = builder.createBlock(&body, body.end(),
-                                    funcOp.getResultTypes(), argLocs);
+  Block *exit =
+      builder.createBlock(&body, body.end(), funcOp.getResultTypes(), argLocs);
 
   // add a return op fed by the block args
   builder.create<func::ReturnOp>(funcOp.getLoc(), exit->getArguments());

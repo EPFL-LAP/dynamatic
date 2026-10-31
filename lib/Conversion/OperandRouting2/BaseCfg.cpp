@@ -109,7 +109,7 @@ Cfg dynamatic::experimental::operand_routing2::getBaseCfg(Region &body) {
   return cfg;
 }
 
-unsigned dynamatic::experimental::operand_routing2::getBlockNumber(
-    Block *block) {
+unsigned
+dynamatic::experimental::operand_routing2::getBlockNumber(Block *block) {
   return std::distance(block->getParent()->begin(), block->getIterator());
 }
