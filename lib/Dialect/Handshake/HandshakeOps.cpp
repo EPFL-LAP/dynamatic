@@ -802,10 +802,18 @@ static ParseResult parseFuncPortType(OpAsmParser &parser, Type &type) {
   OptionalParseResult hasType = parser.parseOptionalType(type);
   if (hasType.has_value())
     return *hasType;
+  // The position of the next token to read, before the Handshake type parser
+  // runs
+  llvm::SMLoc loc = parser.getCurrentLocation();
   type = handshake::detail::jointHandshakeTypeParser(parser);
-  if (!type)
-    return parser.emitError(parser.getCurrentLocation(), "expected a type");
-  return success();
+  if (type)
+    return success();
+  // Once it has read the `<`, the Handshake type parser reports its own errors
+  // (e.g., an invalid data type). It has read the `<` if the next token to
+  // read has moved past `loc`; otherwise, it read nothing and reported nothing
+  if (parser.getCurrentLocation() != loc)
+    return failure();
+  return parser.emitError(loc, "expected a type");
 }
 
 /// Prints the type of a function's argument or result (see
