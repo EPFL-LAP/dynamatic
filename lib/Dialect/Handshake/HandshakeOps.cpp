@@ -762,24 +762,6 @@ LogicalResult BufferOp::verify() {
   return success();
 }
 
-/// Parses a FuncOp signature using
-/// mlir::function_interface_impl::parseFunctionSignature while getting access
-/// to the parsed SSA names to store as attributes.
-static ParseResult
-parseFuncOpArgs(OpAsmParser &parser,
-                SmallVectorImpl<OpAsmParser::Argument> &entryArgs,
-                SmallVectorImpl<Type> &resTypes,
-                SmallVectorImpl<DictionaryAttr> &resAttrs) {
-  bool isVariadic;
-  if (mlir::function_interface_impl::parseFunctionSignatureWithArguments(
-          parser, /*allowVariadic=*/true, entryArgs, isVariadic, resTypes,
-          resAttrs)
-          .failed())
-    return failure();
-
-  return success();
-}
-
 /// Generates names for a handshake.func input and output arguments, based on
 /// the number of args as well as a prefix.
 static SmallVector<Attribute> getFuncOpNames(Builder &builder, unsigned cnt,
@@ -812,60 +794,142 @@ void handshake::FuncOp::build(OpBuilder &builder, OperationState &state,
   state.addRegion();
 }
 
-ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
-  auto &builder = parser.getBuilder();
-  StringAttr nameAttr;
-  SmallVector<OpAsmParser::Argument> args;
-  SmallVector<Type> resTypes;
-  SmallVector<DictionaryAttr> resAttributes;
-  SmallVector<Attribute> argNames;
-
-  // Parse visibility.
-  (void)mlir::impl::parseOptionalVisibilityKeyword(parser, result.attributes);
-
-  // Parse signature
-  if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
-                             result.attributes) ||
-      parseFuncOpArgs(parser, args, resTypes, resAttributes))
+/// Parses the type of a function's argument or result. Handshake types are
+/// written without their dialect prefix, like in the operations of the body.
+/// Example: `<i32>`
+static ParseResult parseFuncPortType(OpAsmParser &parser, Type &type) {
+  // Other types (e.g., memrefs), or a Handshake type with its dialect prefix
+  OptionalParseResult hasType = parser.parseOptionalType(type);
+  if (hasType.has_value())
+    return *hasType;
+  // The position of the next token to read, before the Handshake type parser
+  // runs
+  llvm::SMLoc loc = parser.getCurrentLocation();
+  type = handshake::detail::jointHandshakeTypeParser(parser);
+  if (type)
+    return success();
+  // Once it has read the `<`, the Handshake type parser reports its own errors
+  // (e.g., an invalid data type). It has read the `<` if the next token to
+  // read has moved past `loc`; otherwise, it read nothing and reported nothing
+  if (parser.getCurrentLocation() != loc)
     return failure();
+  return parser.emitError(loc, "expected a type");
+}
+
+/// Prints the type of a function's argument or result (see
+/// `parseFuncPortType`).
+static void printFuncPortType(OpAsmPrinter &printer, Type type) {
+  if (isa<handshake::ControlType, handshake::ChannelType>(type))
+    printHandshakeType(printer, type);
+  else
+    printer.printType(type);
+}
+
+/// Example: `handshake.func @f(%a: <i32>, %start: <>) -> (out: <i32>, end: <>)`
+ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
+  Builder &builder = parser.getBuilder();
+  MLIRContext *ctx = builder.getContext();
+
+  // Example: `@f`
+  (void)mlir::impl::parseOptionalVisibilityKeyword(parser, result.attributes);
+  StringAttr nameAttr;
+  if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
+                             result.attributes))
+    return failure();
+
+  // The arguments, named by their SSA names
+  // Example: `(%a: <i32>, %start: <>)`
+  SmallVector<OpAsmParser::Argument> args;
+  auto parseArg = [&]() -> ParseResult {
+    OpAsmParser::Argument &arg = args.emplace_back();
+    // A function without a body has no SSA names
+    // Example: `%a`
+    OptionalParseResult hasSSAName = parser.parseOptionalArgument(arg);
+    if (hasSSAName.has_value() && (failed(*hasSSAName) || parser.parseColon()))
+      return failure();
+    // Example: `<i32>`
+    if (parseFuncPortType(parser, arg.type))
+      return failure();
+    // Example: `{handshake.arg_name = "a"}`
+    NamedAttrList attrs;
+    if (parser.parseOptionalAttrDict(attrs))
+      return failure();
+    arg.attrs = attrs.getDictionary(ctx);
+    return success();
+  };
+  if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, parseArg))
+    return failure();
+
+  // The results, each with its name if it has one
+  // Example: `-> (out0: <i32>, end: <>)`
+  SmallVector<Type> resTypes;
+  SmallVector<DictionaryAttr> resAttrs;
+  SmallVector<Attribute> resNames;
+  auto parseRes = [&](bool inParens) -> ParseResult {
+    // Example: `out0`
+    std::string name;
+    if (succeeded(parser.parseOptionalKeywordOrString(&name))) {
+      if (parser.parseColon())
+        return failure();
+    } else {
+      name = "out" + std::to_string(resTypes.size());
+    }
+    resNames.push_back(builder.getStringAttr(name));
+    // Example: `<i32>`
+    if (parseFuncPortType(parser, resTypes.emplace_back()))
+      return failure();
+    // Its attributes, if any, as for the arguments. Without parentheses, a
+    // `{` starts the body
+    NamedAttrList attrs;
+    if (inParens && parser.parseOptionalAttrDict(attrs))
+      return failure();
+    resAttrs.push_back(attrs.getDictionary(ctx));
+    return success();
+  };
+  if (succeeded(parser.parseOptionalArrow())) {
+    // A single result may be written without parentheses
+    if (failed(parser.parseOptionalLParen())) {
+      if (parseRes(/*inParens=*/false))
+        return failure();
+    } else if (parser.parseCommaSeparatedList(
+                   [&]() { return parseRes(/*inParens=*/true); }) ||
+               parser.parseRParen()) {
+      return failure();
+    }
+  }
+
   mlir::call_interface_impl::addArgAndResultAttrs(
-      builder, result, args, resAttributes,
+      builder, result, args, resAttrs,
       handshake::FuncOp::getArgAttrsAttrName(result.name),
       handshake::FuncOp::getResAttrsAttrName(result.name));
-
-  // Set function type
   SmallVector<Type> argTypes;
-  for (auto arg : args)
+  for (OpAsmParser::Argument &arg : args)
     argTypes.push_back(arg.type);
-
   result.addAttribute(
       handshake::FuncOp::getFunctionTypeAttrName(result.name),
       TypeAttr::get(builder.getFunctionType(argTypes, resTypes)));
 
-  // Determine the names of the arguments. If no SSA values are present, use
-  // fallback names.
-  bool noSSANames =
-      llvm::any_of(args, [](auto arg) { return arg.ssaName.name.empty(); });
-  if (noSSANames) {
-    argNames = getFuncOpNames(builder, args.size(), "in");
-  } else {
-    llvm::transform(args, std::back_inserter(argNames), [&](auto arg) {
-      return builder.getStringAttr(arg.ssaName.name.drop_front());
-    });
-  }
-
-  // Parse attributes
+  // Example: `attributes {argNames = ["a", "start"]}`
   if (failed(parser.parseOptionalAttrDictWithKeyword(result.attributes)))
     return failure();
 
-  // If argNames and resNames wasn't provided manually, infer argNames attribute
-  // from the parsed SSA names and resNames from our naming convention.
-  if (!result.attributes.get("argNames"))
+  // The names of the arguments are their SSA names, unless given explicitly.
+  // Without SSA names (i.e., without a body), they follow a naming convention
+  if (!result.attributes.get("argNames")) {
+    bool hasSSANames =
+        llvm::all_of(args, [](auto arg) { return !arg.ssaName.name.empty(); });
+    SmallVector<Attribute> argNames;
+    if (hasSSANames) {
+      for (OpAsmParser::Argument &arg : args)
+        argNames.push_back(
+            builder.getStringAttr(arg.ssaName.name.drop_front()));
+    } else {
+      argNames = getFuncOpNames(builder, args.size(), "in");
+    }
     result.addAttribute("argNames", builder.getArrayAttr(argNames));
-  if (!result.attributes.get("resNames")) {
-    auto resNames = getFuncOpNames(builder, resTypes.size(), "out");
-    result.addAttribute("resNames", builder.getArrayAttr(resNames));
   }
+  if (!result.attributes.get("resNames"))
+    result.addAttribute("resNames", builder.getArrayAttr(resNames));
 
   // Parse the optional function body. The printer will not print the body if
   // its empty, so disallow parsing of empty body in the parser.
@@ -882,14 +946,92 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
   if (body->empty())
     return parser.emitError(loc, "expected non-empty function body");
 
-  // If a body was parsed, the arg and res names need to be resolved
   return success();
 }
 
 void FuncOp::print(OpAsmPrinter &p) {
-  mlir::function_interface_impl::printFunctionOp(
-      p, *this, /*isVariadic=*/true, getFunctionTypeAttrName(),
-      getArgAttrsAttrName(), getResAttrsAttrName());
+  p << ' ';
+  if (std::optional<StringRef> visibility = getSymVisibility())
+    p << *visibility << ' ';
+  p.printSymbolName(getName());
+
+  // The names of the arguments are only printed as an attribute when they
+  // differ from the SSA names, e.g., when they are not valid SSA names (see
+  // `getAsmBlockArgumentNames`)
+  ArrayAttr argNames = getArgNames();
+  bool argNamesAreSSANames =
+      !isExternal() && argNames && argNames.size() == getNumArguments();
+  p << '(';
+  for (auto [idx, type] : llvm::enumerate(getArgumentTypes())) {
+    if (idx > 0)
+      p << ", ";
+    if (!isExternal()) {
+      BlockArgument arg = getArgument(idx);
+      p.printOperand(arg);
+      p << ": ";
+      if (argNamesAreSSANames) {
+        std::string ssaName;
+        llvm::raw_string_ostream os(ssaName);
+        p.printOperand(arg, os);
+        auto name = dyn_cast<StringAttr>(argNames[idx]);
+        argNamesAreSSANames = name && ssaName == ("%" + name.getValue()).str();
+      }
+    }
+    printFuncPortType(p, type);
+    if (DictionaryAttr attrs = getArgAttrDict(idx))
+      p.printOptionalAttrDict(attrs.getValue());
+  }
+  p << ')';
+
+  // The results are printed with their names, unless the names are malformed
+  ArrayAttr resNames = getResNames();
+  bool printResNames = resNames && resNames.size() == getNumResults() &&
+                       llvm::all_of(resNames, [](Attribute name) {
+                         return isa<StringAttr>(name);
+                       });
+  if (getNumResults() > 0) {
+    p << " -> (";
+    for (auto [idx, type] : llvm::enumerate(getResultTypes())) {
+      if (idx > 0)
+        p << ", ";
+      if (printResNames) {
+        p.printKeywordOrString(cast<StringAttr>(resNames[idx]).getValue());
+        p << ": ";
+      }
+      printFuncPortType(p, type);
+      if (DictionaryAttr attrs = getResultAttrDict(idx))
+        p.printOptionalAttrDict(attrs.getValue());
+    }
+    p << ')';
+  }
+
+  SmallVector<StringRef> elidedAttrs = {
+      SymbolTable::getSymbolAttrName(), getSymVisibilityAttrName(),
+      getFunctionTypeAttrName(), getArgAttrsAttrName(), getResAttrsAttrName()};
+  if (argNamesAreSSANames)
+    elidedAttrs.push_back("argNames");
+  if (printResNames)
+    elidedAttrs.push_back("resNames");
+  p.printOptionalAttrDictWithKeyword((*this)->getAttrs(), elidedAttrs);
+
+  Region &body = getBody();
+  if (!body.empty()) {
+    p << ' ';
+    p.printRegion(body, /*printEntryBlockArgs=*/false,
+                  /*printBlockTerminators=*/true);
+  }
+}
+
+void FuncOp::getAsmBlockArgumentNames(Region &region,
+                                      OpAsmSetValueNameFn setNameFn) {
+  // Corner case: invalid IR, whose names do not match the arguments
+  ArrayAttr argNames = getArgNames();
+  if (!argNames || argNames.size() != region.getNumArguments())
+    return;
+  for (auto [arg, name] : llvm::zip_equal(region.getArguments(), argNames)) {
+    if (auto nameAttr = dyn_cast<StringAttr>(name))
+      setNameFn(arg, nameAttr.getValue());
+  }
 }
 
 bool ConditionalBranchOp::isControl() {

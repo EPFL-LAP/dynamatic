@@ -1,7 +1,7 @@
 module {
-  handshake.func @i_rhs(%d: !handshake.channel<i32>, %c: !handshake.channel<i1>, ...) -> (!handshake.channel<i32>, !handshake.channel<i32>) attributes {argNames = ["D", "C"], resNames = ["A", "B"]} {
-    %d_forked:2 = fork [2] %d {handshake.bb = 1 : ui32, handshake.name = "fork_data"} : <i32>
-    %c_forked:2 = fork [2] %c {handshake.bb = 1 : ui32, handshake.name = "fork_control"} : <i1>
+  handshake.func @i_rhs(%D: <i32>, %C: <i1>) -> (A: <i32>, B: <i32>) {
+    %d_forked:2 = fork [2] %D {handshake.bb = 1 : ui32, handshake.name = "fork_data"} : <i32>
+    %c_forked:2 = fork [2] %C {handshake.bb = 1 : ui32, handshake.name = "fork_control"} : <i1>
 
     %data_0 = mux %ctrl_init_0 [%d_forked#0, %loop_out_0] {handshake.bb = 1 : ui32, handshake.name = "data_mux_0"}  : <i1>, [<i32>, <i32>] to <i32>
     %data_forked_0:2 = fork [2] %data_0 {handshake.bb = 1 : ui32, handshake.name = "fork_data_mux_0"} : <i32>

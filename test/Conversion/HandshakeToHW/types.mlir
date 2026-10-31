@@ -8,7 +8,7 @@
 // CHECK:           hw.output %[[VAL_1]] : !handshake.control<>
 // CHECK:         }
 // CHECK:         hw.module.extern @handshake_sink_0(in %[[VAL_5:.*]] : !handshake.channel<i32>, in %[[VAL_6:.*]] : i1, in %[[VAL_7:.*]] : i1) attributes {hw.name = "handshake.sink", hw.parameters = {DATA_TYPE = !handshake.channel<i32>}}
-handshake.func @dontChangeTypes(%arg : !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.control<> {
+handshake.func @dontChangeTypes(%arg: <i32>, %start: <>) -> (<>) {
   sink %arg : <i32>
   end %start : <>
 }
@@ -22,7 +22,7 @@ handshake.func @dontChangeTypes(%arg : !handshake.channel<i32>, %start: !handsha
 // CHECK:           hw.output %[[VAL_4]] : !handshake.channel<i32, [extra: i32]>
 // CHECK:         }
 // CHECK:         hw.module.extern @handshake_addf_0(in %[[VAL_6:.*]] : !handshake.channel<i32, [extra: i32]>, in %[[VAL_7:.*]] : !handshake.channel<i32, [extra: i32]>, in %[[VAL_8:.*]] : i1, in %[[VAL_9:.*]] : i1, out result : !handshake.channel<i32, [extra: i32]>) attributes {hw.name = "handshake.addf", hw.parameters = {DATA_TYPE = !handshake.channel<f32, [extra: ui32]>, FPU_IMPL = "flopoco", INTERNAL_DELAY = "0_0", LATENCY = 1 : ui32}}
-handshake.func @lowerNonIntTypes(%arg0 : !handshake.channel<f32, [extra: ui32]>, %arg1 : !handshake.channel<f32, [extra: ui32]>) -> !handshake.channel<f32, [extra: ui32]> {
+handshake.func @lowerNonIntTypes(%arg0: <f32, [extra: ui32]>, %arg1: <f32, [extra: ui32]>) -> (<f32, [extra: ui32]>) {
   %res = addf %arg0, %arg1 {latency = 1}: <f32, [extra: ui32]>
   end %res : <f32, [extra: ui32]>
 }

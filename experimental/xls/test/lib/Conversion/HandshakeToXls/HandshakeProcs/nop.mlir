@@ -13,7 +13,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_nop(%arg0: !handshake.channel<i32>) -> (!handshake.channel<i32>) {
+  handshake.func @proc_nop(%arg0: <i32>) -> (<i32>) {
     end %arg0 : <i32>
   }
 }

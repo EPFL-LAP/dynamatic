@@ -1,7 +1,7 @@
 module {
-  handshake.func @e_lhs(%d: !handshake.channel<i32>, %c: !handshake.channel<i1>, ...) -> (!handshake.channel<i32>) attributes {argNames = ["D", "C"], resNames = ["A"]} {
-    %d_forked:2 = fork [2] %d {handshake.bb = 1 : ui32, handshake.name = "fork_data"} : <i32>
-    %c_forked:2 = fork [2] %c {handshake.bb = 1 : ui32, handshake.name = "fork_control"} : <i1>
+  handshake.func @e_lhs(%D: <i32>, %C: <i1>) -> (A: <i32>) {
+    %d_forked:2 = fork [2] %D {handshake.bb = 1 : ui32, handshake.name = "fork_data"} : <i32>
+    %c_forked:2 = fork [2] %C {handshake.bb = 1 : ui32, handshake.name = "fork_control"} : <i1>
     %c_not = not %c_forked#0 {handshake.bb = 1 : ui32, handshake.name = "not"} : <i1>
     %c_not_forked:2 = fork [2] %c_not {handshake.bb = 1 : ui32, handshake.name = "fork_c_not"} : <i1>
     %t_0, %f_0 = cond_br %c_not_forked#0, %d_forked#0 {handshake.bb = 1 : ui32, handshake.name = "supp_br_0"} : <i1>, <i32>

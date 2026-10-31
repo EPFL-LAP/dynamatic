@@ -73,6 +73,13 @@ llvm::hash_code hash_value(const ExtraSignal &signal);
 namespace detail {
 /// Parses a handshake::ControlType or handshake::ChannelType and returns it as
 /// an opaque Type. Returns nullptr on a parsing failure.
+///
+/// TODO: This is not the idiomatic way of writing an MLIR parser. A nullptr
+/// means either that there is no Handshake type (nothing is read, no error is
+/// reported) or that it is malformed (an error is reported), so callers tell
+/// them apart by comparing the parser's position (see `parseFuncPortType`).
+/// Like `parseOptionalType`, this should be `parseOptionalHandshakeType`
+/// returning an `OptionalParseResult`.
 mlir::Type jointHandshakeTypeParser(mlir::AsmParser &parser);
 } // namespace detail
 
