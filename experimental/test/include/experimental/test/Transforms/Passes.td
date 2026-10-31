@@ -21,4 +21,18 @@ def TestHandshakeSimulator : Pass<"exp-test-handshake-simulator",
   let summary = "Test the Handshake simulator";
 }
 
+def TestPrintFormalProperties : Pass<"exp-test-print-formal-properties",
+                                     "mlir::ModuleOp"> {
+  let summary = "Print formal properties in SMV syntax";
+  let description = [{
+    Loads the formal properties of a JSON file, as written by
+    --handshake-annotate-properties, and prints each one on a line of the
+    standard output as its kind followed by its expression in SMV syntax.
+  }];
+  let options = [
+    Option<"jsonPath", "json-path", "std::string", "\"\"",
+           "Path to the JSON-formatted formal properties">
+  ];
+}
+
 #endif // EXPERIMENTAL_TEST_TRANSFORMS_PASSES_TD

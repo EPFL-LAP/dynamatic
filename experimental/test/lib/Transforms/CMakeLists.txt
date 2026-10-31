@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticExperimentalTestTransforms
   TestHandshakeSimulator.cpp
+  TestPrintFormalProperties.cpp
 
   DEPENDS
   DynamaticExperimentalTestTransformsPassIncGen
