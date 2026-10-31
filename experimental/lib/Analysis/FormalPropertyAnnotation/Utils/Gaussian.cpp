@@ -1,4 +1,4 @@
-#include "dynamatic/Support/LinearAlgebra/Gaussian.h"
+#include "Gaussian.h"
 
 void gaussianElimination(MatIntType &m) {
   size_t rows = m.size1();

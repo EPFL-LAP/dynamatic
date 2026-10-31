@@ -1,4 +1,4 @@
-#include "experimental/Support/IOG.h"
+#include "IOG.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace dynamatic {

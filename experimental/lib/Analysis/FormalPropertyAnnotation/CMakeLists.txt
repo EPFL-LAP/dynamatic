@@ -1,5 +1,9 @@
 add_dynamatic_library(DynamaticFormalPropertyAnnotation
   HandshakeAnnotateProperties.cpp
+  Utils/FlowExpression.cpp
+  Utils/Gaussian.cpp
+  Utils/IndexChannelAnalysis.cpp
+  Utils/IOG.cpp
 
   DEPENDS
   DynamaticExperimentalAnalysisPassIncGen

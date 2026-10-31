@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Analysis/IndexChannelAnalysis.h"
+#include "Utils/FlowExpression.h"
+#include "Utils/Gaussian.h"
+#include "Utils/IOG.h"
+#include "Utils/IndexChannelAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
@@ -24,12 +27,9 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
-#include "experimental/Support/FlowExpression.h"
 #include "experimental/Support/FormalProperty.h"
-#include "experimental/Support/IOG.h"
 #include "experimental/Support/PropertyExpr.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
