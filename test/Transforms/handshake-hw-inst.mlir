@@ -2,7 +2,7 @@
 // RUN: dynamatic-opt %s --func-maximize-ssa --lower-cf-to-handshake --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   handshake.func @hw_inst(
-// CHECK-SAME:                            %[[VAL_0:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["start"], resNames = ["out0", "end"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) -> (out0: <i32>, end: <>) {
 // CHECK:           %[[VAL_1:.*]] = source {handshake.bb = 0 : ui32, handshake.name = "source0"} : <>
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, handshake.name = "constant0", value = 31 : i32} : <>, <i32>
 // CHECK:           %[[VAL_3:.*]] = source {handshake.bb = 0 : ui32, handshake.name = "source1"} : <>
@@ -16,7 +16,7 @@
 // CHECK:           %[[VAL_11:.*]] = addi %[[VAL_10]], %[[VAL_9]] {handshake.bb = 0 : ui32, handshake.name = "addi3"} : <i32>
 // CHECK:           end {handshake.bb = 0 : ui32, handshake.name = "end0"} %[[VAL_11]], %[[VAL_0]] : <i32>, <>
 // CHECK:         }
-// CHECK:         handshake.func private @__placeholder(!handshake.channel<i32>, !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["input_a", "start"], resNames = ["out0", "out1", "end"]}
+// CHECK:         handshake.func private @__placeholder(<i32>, <>) -> (out0: <i32>, out1: <i32>, end: <>) attributes {argNames = ["input_a", "start"]}
 module {
   func.func @hw_inst() -> i32 {
     %c31_i32 = arith.constant {handshake.name = "constant0"} 31 : i32

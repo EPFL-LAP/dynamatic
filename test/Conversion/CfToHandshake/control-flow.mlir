@@ -1,8 +1,7 @@
 // RUN: dynamatic-opt --func-maximize-ssa --lower-cf-to-handshake --remove-operation-names %s --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   handshake.func @selfLoop(
-// CHECK-SAME:                             %[[VAL_0:.*]]: !handshake.channel<i32>, %[[VAL_1:.*]]: !handshake.channel<i32>,
-// CHECK-SAME:                             %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.control<> attributes {argNames = ["in0", "in1", "start"], resNames = ["end"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <i32>, %[[VAL_1:.*]]: <i32>, %[[VAL_2:.*]]: <>) -> (end: <>) {
 // CHECK:           %[[VAL_3:.*]] = br %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32>
 // CHECK:           %[[VAL_4:.*]] = br %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32>
 // CHECK:           %[[VAL_5:.*]] = br %[[VAL_2]] {handshake.bb = 0 : ui32} : <>
@@ -28,9 +27,7 @@ func.func @selfLoop(%arg0: i32, %arg1: i32) {
 // -----
 
 // CHECK-LABEL:   handshake.func @duplicateLiveOut(
-// CHECK-SAME:                                     %[[VAL_0:.*]]: !handshake.channel<i1>,
-// CHECK-SAME:                                     %[[VAL_1:.*]]: !handshake.channel<i32>, %[[VAL_2:.*]]: !handshake.channel<i32>,
-// CHECK-SAME:                                     %[[VAL_3:.*]]: !handshake.control<>, ...) -> !handshake.control<> attributes {argNames = ["in0", "in1", "in2", "start"], resNames = ["end"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <i1>, %[[VAL_1:.*]]: <i32>, %[[VAL_2:.*]]: <i32>, %[[VAL_3:.*]]: <>) -> (end: <>) {
 // CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = cond_br %[[VAL_0]], %[[VAL_1]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_0]], %[[VAL_2]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_0]], %[[VAL_3]] {handshake.bb = 0 : ui32} : <i1>, <>
@@ -49,9 +46,7 @@ func.func @duplicateLiveOut(%arg0: i1, %arg1: i32, %arg2: i32) {
 // -----
 
 // CHECK-LABEL:   handshake.func @divergeSameArg(
-// CHECK-SAME:                                   %[[VAL_0:.*]]: !handshake.channel<i1>,
-// CHECK-SAME:                                   %[[VAL_1:.*]]: !handshake.channel<i32>,
-// CHECK-SAME:                                   %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.control<> attributes {argNames = ["in0", "in1", "start"], resNames = ["end"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <i1>, %[[VAL_1:.*]]: <i32>, %[[VAL_2:.*]]: <>) -> (end: <>) {
 // CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = cond_br %[[VAL_0]], %[[VAL_1]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]] = cond_br %[[VAL_0]], %[[VAL_2]] {handshake.bb = 0 : ui32} : <i1>, <>
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_3]] {handshake.bb = 1 : ui32} : <i32>

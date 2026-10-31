@@ -6,8 +6,8 @@
 // CHECK-LABEL:  xls.spawn @addi_32
 // CHECK-SAME:     %[[ARG0]], %[[ARG1]], %[[ARG2]]
 module {
-  handshake.func @end_simple(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>) -> (!handshake.channel<i32>) attributes {argNames = ["lhs", "rhs"], resNames = ["out"]} {
-    %0 = addi %arg0, %arg1 : <i32>
+  handshake.func @end_simple(%lhs: <i32>, %rhs: <i32>) -> (out: <i32>) {
+    %0 = addi %lhs, %rhs : <i32>
     end %0 : <i32>
   }
 }

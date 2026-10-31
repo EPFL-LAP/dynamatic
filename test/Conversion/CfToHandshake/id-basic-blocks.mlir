@@ -7,7 +7,7 @@
 
 // RUN: dynamatic-opt --func-maximize-ssa --lower-cf-to-handshake --remove-operation-names %s --split-input-file | FileCheck %s
 // CHECK-LABEL:   handshake.func @simpleLoad(
-// CHECK-SAME:      %[[ARG0:.*]]: memref<4xi32>, %[[ARG1:.*]]: !handshake.channel<i32>, %[[ARG2:.*]]: !handshake.control<>, %[[ARG3:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["mem0", "in0", "mem0_start", "start"], resNames = ["out0", "mem0_end", "end"]} {
+// CHECK-SAME:     %[[ARG0:.*]]: memref<4xi32>, %[[ARG1:.*]]: <i32>, %[[ARG2:.*]]: <>, %[[ARG3:.*]]: <>) -> (out0: <i32>, mem0_end: <>, end: <>) {
 // CHECK:           %[[VAL_0:.*]], %[[VAL_1:.*]] = mem_controller{{\[}}%[[ARG0]] : memref<4xi32>] start(%[[ARG2]]) groups(bb0: [load(%[[VAL_2:.*]])]) end(%[[ARG3]]) : <i32>, <i32>
 // CHECK:           %[[VAL_2]], %[[VAL_3:.*]] = load{{\[}}%[[ARG1]]] %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
 // CHECK:           end {handshake.bb = 0 : ui32} %[[VAL_3]], %[[VAL_1]], %[[ARG3]] : <i32>, <>, <>
@@ -21,8 +21,7 @@ func.func @simpleLoad(%arg0: memref<4xi32>, %arg1: index) -> i32 {
 // -----
 
 // CHECK-LABEL:   handshake.func @ifThenElse(
-// CHECK-SAME:                               %[[VAL_0:.*]]: !handshake.channel<i32>, %[[VAL_1:.*]]: !handshake.channel<i1>,
-// CHECK-SAME:                               %[[VAL_2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["in0", "in1", "start"], resNames = ["out0", "end"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <i32>, %[[VAL_1:.*]]: <i1>, %[[VAL_2:.*]]: <>) -> (out0: <i32>, end: <>) {
 // CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = cond_br %[[VAL_1]], %[[VAL_0]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]] = cond_br %[[VAL_1]], %[[VAL_2]] {handshake.bb = 0 : ui32} : <i1>, <>
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_3]] {handshake.bb = 1 : ui32} : <i32>
@@ -60,8 +59,7 @@ func.func @ifThenElse(%arg0: i32, %arg1: i1) -> i32 {
 // -----
 
 // CHECK-LABEL:   handshake.func @multipleReturns(
-// CHECK-SAME:                                    %[[VAL_0:.*]]: !handshake.channel<i32>, %[[VAL_1:.*]]: !handshake.channel<i1>,
-// CHECK-SAME:                                    %[[VAL_2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["in0", "in1", "start"], resNames = ["out0", "end"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <i32>, %[[VAL_1:.*]]: <i1>, %[[VAL_2:.*]]: <>) -> (out0: <i32>, end: <>) {
 // CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = cond_br %[[VAL_1]], %[[VAL_0]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]] = cond_br %[[VAL_1]], %[[VAL_2]] {handshake.bb = 0 : ui32} : <i1>, <>
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_3]] {handshake.bb = 1 : ui32} : <i32>
@@ -93,8 +91,7 @@ func.func @multipleReturns(%arg0: i32, %arg1: i1) -> i32 {
 // -----
 
 // CHECK-LABEL:   handshake.func @simpleLoop(
-// CHECK-SAME:                               %[[VAL_0:.*]]: !handshake.channel<i32>,
-// CHECK-SAME:                               %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.control<> attributes {argNames = ["in0", "start"], resNames = ["end"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <i32>, %[[VAL_1:.*]]: <>) -> (end: <>) {
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
 // CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_4:.*]] = br %[[VAL_2]] {handshake.bb = 0 : ui32} : <i32>

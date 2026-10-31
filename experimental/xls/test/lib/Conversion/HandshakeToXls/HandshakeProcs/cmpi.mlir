@@ -17,7 +17,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_cmpi(%lhs: !handshake.channel<i32>, %rhs: !handshake.channel<i32>) -> (!handshake.channel<i1>) {
+  handshake.func @proc_cmpi(%lhs: <i32>, %rhs: <i32>) -> (<i1>) {
     %0 = handshake.cmpi "slt", %lhs, %rhs: <i32>
     end %0: <i1>
   }

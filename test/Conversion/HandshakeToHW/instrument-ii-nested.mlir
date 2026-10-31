@@ -31,14 +31,14 @@
 // CHECK-SAME:      attributes {hw.name = "ii_monitor", hw.parameters = {INIT_SELECTS = "[0]", LOOP_DEPTH = 2 : ui32, LOOP_MAX_DEPTH = 2 : ui32}}
 
 module {
-  handshake.func @nestedLoops(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>, %arg2: !handshake.control<>, ...) -> !handshake.control<> attributes {argNames = ["in0", "in1", "start"], resNames = ["end"]} {
-    %start:2 = fork [2] %arg2 {handshake.bb = 0 : ui32, handshake.name = "fork0"} : <>
-    %bound:2 = fork [2] %arg1 {handshake.bb = 0 : ui32, handshake.name = "fork1"} : <i32>
+  handshake.func @nestedLoops(%in0: <i32>, %in1: <i32>, %start: <>) -> (end: <>) {
+    %startFork:2 = fork [2] %start {handshake.bb = 0 : ui32, handshake.name = "fork0"} : <>
+    %bound:2 = fork [2] %in1 {handshake.bb = 0 : ui32, handshake.name = "fork1"} : <i32>
 
     // Outer loop header.
-    %outerVal = mux %outerIndex [%arg0, %outerBackVal] {handshake.bb = 1 : ui32, handshake.name = "muxOuter"} : <i1>, [<i32>, <i32>] to <i32>
+    %outerVal = mux %outerIndex [%in0, %outerBackVal] {handshake.bb = 1 : ui32, handshake.name = "muxOuter"} : <i1>, [<i32>, <i32>] to <i32>
     %outerVals:2 = fork [2] %outerVal {handshake.bb = 1 : ui32, handshake.name = "fork2"} : <i32>
-    %outerCtrl, %outerIndex = control_merge [%start#1, %outerBackCtrl]  {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : [<>, <>] to <>, <i1>
+    %outerCtrl, %outerIndex = control_merge [%startFork#1, %outerBackCtrl]  {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : [<>, <>] to <>, <i1>
 
     // Inner loop header.
     %innerVal = mux %innerIndex [%outerVals#0, %innerBackVal] {handshake.bb = 2 : ui32, handshake.name = "muxInner"} : <i1>, [<i32>, <i32>] to <i32>
@@ -58,6 +58,6 @@ module {
     sink %outerExitVal {handshake.name = "sink1"} : <i32>
     sink %outerExitCtrl {handshake.name = "sink2"} : <>
 
-    end {handshake.bb = 4 : ui32, handshake.name = "end0"} %start#0 : <>
+    end {handshake.bb = 4 : ui32, handshake.name = "end0"} %startFork#0 : <>
   }
 }

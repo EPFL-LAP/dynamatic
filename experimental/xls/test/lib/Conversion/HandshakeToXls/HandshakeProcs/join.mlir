@@ -29,7 +29,7 @@
 
 
 module {
-  handshake.func @proc_join(%arg0: !handshake.control<>, %arg1: !handshake.control<>, %arg2: !handshake.control<>) -> (!handshake.control<>) {
+  handshake.func @proc_join(%arg0: <>, %arg1: <>, %arg2: <>) -> (<>) {
     %0 = join %arg0, %arg1, %arg2 : <>
     end %0 : <>
   }

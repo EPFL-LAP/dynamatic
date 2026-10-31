@@ -24,11 +24,11 @@
 // NOINSTR-NOT: ii_monitor
 
 module {
-  handshake.func @selfLoop(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>, %arg2: !handshake.control<>, ...) -> !handshake.control<> attributes {argNames = ["in0", "in1", "start"], resNames = ["end"]} {
-    %0:2 = fork [2] %arg2 {handshake.bb = 0 : ui32, handshake.name = "fork0"} : <>
-    %1 = mux %5#1 [%arg0, %trueResult] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, [<i32>, <i32>] to <i32>
+  handshake.func @selfLoop(%in0: <i32>, %in1: <i32>, %start: <>) -> (end: <>) {
+    %0:2 = fork [2] %start {handshake.bb = 0 : ui32, handshake.name = "fork0"} : <>
+    %1 = mux %5#1 [%in0, %trueResult] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, [<i32>, <i32>] to <i32>
     %2:2 = fork [2] %1 {handshake.bb = 1 : ui32, handshake.name = "fork1"} : <i32>
-    %3 = mux %5#0 [%arg1, %trueResult_0] {handshake.bb = 1 : ui32, handshake.name = "mux1"} : <i1>, [<i32>, <i32>] to <i32>
+    %3 = mux %5#0 [%in1, %trueResult_0] {handshake.bb = 1 : ui32, handshake.name = "mux1"} : <i1>, [<i32>, <i32>] to <i32>
     %4:2 = fork [2] %3 {handshake.bb = 1 : ui32, handshake.name = "fork2"} : <i32>
     %result, %index = control_merge [%0#1, %trueResult_2]  {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : [<>, <>] to <>, <i1>
     %5:2 = fork [2] %index {handshake.bb = 1 : ui32, handshake.name = "fork3"} : <i1>

@@ -19,7 +19,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_cbranch(%cond: !handshake.channel<i1>, %in: !handshake.channel<i11>) -> (!handshake.channel<i11>, !handshake.channel<i11>) {
+  handshake.func @proc_cbranch(%cond: <i1>, %in: <i11>) -> (<i11>, <i11>) {
     %true, %false = cond_br %cond, %in : !handshake.channel<i1>, !handshake.channel<i11>
     end %true, %false : <i11>, <i11> }
 }

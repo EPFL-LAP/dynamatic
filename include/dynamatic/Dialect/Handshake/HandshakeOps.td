@@ -49,7 +49,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    SymbolVisibility,
    Symbol,
    RegionKindInterface,
-   OpAsmOpInterface,
+   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmBlockArgumentNames"]>,
    HasClock,
   // The IOs of a FuncOp have custom names,
   // defined here in the Tablegen

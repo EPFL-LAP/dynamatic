@@ -1,15 +1,15 @@
 module {
-  handshake.func @eraseSingleInputMerge(%start: !handshake.control<>, ...) -> !handshake.control<> attributes {argNames = ["start"], resNames = ["end"]} {
+  handshake.func @eraseSingleInputMerge(%start: <>) -> (end: <>) {
     %mergeStart = merge %start : <>
     end %mergeStart : <>
   }
 
-  handshake.func @downgradeIndexLessControlMerge(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>, %start: none) -> !handshake.channel<i32> attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
+  handshake.func @downgradeIndexLessControlMerge(%arg0: <i32>, %arg1: <i32>, %start: none) -> (out0: <i32>) {
     %cmergeRes, %cmergeIdx = control_merge [%arg0, %arg1] : [<i32>, <i32>] to <i32>, <i1>
     end %cmergeRes : <i32>
   }
 
-  handshake.func @isMyArgZero(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i1> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
+  handshake.func @isMyArgZero(%arg0: <i32>, %start: <>) -> (out0: <i1>) {
   // ^bb0:
     %mergeArg0 = merge %arg0 : <i32>
     %mergeStart = merge %start : <>

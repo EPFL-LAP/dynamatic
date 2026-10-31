@@ -42,7 +42,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_cmerge(%a: !handshake.channel<i33>, %b: !handshake.channel<i33>, %c: !handshake.channel<i33>) -> (!handshake.channel<i33>, !handshake.channel<i2>) {
+  handshake.func @proc_cmerge(%a: <i33>, %b: <i33>, %c: <i33>) -> (<i33>, <i2>) {
     %0, %1 = control_merge [%a, %b, %c] : [<i33>, <i33>, <i33>] to <i33>, <i2>
     end %0, %1 : <i33>, <i2> }
 }
