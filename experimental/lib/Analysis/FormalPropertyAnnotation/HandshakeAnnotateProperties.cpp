@@ -305,9 +305,18 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlotsRec(
     return success();
   }
 
+  // A unit with latency: the copied slot is its last pipeline slot
   if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(curOp)) {
-    annotateCopiedSlot(State(latencyOp.getPipelineSlots().back()));
-    return success();
+    std::vector<PipelineSlotNamer> slots = latencyOp.getPipelineSlots();
+    if (!slots.empty()) {
+      annotateCopiedSlot(State(slots.back()));
+      return success();
+    }
+    // Corner case: a unit with a latency of 0 has no pipeline slot, so the
+    // walk continues to its operands below, as for the other units without
+    // slots
+    assert(succeeded(latencyOp.getLatency()) && *latencyOp.getLatency() == 0 &&
+           "a unit without pipeline slots must have a latency of 0");
   }
 
   if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(curOp)) {
