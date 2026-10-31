@@ -602,6 +602,15 @@ struct EntryCMergePath {
 // one input coming from an entry node), and returns the effective slots along
 // the path. It is used in the annotation of the entry token order invariant and
 // single entry token invariant
+//
+// TODO: Only the control merges that the entry argument reaches directly are
+// found, so the inner loops of a loop nest and the loops after another loop get
+// no entry invariants, although their entry inputs (those that are not back
+// edges) carry at most one token while the loop is active when the merge is on
+// the control network of a sequential CFG. Find the entry paths of every
+// control merge instead, walking backward from each entry input to the unit
+// where its token originates (an argument, an outer control merge, or a
+// branch).
 std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
   // The entry is modeled as a slot that initially holds one token
   std::vector<EffectiveSlotNamer> entrySlot;
@@ -615,6 +624,13 @@ std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
           return PathStep::Traverse;
         // The entry token reaches another unit before any control merge, so
         // the path does not lead to an entry control merge
+        //
+        // TODO: This drops the paths through a branch of the control network.
+        // A path that arrives on the data operand of a branch (unconditional,
+        // or conditional before a loop guarded by an if) could be followed to
+        // the output that leads to the control merge, as the branch does not
+        // copy the token; one that arrives on the condition carries another
+        // token
         return PathStep::Drop;
       });
 
