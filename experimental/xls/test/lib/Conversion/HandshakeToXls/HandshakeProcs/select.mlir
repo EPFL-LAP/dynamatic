@@ -19,7 +19,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_select(%sel: !handshake.channel<i1>, %if_true: !handshake.channel<i7>, %if_false: !handshake.channel<i7>) -> (!handshake.channel<i7>) {
+  handshake.func @proc_select(%sel: <i1>, %if_true: <i7>, %if_false: <i7>) -> (<i7>) {
     %res = select %sel [%if_true, %if_false] : <i1>, <i7>
     end %res : <i7>
   }

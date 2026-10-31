@@ -32,7 +32,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_mux(%sel: !handshake.channel<i2>, %inp0: !handshake.channel<i5>, %inp1: !handshake.channel<i5>, %inp2: !handshake.channel<i5> ) -> (!handshake.channel<i5>) {
+  handshake.func @proc_mux(%sel: <i2>, %inp0: <i5>, %inp1: <i5>, %inp2: <i5>) -> (<i5>) {
     %res = mux %sel [%inp0, %inp1, %inp2] : <i2>, [<i5>, <i5>, <i5>] to <i5>
     end %res : <i5>
   }

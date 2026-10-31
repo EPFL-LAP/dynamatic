@@ -17,7 +17,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_fork(%arg0: !handshake.channel<i42>) -> (!handshake.channel<i42>, !handshake.channel<i42>, !handshake.channel<i42>) {
+  handshake.func @proc_fork(%arg0: <i42>) -> (<i42>, <i42>, <i42>) {
     %0:3 = fork [3] %arg0 : <i42>
     end %0#0, %0#1, %0#2 : <i42>, <i42>, <i42>
   }

@@ -6,7 +6,7 @@
 // CHECK-LABEL:  xls.spawn @nop_32
 // CHECK-SAME:     %[[ARG0]], %[[ARG1]]
 module {
-  handshake.func @end_nop(%arg0: !handshake.channel<i32>) -> (!handshake.channel<i32>) attributes {argNames = ["in"], resNames = ["out"]} {
-    end %arg0 : <i32>
+  handshake.func @end_nop(%in: <i32>) -> (out: <i32>) {
+    end %in : <i32>
   }
 }

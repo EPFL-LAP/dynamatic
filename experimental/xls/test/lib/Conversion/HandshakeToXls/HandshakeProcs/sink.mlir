@@ -11,7 +11,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_sink(%in: !handshake.channel<i101>) -> () {
+  handshake.func @proc_sink(%in: <i101>) {
     sink %in : <i101>
     end 
   }

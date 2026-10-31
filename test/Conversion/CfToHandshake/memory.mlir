@@ -7,7 +7,7 @@
 
 // RUN: dynamatic-opt --func-maximize-ssa --lower-cf-to-handshake --remove-operation-names %s --split-input-file | FileCheck %s
 // CHECK-LABEL:   handshake.func @simpleLoadStore(
-// CHECK-SAME:      %[[ARG0:.*]]: !handshake.channel<i32>, %[[ARG1:.*]]: memref<4xi32>, %[[ARG2:.*]]: !handshake.control<>, %[[ARG3:.*]]: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>) attributes {argNames = ["in0", "mem0", "mem0_start", "start"], resNames = ["mem0_end", "end"]} {
+// CHECK-SAME:     %[[ARG0:.*]]: <i32>, %[[ARG1:.*]]: memref<4xi32>, %[[ARG2:.*]]: <>, %[[ARG3:.*]]: <>) -> (mem0_end: <>, end: <>) {
 // CHECK:           %[[VAL_0:.*]], %[[VAL_1:.*]] = mem_controller{{\[}}%[[ARG1]] : memref<4xi32>] start(%[[ARG2]]) groups(bb0 %[[VAL_2:.*]]: [store(%[[VAL_3:.*]], %[[VAL_4:.*]]), load(%[[VAL_5:.*]])]) end(%[[ARG3]]) : <i32>, <i32>, <i32>
 // CHECK:           %[[VAL_2]] = constant %[[ARG3]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_6:.*]] = constant %[[ARG3]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
@@ -25,7 +25,7 @@ func.func @simpleLoadStore(%arg0 : index, %arg1 : memref<4xi32>) {
 // -----
 
 // CHECK-LABEL:   handshake.func @storeMulBlocks(
-// CHECK-SAME:      %[[ARG0:.*]]: !handshake.channel<i1>, %[[ARG1:.*]]: !handshake.channel<i32>, %[[ARG2:.*]]: memref<4xi32>, %[[ARG3:.*]]: !handshake.control<>, %[[ARG4:.*]]: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>) attributes {argNames = ["in0", "in1", "mem0", "mem0_start", "start"], resNames = ["mem0_end", "end"]} {
+// CHECK-SAME:     %[[ARG0:.*]]: <i1>, %[[ARG1:.*]]: <i32>, %[[ARG2:.*]]: memref<4xi32>, %[[ARG3:.*]]: <>, %[[ARG4:.*]]: <>) -> (mem0_end: <>, end: <>) {
 // CHECK:           %[[VAL_0:.*]] = mem_controller{{\[}}%[[ARG2]] : memref<4xi32>] start(%[[ARG3]]) groups(bb1 %[[VAL_1:.*]]: [store(%[[VAL_2:.*]], %[[VAL_3:.*]])], bb2 %[[VAL_4:.*]]: [store(%[[VAL_5:.*]], %[[VAL_6:.*]])]) end(%[[VAL_7:.*]]) : <i32>, <i32>, <i32>
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[ARG0]], %[[ARG1]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = cond_br %[[ARG0]], %[[ARG4]] {handshake.bb = 0 : ui32} : <i1>, <>
@@ -61,7 +61,7 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
 // -----
 
 // CHECK-LABEL:   handshake.func @forwardLoadToBB(
-// CHECK-SAME:      %[[ARG0:.*]]: !handshake.channel<i1>, %[[ARG1:.*]]: !handshake.channel<i32>, %[[ARG2:.*]]: memref<4xi32>, %[[ARG3:.*]]: !handshake.control<>, %[[ARG4:.*]]: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>) attributes {argNames = ["in0", "in1", "mem0", "mem0_start", "start"], resNames = ["mem0_end", "end"]} {
+// CHECK-SAME:     %[[ARG0:.*]]: <i1>, %[[ARG1:.*]]: <i32>, %[[ARG2:.*]]: memref<4xi32>, %[[ARG3:.*]]: <>, %[[ARG4:.*]]: <>) -> (mem0_end: <>, end: <>) {
 // CHECK:           %[[VAL_0:.*]], %[[VAL_1:.*]] = mem_controller{{\[}}%[[ARG2]] : memref<4xi32>] start(%[[ARG3]]) groups(bb0: [load(%[[VAL_2:.*]])]) end(%[[VAL_3:.*]]) : <i32>, <i32>
 // CHECK:           %[[VAL_2]], %[[VAL_4:.*]] = load{{\[}}%[[ARG1]]] %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
 // CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]] = cond_br %[[ARG0]], %[[VAL_4]] {handshake.bb = 0 : ui32} : <i1>, <i32>
@@ -89,7 +89,7 @@ func.func @forwardLoadToBB(%arg0 : i1, %arg1 : index, %arg2: memref<4xi32>) {
 // -----
 
 // CHECK-LABEL:   handshake.func @multipleMemories(
-// CHECK-SAME:      %[[ARG0:.*]]: !handshake.channel<i1>, %[[ARG1:.*]]: memref<4xi32>, %[[ARG2:.*]]: memref<4xi32>, %[[ARG3:.*]]: !handshake.control<>, %[[ARG4:.*]]: !handshake.control<>, %[[ARG5:.*]]: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["in0", "mem0", "mem1", "mem0_start", "mem1_start", "start"], resNames = ["mem0_end", "mem1_end", "end"]} {
+// CHECK-SAME:     %[[ARG0:.*]]: <i1>, %[[ARG1:.*]]: memref<4xi32>, %[[ARG2:.*]]: memref<4xi32>, %[[ARG3:.*]]: <>, %[[ARG4:.*]]: <>, %[[ARG5:.*]]: <>) -> (mem0_end: <>, mem1_end: <>, end: <>) {
 // CHECK:           %[[VAL_0:.*]], %[[VAL_1:.*]] = mem_controller{{\[}}%[[ARG2]] : memref<4xi32>] start(%[[ARG4]]) groups(bb1: [load(%[[VAL_2:.*]])], bb2 %[[VAL_3:.*]]: [store(%[[VAL_4:.*]], %[[VAL_5:.*]])]) end(%[[VAL_6:.*]]) : <i32>, <i32>, <i32>
 // CHECK:           %[[VAL_7:.*]], %[[VAL_8:.*]] = mem_controller{{\[}}%[[ARG1]] : memref<4xi32>] start(%[[ARG3]]) groups(bb1 %[[VAL_9:.*]]: [store(%[[VAL_10:.*]], %[[VAL_11:.*]])], bb2: [load(%[[VAL_12:.*]])]) end(%[[VAL_6]]) : <i32>, <i32>, <i32>
 // CHECK:           %[[VAL_13:.*]] = constant %[[ARG5]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>

@@ -12,7 +12,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_source() -> (!handshake.control<>) {
+  handshake.func @proc_source() -> (<>) {
     %1 = source : <>
     end %1: <>
   }

@@ -17,7 +17,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_binIop(%lhs: !handshake.channel<i32>, %rhs: !handshake.channel<i32>) -> (!handshake.channel<i32>) {
+  handshake.func @proc_binIop(%lhs: <i32>, %rhs: <i32>) -> (<i32>) {
     %0 = handshake.xori %lhs, %rhs: <i32>
     end %0: <i32>
   }

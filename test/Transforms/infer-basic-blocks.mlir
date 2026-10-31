@@ -2,13 +2,13 @@
 // RUN: dynamatic-opt --handshake-infer-basic-blocks --remove-operation-names %s --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   handshake.func @backtrackToArgument(
-// CHECK-SAME:                                        %[[VAL_0:.*]]: !handshake.control<>, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) {
 // CHECK:           %[[VAL_1:.*]] = fork  [1] %[[VAL_0]] {handshake.bb = 0 : ui32} : <>
 // CHECK:           %[[VAL_2:.*]] = fork  [1] %[[VAL_1]] {handshake.bb = 0 : ui32} : <>
 // CHECK:           %[[VAL_3:.*]] = fork  [1] %[[VAL_2]] {handshake.bb = 0 : ui32} : <>
 // CHECK:           end
 // CHECK:         }
-handshake.func @backtrackToArgument(%start: !handshake.control<>) {
+handshake.func @backtrackToArgument(%start: <>) {
   %0 = fork [1] %start : <>
   %1 = fork [1] %0 : <>
   %2 = fork [1] %1 : <>
@@ -18,7 +18,7 @@ handshake.func @backtrackToArgument(%start: !handshake.control<>) {
 // -----
 
 // CHECK-LABEL:   handshake.func @backtrackToKnownBB(
-// CHECK-SAME:                                       %[[VAL_0:.*]]: !handshake.control<>, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) {
 // CHECK:           %[[VAL_1:.*]] = br %[[VAL_0]] {handshake.bb = 0 : ui32} : <>
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_1]] {handshake.bb = 1 : ui32} : <>
 // CHECK:           %[[VAL_3:.*]]:2 = fork  [2] %[[VAL_2]] {handshake.bb = 1 : ui32} : <>
@@ -26,7 +26,7 @@ handshake.func @backtrackToArgument(%start: !handshake.control<>) {
 // CHECK:           %[[VAL_5:.*]] = fork  [1] %[[VAL_3]]#1 {handshake.bb = 1 : ui32} : <>
 // CHECK:           end
 // CHECK:         }
-handshake.func @backtrackToKnownBB(%start: !handshake.control<>) {
+handshake.func @backtrackToKnownBB(%start: <>) {
   %0 = br %start {handshake.bb = 0 : ui32} : <>
   %1 = merge %0 {handshake.bb = 1 : ui32} : <>
   %2:2 = fork [2] %1 : <>
@@ -38,7 +38,7 @@ handshake.func @backtrackToKnownBB(%start: !handshake.control<>) {
 // -----
 
 // CHECK-LABEL:   handshake.func @backtrackConflict(
-// CHECK-SAME:                                      %[[VAL_0:.*]]: !handshake.control<>, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) {
 // CHECK:           %[[VAL_1:.*]] = br %[[VAL_0]] {handshake.bb = 0 : ui32} : <>
 // CHECK:           %[[VAL_2:.*]] = br %[[VAL_0]] {handshake.bb = 0 : ui32} : <>
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]] {handshake.bb = 1 : ui32} : <>
@@ -46,7 +46,7 @@ handshake.func @backtrackToKnownBB(%start: !handshake.control<>) {
 // CHECK:           %[[VAL_5:.*]] = merge %[[VAL_3]], %[[VAL_4]] : <>
 // CHECK:           end
 // CHECK:         }
-handshake.func @backtrackConflict(%start: !handshake.control<>) {
+handshake.func @backtrackConflict(%start: <>) {
   %0 = br %start {handshake.bb = 0 : ui32} : <>
   %1 = br %start {handshake.bb = 0 : ui32} : <>
   %2 = merge %0 {handshake.bb = 1 : ui32} : <>
@@ -58,13 +58,13 @@ handshake.func @backtrackConflict(%start: !handshake.control<>) {
 // -----
 
 // CHECK-LABEL:   handshake.func @forwardToKnownBB(
-// CHECK-SAME:                                     %[[VAL_0:.*]]: !handshake.control<>, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) {
 // CHECK:           %[[VAL_1:.*]]:2 = fork  [2] %[[VAL_0]] {handshake.bb = 1 : ui32} : <>
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_1]]#0 {handshake.bb = 1 : ui32} : <>
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]]#1 {handshake.bb = 1 : ui32} : <>
 // CHECK:           end
 // CHECK:         }
-handshake.func @forwardToKnownBB(%start: !handshake.control<>) {
+handshake.func @forwardToKnownBB(%start: <>) {
   %1:2 = fork [2] %start : <>
   %2 = merge %1#0 {handshake.bb = 1 : ui32} : <>
   %3 = merge %1#1 {handshake.bb = 1 : ui32} : <>
@@ -74,7 +74,7 @@ handshake.func @forwardToKnownBB(%start: !handshake.control<>) {
 // -----
 
 // CHECK-LABEL:   handshake.func @forwardConflict(
-// CHECK-SAME:                                    %[[VAL_0:.*]]: !handshake.control<>, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) {
 // CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] {handshake.bb = 1 : ui32} : <>
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_0]] {handshake.bb = 2 : ui32} : <>
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]], %[[VAL_2]] : <>
@@ -83,7 +83,7 @@ handshake.func @forwardToKnownBB(%start: !handshake.control<>) {
 // CHECK:           %[[VAL_6:.*]] = merge %[[VAL_4]]#1 {handshake.bb = 2 : ui32} : <>
 // CHECK:           end
 // CHECK:         }
-handshake.func @forwardConflict(%start: !handshake.control<>) {
+handshake.func @forwardConflict(%start: <>) {
   %0 = merge %start {handshake.bb = 1 : ui32} : <>
   %1 = merge %start {handshake.bb = 2 : ui32} : <>
   %2 = merge %0, %1 : <>
@@ -96,14 +96,14 @@ handshake.func @forwardConflict(%start: !handshake.control<>) {
 // -----
 
 // CHECK-LABEL:   handshake.func @forwardOverBackward(
-// CHECK-SAME:                                        %[[VAL_0:.*]]: !handshake.control<>, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) {
 // CHECK:           %[[VAL_1:.*]] = br %[[VAL_0]] {handshake.bb = 1 : ui32} : <>
 // CHECK:           %[[VAL_2:.*]]:2 = fork  [2] %[[VAL_1]] {handshake.bb = 2 : ui32} : <>
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_2]]#0 {handshake.bb = 2 : ui32} : <>
 // CHECK:           %[[VAL_4:.*]] = merge %[[VAL_2]]#1 {handshake.bb = 2 : ui32} : <>
 // CHECK:           end
 // CHECK:         }
-handshake.func @forwardOverBackward(%start: !handshake.control<>) {
+handshake.func @forwardOverBackward(%start: <>) {
   %0 = br %start {handshake.bb = 1 : ui32} : <>
   %1:2 = fork [2] %0 : <>
   %2 = merge %1#0 {handshake.bb = 2 : ui32} : <>
@@ -114,14 +114,14 @@ handshake.func @forwardOverBackward(%start: !handshake.control<>) {
 // -----
 
 // CHECK-LABEL:   handshake.func @backwardOverForward(
-// CHECK-SAME:                                        %[[VAL_0:.*]]: !handshake.control<>, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) {
 // CHECK:           %[[VAL_1:.*]] = br %[[VAL_0]] {handshake.bb = 1 : ui32} : <>
 // CHECK:           %[[VAL_2:.*]]:2 = fork  [2] %[[VAL_1]] {handshake.bb = 1 : ui32} : <>
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_2]]#0 {handshake.bb = 2 : ui32} : <>
 // CHECK:           %[[VAL_4:.*]] = merge %[[VAL_2]]#1 {handshake.bb = 3 : ui32} : <>
 // CHECK:           end
 // CHECK:         }
-handshake.func @backwardOverForward(%start: !handshake.control<>) {
+handshake.func @backwardOverForward(%start: <>) {
   %0 = br %start {handshake.bb = 1 : ui32} : <>
   %1:2 = fork [2] %0 : <>
   %2 = merge %1#0 {handshake.bb = 2 : ui32} : <>

@@ -4,7 +4,7 @@
 // The properties to check come first, in the order of the channels, followed
 // by the invariants
 
-handshake.func @forkBuffer(%a: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["a", "start"], resNames = ["out0", "end"]} {
+handshake.func @forkBuffer(%a: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
   // Absence of backpressure on the first output of the fork, whose user is the
   // buffer:
   // fork0.outs_0_valid -> buffer0.ins_ready

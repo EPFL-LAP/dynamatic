@@ -2,11 +2,11 @@
 // RUN: dynamatic-opt --canonicalize %s --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   handshake.func @constantFoldExtUI(
-// CHECK-SAME:                                      %[[VAL_0:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) -> (out0: <i32>) {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 64170 : i32} : <>, <i32>
 // CHECK:           end %[[VAL_1]] : <i32>
 // CHECK:         }
-handshake.func @constantFoldExtUI(%start: !handshake.control<>) -> !handshake.channel<i32> {
+handshake.func @constantFoldExtUI(%start: <>) -> (<i32>) {
   %c = constant %start {value = 0xFAAA : i16} : <>, <i16>
   %d = extui %c : <i16> to <i32>
   end %d : <i32>
@@ -15,11 +15,11 @@ handshake.func @constantFoldExtUI(%start: !handshake.control<>) -> !handshake.ch
 // -----
 
 // CHECK-LABEL:   handshake.func @constantFoldExtSI(
-// CHECK-SAME:                                      %[[VAL_0:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) -> (out0: <i32>) {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = -1366 : i32} : <>, <i32>
 // CHECK:           end %[[VAL_1]] : <i32>
 // CHECK:         }
-handshake.func @constantFoldExtSI(%start: !handshake.control<>) -> !handshake.channel<i32> {
+handshake.func @constantFoldExtSI(%start: <>) -> (<i32>) {
   %c = constant %start {value = 0xFAAA : i16} : <>, <i16>
   %d = extsi %c : <i16> to <i32>
   end %d : <i32>
@@ -28,11 +28,11 @@ handshake.func @constantFoldExtSI(%start: !handshake.control<>) -> !handshake.ch
 // -----
 
 // CHECK-LABEL:   handshake.func @constantFoldTruncI(
-// CHECK-SAME:                                       %[[VAL_0:.*]]: !handshake.control<>, ...) -> !handshake.channel<i8> attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) -> (out0: <i8>) {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = -86 : i8} : <>, <i8>
 // CHECK:           end %[[VAL_1]] : <i8>
 // CHECK:         }
-handshake.func @constantFoldTruncI(%start: !handshake.control<>) -> !handshake.channel<i8> {
+handshake.func @constantFoldTruncI(%start: <>) -> (<i8>) {
   %c = constant %start {value = 0xFAAA : i16} : <>, <i16>
   %d = trunci %c : <i16> to <i8>
   end %d : <i8>
