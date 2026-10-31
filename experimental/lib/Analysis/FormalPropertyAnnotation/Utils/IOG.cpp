@@ -339,15 +339,15 @@ private:
   std::vector<IOG> finals;
 };
 
-std::vector<IOG> findAllIOGsWithEntry(BlockArgument entry) {
+} // namespace
+
+static std::vector<IOG> findAllIOGsWithEntry(BlockArgument entry) {
   IOGFinder finder(entry);
   while (!finder.isDone()) {
     finder.step();
   }
   return finder.getIOGs();
 }
-
-} // namespace
 
 std::vector<IOG> findAllIOGs(ModuleOp modOp) {
   std::vector<IOG> ret{};
