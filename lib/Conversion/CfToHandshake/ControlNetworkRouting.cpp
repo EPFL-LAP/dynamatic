@@ -6,15 +6,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/OperandRouting2/ControlNetworkRouting.h"
-#include "dynamatic/Conversion/OperandRouting2/TempOps.h"
+#include "dynamatic/Conversion/CfToHandshake/ControlNetworkRouting.h"
+#include "dynamatic/Conversion/CfToHandshake/TempOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::experimental::operand_routing2;
+using namespace dynamatic::experimental::cf_to_handshake;
 
 namespace {
 /// Whether two edges are the same edge of the function's CFG,
@@ -676,7 +676,7 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
 }
 
 MapVector<MemrefValue, MemoryInterfaceInputs>
-dynamatic::experimental::operand_routing2::routeCfgs(
+dynamatic::experimental::cf_to_handshake::routeCfgs(
     Region &body, const BlockToCond &blockToCond,
     const MapVector<MemrefValue, ControlValue> &memStarts,
     ArrayRef<Cfg> useCfgs,

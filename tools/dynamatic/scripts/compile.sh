@@ -27,7 +27,6 @@ ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
 USE_LSQ_SIZING=${20:-0}
-OPERAND_ROUTING_2=${21:-0}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -332,16 +331,9 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
-elif [[ $OPERAND_ROUTING_2 -ne 0 ]]; then
-  echo_info "Running operand routing 2 for handshake conversion"
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
-    --operand-routing-2-lower-cf-to-handshake \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake with operand routing 2" \
-    "Compiled cf to handshake with operand routing 2"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
-    --func-maximize-ssa --lower-cf-to-handshake \
+    --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
@@ -369,23 +361,11 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
 
-elif [[ $OPERAND_ROUTING_2 -ne 0 ]]; then
+else
 
   # handshake transformations, without the LSQ minimization passes: operand
   # routing is incompatible with them for now
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-remove-unused-memrefs \
-    --handshake-optimize-bitwidths \
-    --handshake-materialize --handshake-infer-basic-blocks \
-    > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
-
-else
-
-  # handshake transformations
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
@@ -458,10 +438,9 @@ else
   else
     CALCULATE_PATH_DELAYS_FLAG=""
   fi
-  # Operand routing, like FTD, connects blocks that are not adjacent in the
-  # CFG, so buffer placement must find backedges from the circuit itself
+  # FTD circuits need FTD-specific backedge identification
   BUFFER_FTD=0
-  if [[ $FAST_TOKEN_DELIVERY -ne 0 || $OPERAND_ROUTING_2 -ne 0 ]]; then
+  if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
     BUFFER_FTD=1
   fi
   # To enable debug information, make sure that Dynamatic is built with Debug

@@ -1,4 +1,4 @@
-//===- AnnotatedCfg.cpp - Annotated CFGs for operand routing 2 --*- C++ -*-===//
+//===- AnnotatedCfg.cpp - Annotated CFGs ------------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/OperandRouting2/AnnotatedCfg.h"
+#include "dynamatic/Conversion/CfToHandshake/AnnotatedCfg.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -15,14 +15,14 @@
 
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::experimental::operand_routing2;
+using namespace dynamatic::experimental::cf_to_handshake;
 
 //===----------------------------------------------------------------------===//
 // Block uses
 //===----------------------------------------------------------------------===//
 
 SetVector<BlockUse>
-dynamatic::experimental::operand_routing2::collectBlockUses(Region &body) {
+dynamatic::experimental::cf_to_handshake::collectBlockUses(Region &body) {
   // set vector gives uniqueness
   // and also iterates over in insertion order
   SetVector<BlockUse> uses;
@@ -69,8 +69,8 @@ dynamatic::experimental::operand_routing2::collectBlockUses(Region &body) {
 //===----------------------------------------------------------------------===//
 
 /// Checks whether the block produces the value
-bool dynamatic::experimental::operand_routing2::isProducedIn(Value value,
-                                                             Block *block) {
+bool dynamatic::experimental::cf_to_handshake::isProducedIn(Value value,
+                                                            Block *block) {
   // an operation result is produced in the operation's block:
   // check if the given block is equal to the operation's block
   if (Operation *producer = value.getDefiningOp())
@@ -120,7 +120,7 @@ static Value findLiveOutProducerFromBranch(const CfgEdge &edge,
     return condBrOp.getFalseOperand(argIdx);
 }
 
-Cfg dynamatic::experimental::operand_routing2::buildCfg(
+Cfg dynamatic::experimental::cf_to_handshake::buildCfg(
     const Cfg &base, const SetVector<BlockUse> &blockUses) {
   // Make a copy of the base cfg
   // to annotate which basic blocks are needed for these consumers
@@ -233,7 +233,7 @@ static Cfg buildMemoryInterfaceCfg(const Cfg &base, ArrayRef<Block *> blocks) {
 }
 
 MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg>
-dynamatic::experimental::operand_routing2::collectMemoryInterfaceCfgs(
+dynamatic::experimental::cf_to_handshake::collectMemoryInterfaceCfgs(
     const Cfg &base, const MapVector<MemrefValue, ControlValue> &memStarts) {
   // the memory's start produces the token in the entry block
   Block *entryBlock = base.entry;
@@ -495,7 +495,7 @@ static bool bypassBlock(Cfg &cfg) {
   return true;
 }
 
-void dynamatic::experimental::operand_routing2::optimizeCfg(Cfg &cfg) {
+void dynamatic::experimental::cf_to_handshake::optimizeCfg(Cfg &cfg) {
   bool changed = true;
   while (changed)
     changed = mergeSides(cfg) || removeSelfLoop(cfg) || bypassBlock(cfg);

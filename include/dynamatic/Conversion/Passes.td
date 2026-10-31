@@ -50,22 +50,6 @@ def ScfToCf : Pass<"lower-scf-to-cf", "mlir::ModuleOp"> {
 }
 
 //===----------------------------------------------------------------------===//
-// CfToHandshake
-//===----------------------------------------------------------------------===//
-
-def CfToHandshake : Pass<"lower-cf-to-handshake", "mlir::ModuleOp"> {
-  let summary = "Lowers func and cf dialects to handshake.";
-  let description = [{
-    Lowers func-level functions whose body have unstructured control flow into
-      their handshake counterparts,
-      which represent dataflow circuits that can ultimately be converted to an
-          RTL design.
-    Functions must be in maximal SSA form (see --func-maximize-ssa).
-  }];
-  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
-}
-
-//===----------------------------------------------------------------------===//
 // FtdCfToHandshake
 //===----------------------------------------------------------------------===//
 
@@ -86,18 +70,15 @@ def FtdCfToHandshake : Pass<"ftd-lower-cf-to-handshake", "mlir::ModuleOp"> {
 }
 
 //===----------------------------------------------------------------------===//
-// OperandRouting2CfToHandshake
+// CfToHandshake
 //===----------------------------------------------------------------------===//
 
-def OperandRouting2CfToHandshake
-    : Pass<"operand-routing-2-lower-cf-to-handshake", "mlir::ModuleOp"> {
+def CfToHandshake : Pass<"lower-cf-to-handshake", "mlir::ModuleOp"> {
   let summary = "Lowers func and cf dialects to handshake, routing every "
                 "consumer on its own optimized CFG";
   let description = [{
-    Same lowering as `CfToHandshake`, except that every consumer is routed
-    with the control-network routing algorithm on a CFG optimized to that
-    consumer. Used through the "--operand-routing-2" flag of the compile
-    command.
+    Every consumer is routed with the control-network routing algorithm on a
+    CFG optimized to that consumer.
   }];
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }

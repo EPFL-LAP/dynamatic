@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_CONVERSION_OPERANDROUTING2_TEMPOPS_H
-#define EXPERIMENTAL_CONVERSION_OPERANDROUTING2_TEMPOPS_H
+#ifndef EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_TEMPOPS_H
+#define EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_TEMPOPS_H
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Builders.h"
@@ -20,7 +20,7 @@
 
 namespace dynamatic {
 namespace experimental {
-namespace operand_routing2 {
+namespace cf_to_handshake {
 
 using mlir::UnrealizedConversionCastOp;
 
@@ -87,8 +87,8 @@ private:
   UnrealizedConversionCastOp castOp;
 };
 
-} // namespace operand_routing2
+} // namespace cf_to_handshake
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // EXPERIMENTAL_CONVERSION_OPERANDROUTING2_TEMPOPS_H
+#endif // EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_TEMPOPS_H

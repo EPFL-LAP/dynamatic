@@ -311,7 +311,6 @@ public:
       "calculate-path-delays";
   static constexpr llvm::StringLiteral INSTRUMENT_II = "instrument-ii";
   static constexpr llvm::StringLiteral LSQ_SIZING = "lsq-sizing";
-  static constexpr llvm::StringLiteral OPERAND_ROUTING_2 = "operand-routing-2";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -334,9 +333,6 @@ public:
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY,
              "Use fast token delivery strategy to build the circuit"});
-    addFlag({OPERAND_ROUTING_2,
-             "Route every block use on its own optimized CFG, with the "
-             "control-network routing algorithm"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
     addOption(
         {K_INDUCTION, "Use the k-induction algorithm for rigidification"});
@@ -813,8 +809,6 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
   std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
   std::string lsqSizing = args.flags.contains(LSQ_SIZING) ? "1" : "0";
-  std::string operandRouting2 =
-      args.flags.contains(OPERAND_ROUTING_2) ? "1" : "0";
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
@@ -822,7 +816,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
                  fastTokenDelivery, milpSolver, straightToQueue, speculation,
                  enableShortCircuit, enableDuplication, calculatePathDelays,
-                 instrumentII, lsqSizing, operandRouting2);
+                 instrumentII, lsqSizing);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

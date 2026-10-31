@@ -1,4 +1,4 @@
-//===- BaseCfg.h - CFG representation for operand routing 2 -----*- C++ -*-===//
+//===- BaseCfg.h - CFG representation ---------------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_CONVERSION_OPERANDROUTING2_BASECFG_H
-#define EXPERIMENTAL_CONVERSION_OPERANDROUTING2_BASECFG_H
+#ifndef EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_BASECFG_H
+#define EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_BASECFG_H
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Block.h"
@@ -23,7 +23,7 @@
 
 namespace dynamatic {
 namespace experimental {
-namespace operand_routing2 {
+namespace cf_to_handshake {
 
 using mlir::SetVector;
 
@@ -115,8 +115,8 @@ Cfg getBaseCfg(Region &body);
 /// The position of a basic block in its region, which is its bb id.
 unsigned getBlockNumber(Block *block);
 
-} // namespace operand_routing2
+} // namespace cf_to_handshake
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // EXPERIMENTAL_CONVERSION_OPERANDROUTING2_BASECFG_H
+#endif // EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_BASECFG_H

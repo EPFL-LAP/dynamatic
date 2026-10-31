@@ -10,19 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_CONVERSION_OPERANDROUTING2_CONTROLNETWORKROUTING_H
-#define EXPERIMENTAL_CONVERSION_OPERANDROUTING2_CONTROLNETWORKROUTING_H
+#ifndef EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_CONTROLNETWORKROUTING_H
+#define EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_CONTROLNETWORKROUTING_H
 
-#include "dynamatic/Conversion/OperandRouting2/AnnotatedCfg.h"
-#include "dynamatic/Conversion/OperandRouting2/BaseCfg.h"
-#include "dynamatic/Conversion/OperandRouting2/TempOps.h"
+#include "dynamatic/Conversion/CfToHandshake/AnnotatedCfg.h"
+#include "dynamatic/Conversion/CfToHandshake/BaseCfg.h"
+#include "dynamatic/Conversion/CfToHandshake/TempOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/Builders.h"
 
 namespace dynamatic {
 namespace experimental {
-namespace operand_routing2 {
+namespace cf_to_handshake {
 
 namespace cf = mlir::cf;
 
@@ -108,8 +108,8 @@ MapVector<MemrefValue, MemoryInterfaceInputs> routeCfgs(
     MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> &memoryCfgs,
     OpBuilder &builder);
 
-} // namespace operand_routing2
+} // namespace cf_to_handshake
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // EXPERIMENTAL_CONVERSION_OPERANDROUTING2_CONTROLNETWORKROUTING_H
+#endif // EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_CONTROLNETWORKROUTING_H

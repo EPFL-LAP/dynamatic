@@ -29,7 +29,6 @@ target_link_libraries(dynamatic-opt
   DynamaticResourceSharing
   DynamaticCfToHandshake
   DynamaticFtdCfToHandshake
-  DynamaticOperandRouting2CfToHandshake
   DynamaticHandshake
   DynamaticHandshakeToHW
   DynamaticHandshakeToSynth

@@ -1,4 +1,4 @@
-//===- AnnotatedCfg.h - Annotated CFGs for operand routing 2 ----*- C++ -*-===//
+//===- AnnotatedCfg.h - Annotated CFGs --------------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -11,10 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_CONVERSION_OPERANDROUTING2_ANNOTATEDCFG_H
-#define EXPERIMENTAL_CONVERSION_OPERANDROUTING2_ANNOTATEDCFG_H
+#ifndef EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_ANNOTATEDCFG_H
+#define EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_ANNOTATEDCFG_H
 
-#include "dynamatic/Conversion/OperandRouting2/BaseCfg.h"
+#include "dynamatic/Conversion/CfToHandshake/BaseCfg.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/ADT/MapVector.h"
@@ -22,7 +22,7 @@
 
 namespace dynamatic {
 namespace experimental {
-namespace operand_routing2 {
+namespace cf_to_handshake {
 
 using mlir::MapVector;
 using mlir::TypedValue;
@@ -76,14 +76,14 @@ collectMemoryInterfaceCfgs(
 /// one rewrite at a time, until none applies.
 void optimizeCfg(Cfg &cfg);
 
-} // namespace operand_routing2
+} // namespace cf_to_handshake
 } // namespace experimental
 } // namespace dynamatic
 
 namespace llvm {
 template <>
-struct DenseMapInfo<dynamatic::experimental::operand_routing2::McOrLsq> {
-  using McOrLsq = dynamatic::experimental::operand_routing2::McOrLsq;
+struct DenseMapInfo<dynamatic::experimental::cf_to_handshake::McOrLsq> {
+  using McOrLsq = dynamatic::experimental::cf_to_handshake::McOrLsq;
   static McOrLsq getEmptyKey() { return static_cast<McOrLsq>(~0U); }
   static McOrLsq getTombstoneKey() { return static_cast<McOrLsq>(~0U - 1); }
   static unsigned getHashValue(McOrLsq mcOrLsq) {
@@ -93,4 +93,4 @@ struct DenseMapInfo<dynamatic::experimental::operand_routing2::McOrLsq> {
 };
 } // namespace llvm
 
-#endif // EXPERIMENTAL_CONVERSION_OPERANDROUTING2_ANNOTATEDCFG_H
+#endif // EXPERIMENTAL_CONVERSION_CFTOHANDSHAKE_ANNOTATEDCFG_H

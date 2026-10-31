@@ -1,4 +1,4 @@
-//===- BaseCfg.cpp - CFG representation for operand routing 2 ---*- C++ -*-===//
+//===- BaseCfg.cpp - CFG representation -------------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,14 +6,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/OperandRouting2/BaseCfg.h"
+#include "dynamatic/Conversion/CfToHandshake/BaseCfg.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::experimental::operand_routing2;
+using namespace dynamatic::experimental::cf_to_handshake;
 
 const LiveOut *CfgEdge::getLiveOut(BlockInput blockInput) const {
   for (const LiveOut &liveOut : liveOuts) {
@@ -63,7 +63,7 @@ SmallVector<const CfgEdge *> Cfg::getInEdges(Block *block) const {
 
 void Cfg::removeEdge(CfgEdge *edge) { edges.erase(edge); }
 
-Cfg dynamatic::experimental::operand_routing2::getBaseCfg(Region &body) {
+Cfg dynamatic::experimental::cf_to_handshake::getBaseCfg(Region &body) {
   // declare the CFG we will build and return
   Cfg cfg;
 
@@ -110,6 +110,6 @@ Cfg dynamatic::experimental::operand_routing2::getBaseCfg(Region &body) {
 }
 
 unsigned
-dynamatic::experimental::operand_routing2::getBlockNumber(Block *block) {
+dynamatic::experimental::cf_to_handshake::getBlockNumber(Block *block) {
   return std::distance(block->getParent()->begin(), block->getIterator());
 }
