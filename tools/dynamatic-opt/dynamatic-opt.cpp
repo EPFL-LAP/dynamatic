@@ -16,6 +16,7 @@
 #include "dynamatic/InitAllDialects.h"
 #include "dynamatic/InitAllPasses.h"
 #include "experimental/InitAllPasses.h"
+#include "experimental/test/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
@@ -23,6 +24,7 @@
 #include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
+#include "test/Transforms/Passes.h"
 #include "tutorials/InitAllPasses.h"
 
 #ifdef DYNAMATIC_ENABLE_XLS
@@ -30,25 +32,9 @@
 #include "experimental/xls/InitAllPasses.h"
 #endif // DYNAMATIC_ENABLE_XLS
 
-// Test passes, no public header.
-namespace dynamatic {
-namespace test {
-void registerTestRTLSuppport();
-} // namespace test
-} // namespace dynamatic
-
-// Experimental test passes, no public header.
-namespace dynamatic {
-namespace experimental {
-namespace test {
-void registerTestHandshakeSimulator();
-} // namespace test
-} // namespace experimental
-} // namespace dynamatic
-
 void registerTestPasses() {
-  dynamatic::test::registerTestRTLSuppport();
-  dynamatic::experimental::test::registerTestHandshakeSimulator();
+  dynamatic::test::registerPasses();
+  dynamatic::experimental::test::registerPasses();
 }
 
 int main(int argc, char **argv) {

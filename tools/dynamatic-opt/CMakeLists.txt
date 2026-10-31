@@ -2,6 +2,12 @@
 include_directories(${DYNAMATIC_SOURCE_DIR}/tutorials/CreatingPasses/include)
 include_directories(${DYNAMATIC_BINARY_DIR}/tutorials/CreatingPasses/include)
 
+# Include headers from the test passes
+include_directories(${DYNAMATIC_SOURCE_DIR}/test/include)
+include_directories(${DYNAMATIC_BINARY_DIR}/test/include)
+include_directories(${DYNAMATIC_SOURCE_DIR}/experimental/test/include)
+include_directories(${DYNAMATIC_BINARY_DIR}/experimental/test/include)
+
 set(LLVM_LINK_COMPONENTS
   Support
 )

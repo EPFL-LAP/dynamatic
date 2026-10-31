@@ -585,10 +585,11 @@ operator<<(llvm::raw_ostream &os,
            const ScalarAssignmentStatement &scalarAssignmentStatement);
 
 class StructuredForStatement;
+class IfElseStatement;
 
 class Statement {
   using Variant = std::variant<ArrayAssignmentStatement, StructuredForStatement,
-                               ScalarAssignmentStatement>;
+                               IfElseStatement, ScalarAssignmentStatement>;
 
 public:
   Statement() = default;
@@ -700,6 +701,41 @@ private:
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const StructuredForStatement &forStatement);
+
+/// ASTNode representing an if-else statement.
+class IfElseStatement {
+public:
+  IfElseStatement(Expression condition, StatementList ifClause,
+                  StatementList elseClause)
+      : condition(std::move(condition)), ifClause(std::move(ifClause)),
+        elseClause(std::move(elseClause)) {}
+
+  /// Returns the conditional expression.
+  const Expression &getCondition() const { return condition; }
+
+  /// Returns the body of the if-clause.
+  const StatementList &getIfClause() const { return ifClause; }
+
+  /// Returns the body of the else-clause.
+  const StatementList &getElseClause() const { return elseClause; }
+
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
+  using SubElements = std::tuple<Expression, StatementList, StatementList>;
+  constexpr static std::size_t CONDITION = 0;
+  constexpr static std::size_t IF = 1;
+  constexpr static std::size_t ELSE = 2;
+
+private:
+  Expression condition;
+  StatementList ifClause;
+  StatementList elseClause;
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const IfElseStatement &ifElse);
 
 /// AST-Node representing a scalar function parameter in C.
 class ScalarParameter {

@@ -1015,14 +1015,19 @@ def NotIOp : Handshake_Op<"noti", [
 //===----------------------------------------------------------------------===//
 
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
+  AttrSizedOperandSegments,
+  AttrSizedResultSegments,
   // The memory controller does not accept ControlTypes with extra signals.
   // Handling extra signals is the responsibility of MemPortOps (Load/Store).
   // See the issue #214.
   IsSimpleHandshake<"memStart">,
   IsSimpleHandshake<"ctrlEnd">,
   IsSimpleHandshake<"memEnd">,
-  IsSimpleHandshakeVariadic<"inputs">,
-  IsSimpleHandshakeVariadic<"outputs">,
+  IsSimpleHandshakeVariadic<"ctrl">,
+  IsSimpleHandshakeVariadic<"ldAddr">,
+  IsSimpleHandshakeVariadic<"stAddr">,
+  IsSimpleHandshakeVariadic<"stData">,
+  IsSimpleHandshakeVariadic<"ldData">,
   DeclareOpInterfaceMethods<MemoryOpInterface>,
   // The IOs of a MemoryControllerOp have custom names,
   // As they are complex, they are declared here,
@@ -1033,69 +1038,71 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   let description = [{
     Each `MemoryControllerOp` represents an interface to an externally defined
     unidimensional memory (i.e., it interfaces a memref input to a Handshake
-    function). It receives control signals from each basic block containing
-    store operations referencing the wrapped memref; the formers are fed to the
-    operation through constants indicating the number of stores the basic block
-    will make to the referenced memory region. It also receives load (address
-    value) and store (address value + data value) memory accesses, optionally
-    fed throuhg an LSQ. It returns a data value for each load request as well as
-    a single control signal to indicate basic block completion to the enclosing
-    function's end operation.
+    function). It receives load (address) and store (address and data)
+    accesses, grouped by basic block, and returns a data value for each load as
+    well as a control signal indicating completion to the enclosing function's
+    end operation. Each basic block that stores to the memory feeds a control
+    signal indicating the number of stores it makes. Optionally, the memory
+    controller forwards the accesses of an LSQ to the memory.
 
-    Additionally, the `connectedBlocks` attribute contains the ordered list of
-    basic blocks (referenced by their unique IDs) that communicate with the
-    controller. Every load/store operation is required to be tagged with the ID
-    of a basic block present in this list.
+    The ports are grouped by kind (`ctrl`, `ldAddr`, `stAddr`, `stData`, and
+    the `ldData` results), and the `groups` attribute describes the basic
+    blocks: their control port (if they store) and their accesses in program
+    order. The n-th load over all groups is the n-th operand of `ldAddr` (and
+    the n-th result of `ldData`), the n-th store the n-th operand of `stAddr`
+    and `stData`. For example:
 
-    Optionally, a memory controller may act as a middle-person between an LSQ
-    and the external memory.
-
-    The order of memory inputs is
-    1. For each basic block:
-      a. If there is at least one store in the block, a control signal fed
-         through a constant indicating the number of store operations in the
-         block.
-      b. Load/Store access requests from within the block, in program order.
-    2. If an LSQ references the same memory region:
-      a. Control signals from basic blocks containing store ports to the LSQ but
-         not directly to the MC. These have the same semantics as the control
-         signals described above.
-      b. A single address operand for load accesses coming through the LSQ and
-         a single pair of address/data operands for store accesses coming
-         through the LSQ.
-
-    The order of memory outputs is
-    1. Load results, in program order (i.e., in load accesses order).
-    2. If an LSQ references the same memory region, a data result for load
-       accesses.
-    3. Control signal indicating completion.
+    ```mlir
+    %ldData, %memEnd = mem_controller[%mem : memref<4xi32>] start(%memStart)
+        groups(bb0: [load(%la0)], bb1 %c0: [store(%sa0, %sd0)]) end(%ctrlEnd)
+        : <i2>, <i32>
     ```
   }];
 
   let arguments = (ins AnyMemRef:$memRef, ControlType:$memStart,
-                       Variadic<ChannelType>:$inputs, ControlType:$ctrlEnd,
-                       I32ArrayAttr:$connectedBlocks);
-  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
+                       Variadic<ChannelType>:$ctrl,
+                       Variadic<ChannelType>:$ldAddr,
+                       Variadic<ChannelType>:$stAddr,
+                       Variadic<ChannelType>:$stData,
+                       Optional<ChannelType>:$lsqLdAddr,
+                       Optional<ChannelType>:$lsqStAddr,
+                       Optional<ChannelType>:$lsqStData,
+                       ControlType:$ctrlEnd,
+                       MemGroupArrayAttr:$groups);
+  let results = (outs Variadic<ChannelType>:$ldData,
+                      Optional<ChannelType>:$lsqLdData,
+                      ControlType:$memEnd);
 
+  // Derives the result types from the memref and the groups. The ports to an
+  // LSQ are null if there is no LSQ.
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
-                                 "ValueRange":$inputs, "Value":$ctrlEnd,
-                                 "ArrayRef<unsigned>":$blocks,
-                                 "unsigned":$numLoads)>];
+                                 "ValueRange":$ctrl, "ValueRange":$ldAddr,
+                                 "ValueRange":$stAddr, "ValueRange":$stData,
+                                 "Value":$lsqLdAddr, "Value":$lsqStAddr,
+                                 "Value":$lsqStData, "Value":$ctrlEnd,
+                                 "ArrayAttr":$groups)>];
 
   let hasVerifier = 1;
 
-  // Dispatch SimpleControl signals to custom print and parse
   let assemblyFormat = [{
-    `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
-    attr-dict `:` custom<SimpleControl>(type($memStart)) custom<SimpleControl>(type($memEnd)) custom<SimpleControl>(type($ctrlEnd)) functional-type($inputs, $outputs)
+    `[` $memRef `:` type($memRef) `]` `start` `(` $memStart `)`
+    `groups` `(` custom<MemGroups>($ctrl, $ldAddr, $stAddr, $stData, $groups) `)`
+    (`lsq` `(` $lsqLdAddr^ `,` $lsqStAddr `,` $lsqStData `)`)?
+    `end` `(` $ctrlEnd `)` attr-dict `:`
+    custom<MemTypes>(ref($groups), ref($lsqLdAddr), type($ctrl), type($ldAddr),
+                     type($stAddr), type($stData), type($ldData),
+                     type($lsqLdAddr), type($lsqStAddr), type($lsqStData),
+                     type($lsqLdData))
+    custom<SimpleControl>(type($memStart)) custom<SimpleControl>(type($ctrlEnd))
+    custom<SimpleControl>(type($memEnd))
   }];
 
   let extraClassDeclaration = [{
     /// Returns the list of basic block IDs the MC is connected to.
     mlir::SmallVector<unsigned> getMCBlocks() {
       mlir::SmallVector<unsigned> blocks;
-      for (mlir::Attribute attr : getConnectedBlocks())
-        blocks.push_back(::llvm::cast<IntegerAttr>(attr).getValue().getZExtValue());
+      for (auto group : getGroups().getAsRange<MemGroupAttr>())
+        blocks.push_back(*group.getBlock());
       return blocks;
     }
 
@@ -1126,6 +1133,13 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 }
 
 def LSQOp : Handshake_Op<"lsq", [
+  AttrSizedOperandSegments,
+  AttrSizedResultSegments,
+  IsSimpleHandshakeVariadic<"ctrl">,
+  IsSimpleHandshakeVariadic<"ldAddr">,
+  IsSimpleHandshakeVariadic<"stAddr">,
+  IsSimpleHandshakeVariadic<"stData">,
+  IsSimpleHandshakeVariadic<"ldData">,
   DeclareOpInterfaceMethods<MemoryOpInterface>,
   // The IOs of a MemoryControllerOp have custom names,
   // As they are complex, they are declared here,
@@ -1142,58 +1156,83 @@ def LSQOp : Handshake_Op<"lsq", [
       be considered groups but the opposite is not generally true (i.e., groups
       are more general than blocks). A group must satisfy a "linear dominance"
       constraint, meaning that all the memory accesses it contains must be
-      clearly program-orderable, and stored in the LSQ's inputs in that order.
+      clearly program-orderable, and stored in the group in that order.
       Additionally, two groups connected to the same LSQ cannot share the same
       control signal, which are determined by the program location of the first
       memory access of each group).
     - Control signals are not fed through a constant and are instead data-less
-      signals simply indicating that a new group has started.
-    - To ensure proper identification of groups when analyzing the operation's
-      operands, the `groupSizes` attribute contains the numberf of load/store
-      ports in each LSQ group, in operand order.
+      signals simply indicating that a new group has started. Every group has
+      one.
 
     In the absence of an MC on the same memory region, the LSQ talks directly to
-    the external memory and its first memory input will be the Handhsake
-    function's memref argument that it interfaces in the circuit. In the
+    the external memory: it has its own memref, start, and end signals. In the
     presence of an MC on the same memory region, all load/store requests to the
-    LSQ are forwarded to the MC (which talks to the external memory) and the
-    first memory input is a control signal.
+    LSQ are forwarded to the MC (which talks to the external memory), through
+    the `ldAddrToMC`, `stAddrToMC`, and `stDataToMC` results, and the loaded
+    data comes back through the `ldDataFromMC` operand.
 
-    The order of memory inputs is
-    1. Wrapped memref (optional, if not connected to an MC).
-    2. For each LSQ group:
-      a. A control signal indicating that the group of accesses has started.
-      b. Load/Store access requests from within the block, in program order.
-    3. If an MC references the same memory region, a single data operand for
-       load accesses coming back from an external memory through the MC.
+    The ports are grouped by kind (`ctrl`, `ldAddr`, `stAddr`, `stData`, and
+    the `ldData` results), and the `groups` attribute describes the groups:
+    their accesses in program order. The n-th load over all groups is the n-th
+    operand of `ldAddr` (and the n-th result of `ldData`), the n-th store the
+    n-th operand of `stAddr` and `stData`. For example:
 
-    The order of results is
-    1. Load results, in program order (i.e., in load accesses order).
-    2. If an MC references the same memory region, a single address operand for
-       load accesses and a single pair of address/data operands for store
-       accesses going to the external memory through the MC.
-    3. Control signal indicating completion.
+    ```mlir
+    %ldData, %memEnd = lsq[%mem : memref<4xi32>] start(%memStart)
+        groups(%g0: [store(%sa0, %sd0), load(%la0)]) end(%ctrlEnd)
+        : <i2>, <i32>
+    ```
   }];
 
-  let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
-  let results = (outs Variadic<HandshakeType>:$outputs);
+  let arguments = (ins Optional<AnyMemRef>:$ownMemRef,
+                       Optional<ControlType>:$ownMemStart,
+                       Variadic<ControlType>:$ctrl,
+                       Variadic<ChannelType>:$ldAddr,
+                       Variadic<ChannelType>:$stAddr,
+                       Variadic<ChannelType>:$stData,
+                       Optional<ChannelType>:$ldDataFromMC,
+                       Optional<ControlType>:$ownCtrlEnd,
+                       MemGroupArrayAttr:$groups);
+  let results = (outs Variadic<ChannelType>:$ldData,
+                      Optional<ChannelType>:$ldAddrToMC,
+                      Optional<ChannelType>:$stAddrToMC,
+                      Optional<ChannelType>:$stDataToMC,
+                      Optional<ControlType>:$ownMemEnd);
 
+  // The first builder creates an LSQ that talks to the memory, the second one
+  // an LSQ that forwards its accesses to an MC. Both derive the result types
+  // from the memref and the groups.
   let builders = [
-    OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs,
-                   "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
+    OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$ctrl,
+                   "ValueRange":$ldAddr, "ValueRange":$stAddr,
+                   "ValueRange":$stData, "Value":$ctrlEnd,
+                   "ArrayAttr":$groups)>,
     OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp,
-                   "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes,
-                   "unsigned":$numLoads)>,
+                   "ValueRange":$ctrl, "ValueRange":$ldAddr,
+                   "ValueRange":$stAddr, "ValueRange":$stData,
+                   "ArrayAttr":$groups)>,
   ];
   let hasVerifier = 1;
-  let hasCustomAssemblyFormat = 1;
+
+  let assemblyFormat = [{
+    `[` custom<LSQMemory>($ownMemRef, type($ownMemRef)) `]`
+    (`start` `(` $ownMemStart^ `)`)?
+    `groups` `(` custom<MemGroups>($ctrl, $ldAddr, $stAddr, $stData, $groups) `)`
+    (`mc` `(` $ldDataFromMC^ `)`)?
+    (`end` `(` $ownCtrlEnd^ `)`)? attr-dict `:`
+    custom<LSQTypes>(ref($groups), ref($ownMemRef), type($ctrl), type($ldAddr),
+                     type($stAddr), type($stData), type($ldData),
+                     type($ownMemStart), type($ldDataFromMC), type($ownCtrlEnd),
+                     type($ldAddrToMC), type($stAddrToMC), type($stDataToMC),
+                     type($ownMemEnd))
+  }];
 
   let extraClassDeclaration = [{
-    /// Returns the list of sizes of all LSQ groups.
+    /// Returns the list of sizes (numbers of accesses) of all LSQ groups.
     mlir::SmallVector<unsigned> getLSQGroupSizes() {
       mlir::SmallVector<unsigned> sizes;
-      for (mlir::Attribute attr : getGroupSizes())
-        sizes.push_back(::llvm::cast<IntegerAttr>(attr).getValue().getZExtValue());
+      for (auto group : getGroups().getAsRange<MemGroupAttr>())
+        sizes.push_back(group.getAccesses().size());
       return sizes;
     }
 
@@ -1202,9 +1241,7 @@ def LSQOp : Handshake_Op<"lsq", [
     dynamatic::LSQPorts getPorts(); 
 
     /// Determines whether the LSQ is connected to an MC.
-    bool isConnectedToMC() {
-      return !::llvm::isa<mlir::MemRefType>(getInputs().front().getType());
-    }
+    bool isConnectedToMC() { return !getOwnMemRef(); }
 
     /// Returns the MC connected to the LSQ, if it exists.
     handshake::MemoryControllerOp getConnectedMC();

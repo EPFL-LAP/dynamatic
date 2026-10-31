@@ -12,6 +12,7 @@ add_dynamatic_library(DynamaticExperimentalSupport
   FormalProperty.cpp
   FlowExpression.cpp
   IOG.cpp
+  PropertyExpr.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR

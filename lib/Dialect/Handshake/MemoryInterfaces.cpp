@@ -88,7 +88,9 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   InterfaceInputs inputs;
   if (failed(determineInterfaceInputs(inputs, builder)))
     return failure();
-  if (inputs.mcInputs.empty() && inputs.lsqInputs.empty())
+  bool needsMC = !inputs.mcGroups.empty();
+  bool needsLSQ = !inputs.lsqGroups.empty();
+  if (!needsMC && !needsLSQ)
     return success();
 
   mcOp = nullptr;
@@ -97,16 +99,21 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   builder.setInsertionPointToStart(&funcOp.front());
   Location loc = memref.getLoc();
 
-  if (!inputs.mcInputs.empty() && inputs.lsqInputs.empty()) {
+  ArrayAttr mcGroups =
+      builder.getArrayAttr(to_vector_of<Attribute>(inputs.mcGroups));
+  ArrayAttr lsqGroups =
+      builder.getArrayAttr(to_vector_of<Attribute>(inputs.lsqGroups));
+  if (needsMC && !needsLSQ) {
     // We only need a memory controller
     mcOp = builder.create<handshake::MemoryControllerOp>(
-        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
-        mcNumLoads);
-  } else if (inputs.mcInputs.empty() && !inputs.lsqInputs.empty()) {
+        loc, memref, memStart, inputs.mcCtrl, inputs.mcLdAddr, inputs.mcStAddr,
+        inputs.mcStData, /*lsqLdAddr=*/nullptr,
+        /*lsqStAddr=*/nullptr, /*lsqStData=*/nullptr, ctrlEnd, mcGroups);
+  } else if (!needsMC && needsLSQ) {
     // We only need an LSQ
-    lsqOp = builder.create<handshake::LSQOp>(loc, memref, memStart,
-                                             inputs.lsqInputs, ctrlEnd,
-                                             inputs.lsqGroupSizes, lsqNumLoads);
+    lsqOp = builder.create<handshake::LSQOp>(
+        loc, memref, memStart, inputs.lsqCtrl, inputs.lsqLdAddr,
+        inputs.lsqStAddr, inputs.lsqStData, ctrlEnd, lsqGroups);
   } else {
     // We need a MC and an LSQ. They need to be connected with 4 new channels
     // so that the LSQ can forward its loads and stores to the MC. We need
@@ -122,28 +129,22 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     Backedge stAddr = edgeBuilder.get(addrType);
     Backedge stData = edgeBuilder.get(
         handshake::ChannelType::get(memrefType.getElementType()));
-    inputs.mcInputs.push_back(ldAddr);
-    inputs.mcInputs.push_back(stAddr);
-    inputs.mcInputs.push_back(stData);
-
-    // Create the memory controller, adding 1 to its load count so that it
-    // generates a load data result for the LSQ
+    // Create the memory controller, with the ports that forward the LSQ's
+    // accesses to the memory
     mcOp = builder.create<handshake::MemoryControllerOp>(
-        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
-        mcNumLoads + 1);
+        loc, memref, memStart, inputs.mcCtrl, inputs.mcLdAddr, inputs.mcStAddr,
+        inputs.mcStData, ldAddr, stAddr, stData, ctrlEnd, mcGroups);
 
-    // Add the MC's load data result to the LSQ's inputs and create the LSQ,
-    // passing a flag to the builder so that it generates the necessary
-    // outputs that will go to the MC
-    inputs.lsqInputs.push_back(mcOp.getOutputs().back());
-    lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, inputs.lsqInputs,
-                                             inputs.lsqGroupSizes, lsqNumLoads);
+    // Create the LSQ, which forwards its accesses to the MC and gets the
+    // loaded data back from it
+    lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, inputs.lsqCtrl,
+                                             inputs.lsqLdAddr, inputs.lsqStAddr,
+                                             inputs.lsqStData, lsqGroups);
 
     // Resolve the backedges to fully connect the MC and LSQ
-    ValueRange lsqMemResults = lsqOp.getOutputs().take_back(3);
-    ldAddr.setValue(lsqMemResults[0]);
-    stAddr.setValue(lsqMemResults[1]);
-    stData.setValue(lsqMemResults[2]);
+    ldAddr.setValue(lsqOp.getLdAddrToMC());
+    stAddr.setValue(lsqOp.getStAddrToMC());
+    stData.setValue(lsqOp.getStDataToMC());
   }
 
   // At this point, all load ports are missing their second operand which is the
@@ -197,16 +198,25 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     Value groupCtrl = getLSQCtrl(*block);
     if (!groupCtrl)
       return failure();
-    inputs.lsqInputs.push_back(groupCtrl);
+    inputs.lsqCtrl.push_back(groupCtrl);
 
-    // Then, add all memory port results that go the interface to the list of
-    // LSQ inputs
+    // Then, add all memory port results that go the interface to the LSQ
+    // inputs of their kind
+    SmallVector<MemAccessKind> accesses;
     for (Operation *lsqOp : lsqGroupOps) {
-      llvm::copy(getMemResultsToInterface(lsqOp),
-                 std::back_inserter(inputs.lsqInputs));
+      if (auto loadOp = dyn_cast<handshake::LoadOp>(lsqOp)) {
+        inputs.lsqLdAddr.push_back(loadOp.getAddressResult());
+        accesses.push_back(MemAccessKind::Load);
+      } else {
+        auto storeOp = cast<handshake::StoreOp>(lsqOp);
+        inputs.lsqStAddr.push_back(storeOp.getAddressResult());
+        inputs.lsqStData.push_back(storeOp.getDataResult());
+        accesses.push_back(MemAccessKind::Store);
+      }
     }
-    // Add the size of the group to our list
-    inputs.lsqGroupSizes.push_back(lsqGroupOps.size());
+    inputs.lsqGroups.push_back(MemGroupAttr::get(builder.getContext(),
+                                                 /*block=*/std::nullopt,
+                                                 /*hasCtrl=*/true, accesses));
   }
 
   if (mcPorts.empty())
@@ -244,17 +254,26 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
       Value blockCtrl = getCtrl(block);
       if (!blockCtrl)
         return failure();
-      inputs.mcInputs.push_back(
+      inputs.mcCtrl.push_back(
           getMCControl(blockCtrl, numStoresInBlock, builder));
     }
 
     // Traverse the list of memory operations in the block once more and
-    // accumulate memory inputs coming from the block
-    for (Operation *mcOp : mcBlockOps)
-      llvm::copy(getMemResultsToInterface(mcOp),
-                 std::back_inserter(inputs.mcInputs));
-
-    inputs.mcBlocks.push_back(block);
+    // accumulate memory inputs coming from the block, by kind
+    SmallVector<MemAccessKind> accesses;
+    for (Operation *mcOp : mcBlockOps) {
+      if (auto loadOp = dyn_cast<handshake::LoadOp>(mcOp)) {
+        inputs.mcLdAddr.push_back(loadOp.getAddressResult());
+        accesses.push_back(MemAccessKind::Load);
+      } else {
+        auto storeOp = cast<handshake::StoreOp>(mcOp);
+        inputs.mcStAddr.push_back(storeOp.getAddressResult());
+        inputs.mcStData.push_back(storeOp.getDataResult());
+        accesses.push_back(MemAccessKind::Store);
+      }
+    }
+    inputs.mcGroups.push_back(MemGroupAttr::get(
+        builder.getContext(), block, numStoresInBlock > 0, accesses));
   }
 
   // Control ports from blocks which do not have memory ports directly
@@ -270,9 +289,12 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     Value blockCtrl = getCtrl(lsqBlock);
     if (!blockCtrl)
       return failure();
-    inputs.mcInputs.push_back(getMCControl(blockCtrl, numStores, builder));
+    inputs.mcCtrl.push_back(getMCControl(blockCtrl, numStores, builder));
 
-    inputs.mcBlocks.push_back(lsqBlock);
+    // The block has no access of its own to the MC
+    inputs.mcGroups.push_back(MemGroupAttr::get(builder.getContext(), lsqBlock,
+                                                /*hasCtrl=*/true,
+                                                /*accesses=*/{}));
   }
 
   return success();

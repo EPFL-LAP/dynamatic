@@ -461,4 +461,43 @@ def FPUImplEnum : I64EnumAttr<"FPUImpl", "", [
 // and then we pass that "fake" attribute to this, which is the real attribute
 def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "fpu_impl">;
 
+def MemAccessKindEnum : I32EnumAttr<"MemAccessKind", "kind of a memory access", [
+  I32EnumAttrCase<"Load", 0, "load">,
+  I32EnumAttrCase<"Store", 1, "store">
+]> {
+  let cppNamespace = "::dynamatic::handshake";
+  let genSpecializedAttr = 0;
+}
+
+def MemGroupAttr : Handshake_Attr<"MemGroup", "mem_group"> {
+  let summary = "A group of accesses to a memory interface";
+  let description = [{
+    A group of accesses to a memory interface, in program order. For a memory
+    controller, a group is a basic block, which has a control port (the number
+    of stores of the block) if it stores. For an LSQ, a group has a control port
+    (the group allocation signal).
+
+    The accesses are numbered by kind over all groups of the interface: the n-th
+    load is the n-th operand of the interface's `ldAddr` segment, and the n-th
+    store is the n-th operand of its `stAddr` and `stData` segments.
+  }];
+  let parameters = (ins
+    OptionalParameter<"::std::optional<unsigned>">:$block,
+    "bool":$hasCtrl,
+    ArrayRefParameter<"::dynamatic::handshake::MemAccessKind">:$accesses
+  );
+  let assemblyFormat = [{
+    `<` (`bb` $block^ `,`)? `ctrl` `=` $hasCtrl `,` `[` $accesses `]` `>`
+  }];
+  let extraClassDeclaration = [{
+    /// Returns the number of accesses of the given kind in the group.
+    unsigned getNumAccesses(::dynamatic::handshake::MemAccessKind kind) const {
+      return ::llvm::count(getAccesses(), kind);
+    }
+  }];
+}
+
+def MemGroupArrayAttr : TypedArrayAttrBase<MemGroupAttr,
+                                           "groups of memory accesses">;
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD

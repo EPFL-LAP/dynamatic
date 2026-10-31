@@ -24,6 +24,7 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
+#include "experimental/Support/PropertyExpr.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
@@ -31,8 +32,11 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/LogicalResult.h"
+#include <cassert>
 #include <fstream>
 #include <ostream>
+#include <vector>
 
 using namespace llvm;
 using namespace mlir;
@@ -61,8 +65,11 @@ struct HandshakeRigidificationPass
   void runOnOperation() override;
 
 private:
-  LogicalResult insertReadyRemover(AbsenceOfBackpressure prop);
-  LogicalResult insertValidMerger(ValidEquivalence prop);
+  // The channels are given by the valid signals of the result ports that
+  // produce them
+  LogicalResult insertReadyRemover(const Signal &valid);
+  LogicalResult insertValidMerger(const Signal &ownerValid,
+                                  const Signal &targetValid);
 };
 } // namespace
 
@@ -78,15 +85,19 @@ void HandshakeRigidificationPass::runOnOperation() {
     llvm::errs() << "[WARNING] Formal property retrieval failed\n";
 
   for (const auto &property : table.getProperties()) {
-    if (property->getTag() == FormalProperty::TAG::OPT &&
-        property->getCheck() != std::nullopt && *property->getCheck()) {
+    if (property.tag == FormalProperty::TAG::OPT &&
+        property.check.value_or(false)) {
 
-      if (auto *p = dyn_cast<AbsenceOfBackpressure>(property.get())) {
-        if (failed(insertReadyRemover(*p)))
+      std::vector<Signal> valids = property.getResultValidSignals();
+      if (property.kind == FormalProperty::ABSENCE_OF_BACKPRESSURE) {
+        assert(valids.size() == 1 && "expected the valid signal of a channel");
+        if (failed(insertReadyRemover(valids[0])))
           return signalPassFailure();
 
-      } else if (auto *p = dyn_cast<ValidEquivalence>(property.get())) {
-        if (failed(insertValidMerger(*p)))
+      } else if (property.kind == FormalProperty::VALID_EQUIVALENCE) {
+        assert(valids.size() == 2 &&
+               "expected the valid signals of two channels");
+        if (failed(insertValidMerger(valids[0], valids[1])))
           return signalPassFailure();
       }
     }
@@ -100,12 +111,12 @@ void HandshakeRigidificationPass::runOnOperation() {
 }
 
 LogicalResult
-HandshakeRigidificationPass::insertReadyRemover(AbsenceOfBackpressure prop) {
+HandshakeRigidificationPass::insertReadyRemover(const Signal &valid) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
-  Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(prop.getOwner());
-  auto channel = ownerOp->getResult(prop.getOwnerIndex());
+  Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(valid.getOpName());
+  auto channel = ownerOp->getResult(valid.getPortIndex());
 
   builder.setInsertionPointAfter(ownerOp);
   auto loc = channel.getLoc();
@@ -117,14 +128,17 @@ HandshakeRigidificationPass::insertReadyRemover(AbsenceOfBackpressure prop) {
 }
 
 LogicalResult
-HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop) {
+HandshakeRigidificationPass::insertValidMerger(const Signal &ownerValid,
+                                               const Signal &targetValid) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
-  Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(prop.getOwner());
-  Operation *targetOp = getAnalysis<NameAnalysis>().getOp(prop.getTarget());
-  auto ownerChannel = ownerOp->getResult(prop.getOwnerIndex());
-  auto targetChannel = targetOp->getResult(prop.getTargetIndex());
+  Operation *ownerOp =
+      getAnalysis<NameAnalysis>().getOp(ownerValid.getOpName());
+  Operation *targetOp =
+      getAnalysis<NameAnalysis>().getOp(targetValid.getOpName());
+  auto ownerChannel = ownerOp->getResult(ownerValid.getPortIndex());
+  auto targetChannel = targetOp->getResult(targetValid.getPortIndex());
 
   builder.setInsertionPointAfter(targetOp);
   Location loc =

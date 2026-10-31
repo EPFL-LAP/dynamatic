@@ -104,11 +104,12 @@ static bool isValidMemrefType(Location loc, MemRefType type) {
 /// Returns the Handshake-level function type corresponding to the func-level
 /// function. On top of the original arguments and results, the Handshake
 /// function has an extra control-only argument and result for each memory
-/// region and for the global start/end signals.
-static FunctionType lowerFunctionType(func::FuncOp funcOp) {
+/// region (including internal arrays) and for the global start/end signals.
+static FunctionType lowerFunctionType(func::FuncOp funcOp,
+                                      unsigned numInternalArrays) {
   SmallVector<Type, 8> argTypes;
   SmallVector<Type, 2> resTypes;
-  unsigned numMemories = 0;
+  unsigned numMemories = numInternalArrays;
   for (Type argType : funcOp.getArgumentTypes()) {
     if (isa<MemRefType>(argType))
       ++numMemories;
@@ -125,8 +126,10 @@ static FunctionType lowerFunctionType(func::FuncOp funcOp) {
 
 /// Produces the list of named attributes of the Handshake function
 /// corresponding to the func-level function (argument and result names in
-/// particular).
-static SmallVector<NamedAttribute> deriveNewAttributes(func::FuncOp funcOp) {
+/// particular, including for internal arrays).
+static SmallVector<NamedAttribute> deriveNewAttributes(
+    func::FuncOp funcOp,
+    const llvm::MapVector<Value, unsigned> &memrefToInternalArrayID) {
   SmallVector<NamedAttribute> attributes;
   MLIRContext *ctx = funcOp.getContext();
   SmallVector<std::string> memRegionNames;
@@ -154,6 +157,9 @@ static SmallVector<NamedAttribute> deriveNewAttributes(func::FuncOp funcOp) {
         if (isa<MemRefType>(argType))
           memRegionNames.push_back(cast<StringAttr>(name->getValue()).str());
         argNames.push_back(name->getValue());
+      }
+      for (auto [memref, internalArrayID] : memrefToInternalArrayID) {
+        memRegionNames.push_back("ram" + std::to_string(internalArrayID));
       }
       for (StringRef mem : memRegionNames)
         argNames.push_back(StringAttr::get(ctx, mem + "_start"));
@@ -184,6 +190,9 @@ static SmallVector<NamedAttribute> deriveNewAttributes(func::FuncOp funcOp) {
         argNames.push_back(
             StringAttr::get(ctx, "in" + std::to_string(argNum++)));
       }
+    }
+    for (auto [memref, internalArrayID] : memrefToInternalArrayID) {
+      memRegionNames.push_back("ram" + std::to_string(internalArrayID));
     }
     for (StringRef memName : memRegionNames)
       argNames.push_back(StringAttr::get(ctx, memName + "_start"));
@@ -237,13 +246,72 @@ void CfToHandshakeTranslator::setBlock(Operation *op, Block *block) {
 }
 
 LogicalResult CfToHandshakeTranslator::translate() {
+  // Iterate the internal array cf ops (alloca ops and get global ops)
+  // and assign each a number
+  //
+  // Store the number under the memref,
+  // so we can refer to it consistently
+  for (Block &block : cfFunc) {
+    for (Operation &op : block) {
+      if (auto allocaOp = dyn_cast<memref::AllocaOp>(&op)) {
+        unsigned internalArrayID = memrefToInternalArrayID.size();
+        memrefToInternalArrayID[allocaOp.getResult()] = internalArrayID;
+      }
+      if (auto getGlobalOp = dyn_cast<memref::GetGlobalOp>(&op)) {
+        unsigned internalArrayID = memrefToInternalArrayID.size();
+        memrefToInternalArrayID[getGlobalOp.getResult()] = internalArrayID;
+      }
+    }
+  }
+
   // Create a Handshake-level function corresponding to the func-level one
   builder.setInsertionPoint(cfFunc);
-  funcOp = builder.create<handshake::FuncOp>(cfFunc.getLoc(), cfFunc.getName(),
-                                             lowerFunctionType(cfFunc),
-                                             deriveNewAttributes(cfFunc));
+  funcOp = builder.create<handshake::FuncOp>(
+      cfFunc.getLoc(), cfFunc.getName(),
+      lowerFunctionType(cfFunc, memrefToInternalArrayID.size()),
+      deriveNewAttributes(cfFunc, memrefToInternalArrayID));
   if (cfFunc.isExternal())
     return success();
+
+  // The arguments of the Handshake function's entry block are the original
+  // function's arguments followed by the memory start signals and the global
+  // start signal
+  Block *body = new Block();
+  funcOp.getBody().push_back(body);
+  Location loc = cfFunc.getLoc();
+  Type ctrlType = handshake::ControlType::get(cfFunc.getContext());
+
+  // Add the original function's arguments to the entry block,
+  // in their Handshake types
+  for (unsigned idx = 0; idx < cfFunc.getNumArguments(); ++idx) {
+    body->addArgument(funcOp.getArgumentTypes()[idx], loc);
+  }
+
+  // Add a memory start signal per function arg cf memref to the entry block,
+  // and store it under the cf memref
+  for (BlockArgument arg : cfFunc.getArguments()) {
+    auto memrefTy = dyn_cast<MemRefType>(arg.getType());
+    if (!memrefTy) {
+      continue;
+    }
+    if (!isValidMemrefType(arg.getLoc(), memrefTy)) {
+      return failure();
+    }
+    memInfo.insert({arg,
+                    {/*mcPorts=*/{}, /*lsqPorts=*/{},
+                     /*memStart=*/body->addArgument(ctrlType, loc)}});
+  }
+
+  // Add a memory start signal per internal array cf memref to the entry block,
+  // and store it under the cf memref
+  for (auto [memref, internalArrayID] : memrefToInternalArrayID) {
+    memInfo.insert({memref,
+                    {/*mcPorts=*/{}, /*lsqPorts=*/{},
+                     /*memStart=*/body->addArgument(ctrlType, loc)}});
+  }
+
+  // Add the global start signal to the entry block
+  body->addArgument(ctrlType, loc);
 
   if (failed(translateBody())) {
     // The translation stopped midway, so some backedges may still be in use;
@@ -255,10 +323,7 @@ LogicalResult CfToHandshakeTranslator::translate() {
 }
 
 LogicalResult CfToHandshakeTranslator::translateBody() {
-  // The arguments of the Handshake function's entry block are the original
-  // function's arguments followed by the memory start signals and the global
-  // start signal
-  Block *body = funcOp.addEntryBlock();
+  Block *body = funcOp.getBodyBlock();
   Block *cfEntry = &cfFunc.front();
   for (BlockArgument arg : cfEntry->getArguments())
     valueMap.map(arg, body->getArgument(arg.getArgNumber()));
@@ -275,7 +340,7 @@ LogicalResult CfToHandshakeTranslator::translateBody() {
     }
   }
   computePredecessors();
-  if (failed(initMemories()) || failed(initTranslation()))
+  if (failed(initTranslation()))
     return failure();
 
   // Translate blocks in reverse post-order so that values are translated
@@ -319,38 +384,6 @@ void CfToHandshakeTranslator::computePredecessors() {
     for (auto [succIdx, succ] : llvm::enumerate(block.getSuccessors()))
       preds[succ].emplace_back(&block, succIdx);
   }
-}
-
-LogicalResult CfToHandshakeTranslator::initMemories() {
-  // Record memories passed as function arguments, even if they aren't used by
-  // any memory operation. Each one has a dedicated start signal in the function
-  // arguments
-  auto funcArgs = funcOp.getArguments();
-  unsigned numMemories = llvm::count_if(
-      funcArgs, [](auto arg) { return isa<MemRefType>(arg.getType()); });
-  unsigned memStartIdx = funcArgs.size() - numMemories - 1;
-  for (BlockArgument arg : cfFunc.getArguments()) {
-    if (auto memrefTy = dyn_cast<MemRefType>(arg.getType())) {
-      if (!isValidMemrefType(arg.getLoc(), memrefTy))
-        return failure();
-      memInfo.insert({arg,
-                      {/*mcPorts=*/{}, /*lsqPorts=*/{},
-                       /*memStart=*/funcArgs[memStartIdx++]}});
-    }
-  }
-
-  // Internally allocated memories use the function's start as their memory
-  // start signal
-  Value start = funcArgs.back();
-  cfFunc.walk([&](memref::AllocaOp op) {
-    memInfo.insert({op.getResult(),
-                    {/*mcPorts=*/{}, /*lsqPorts=*/{}, /*memStart=*/start}});
-  });
-  cfFunc.walk([&](memref::GetGlobalOp op) {
-    memInfo.insert({op.getResult(),
-                    {/*mcPorts=*/{}, /*lsqPorts=*/{}, /*memStart=*/start}});
-  });
-  return success();
 }
 
 /// Creates a placeholder operand for each incoming edge, replaced by the value
@@ -724,6 +757,14 @@ CfToHandshakeTranslator::translateAlloca(memref::AllocaOp allocaOp) {
   auto ramOp = builder.create<handshake::RAMOp>(allocaOp.getLoc(), type,
                                                 getZeroFilledDenseAttr(type));
   valueMap.map(allocaOp.getResult(), ramOp.getResult());
+
+  // Use internal array ID to name RAM op
+  std::string name =
+      "ram" +
+      std::to_string(memrefToInternalArrayID.lookup(allocaOp.getResult()));
+  if (failed(namer.setName(ramOp, name))) {
+    return allocaOp->emitError() << "RAM name " << name << " is already taken";
+  }
   return success();
 }
 
@@ -734,6 +775,14 @@ CfToHandshakeTranslator::translateGetGlobal(memref::GetGlobalOp getGlobalOp) {
       getGlobalOp, getGlobalOp.getNameAttr());
   if (!global)
     return getGlobalOp->emitError() << "reference to unknown global";
+  // A const global array becomes an internal read-only memory unit.
+  // A non-const global array is rejected:
+  // it is not guaranteed to be reset to an initial value per invocation,
+  // which could imply state across invocations of the kernel,
+  // which we do not currently support
+  if (!global.getConstant()) {
+    return global->emitError() << "a global must be constant to become a RAM";
+  }
   auto denseAttr =
       dyn_cast_if_present<DenseElementsAttr>(global.getInitialValueAttr());
   if (!denseAttr) {
@@ -743,6 +792,15 @@ CfToHandshakeTranslator::translateGetGlobal(memref::GetGlobalOp getGlobalOp) {
   auto ramOp = builder.create<handshake::RAMOp>(
       getGlobalOp.getLoc(), getGlobalOp.getType(), denseAttr);
   valueMap.map(getGlobalOp.getResult(), ramOp.getResult());
+
+  // Use internal array ID to name RAM op
+  std::string name =
+      "ram" +
+      std::to_string(memrefToInternalArrayID.lookup(getGlobalOp.getResult()));
+  if (failed(namer.setName(ramOp, name))) {
+    return getGlobalOp->emitError()
+           << "RAM name " << name << " is already taken";
+  }
   return success();
 }
 
@@ -1041,18 +1099,22 @@ void CfToHandshakeTranslator::createEnd() {
     }
   }
 
-  for (BlockArgument arg : funcOp.getArguments()) {
-    if (!isa<MemRefType>(arg.getType()))
-      continue;
-    if (arg.use_empty()) {
-      // When the memory region is not accessed, just a create a constant source
-      // of valid "memory end" tokens for it
-      auto sourceOp = builder.create<handshake::SourceOp>(loc);
-      setBB(sourceOp, exitBlockID);
-      endOprds.push_back(sourceOp.getResult());
+  // Add a memory end signal per cf memref
+  // (function args, then internal arrays)
+  // to the end op's operands
+  for (auto &[cfMemref, memAccesses] : memInfo) {
+    Value handshakeMemref = valueMap.lookup(cfMemref);
+    if (handshakeMemref.use_empty()) {
+      // A memory region that is not accessed
+      // ends immediately after starting:
+      // its memory end comes from its memory start
+      endOprds.push_back(memAccesses.memStart);
       continue;
     }
-    for (Operation *userOp : arg.getUsers()) {
+    // Find all memory interfaces of the memory region,
+    // and then find the master interface
+    // (the memory interface which provides the memory end)
+    for (Operation *userOp : handshakeMemref.getUsers()) {
       auto memOp = cast<handshake::MemoryOpInterface>(userOp);
       if (memOp.isMasterInterface()) {
         endOprds.push_back(memOp.getMemEnd());

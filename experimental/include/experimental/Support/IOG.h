@@ -4,6 +4,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
+#include "llvm/ADT/SetVector.h"
 #include <unordered_set>
 
 namespace dynamatic {
@@ -31,7 +32,9 @@ struct IOGPathSet {
 // This way, there is a fixed number of tokens within the IOG.
 struct IOG {
   IOG() = default;
-  std::unordered_set<Operation *> units;
+  // Ordered by insertion, so that the properties derived from the IOG are
+  // annotated in the same order in every run
+  llvm::SetVector<Operation *> units;
   llvm::DenseSet<mlir::Value> channels;
   BlockArgument entry;
 
@@ -53,10 +56,7 @@ struct IOG {
   isExitBranch(handshake::ConditionalBranchOp branch) const;
   IOGPathSet findAllPaths(Operation *startOp, Operation *endOp) const;
 
-  inline bool contains(Operation *op) const {
-    auto iter = units.find(op);
-    return iter != units.end();
-  }
+  inline bool contains(Operation *op) const { return units.contains(op); }
 
   inline bool contains(mlir::Value channel) const {
     auto iter = channels.find(channel);

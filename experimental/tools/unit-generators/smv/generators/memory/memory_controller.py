@@ -11,22 +11,20 @@ def generate_memory_controller(name, params):
     num_stores = params["num_stores"]
     num_controls = params["num_controls"]
 
-    smv_input_symbols = params["smv_input_symbols"]
-
     if num_loads == 0:
         return _generate_mem_controller_loadless(
-            name, num_stores, num_controls, data_type, addr_type, ctrl_type, smv_input_symbols
+            name, num_stores, num_controls, data_type, addr_type, ctrl_type
         )
     elif num_stores == 0:
-        return _generate_mem_controller_storeless(name, num_loads, data_type, addr_type, smv_input_symbols)
+        return _generate_mem_controller_storeless(name, num_loads, data_type, addr_type)
     else:
         return _generate_mem_controller(
-            name, num_loads, num_stores, num_controls, data_type, addr_type, ctrl_type, smv_input_symbols
+            name, num_loads, num_stores, num_controls, data_type, addr_type, ctrl_type
         )
 
 
 def _generate_mem_controller_loadless(
-    name, num_stores, num_controls, data_type, addr_type, ctrl_type, smv_input_symbols=None
+    name, num_stores, num_controls, data_type, addr_type, ctrl_type
 ):
 
     control_ports = [f"ctrl_{n}" for n in range(num_controls)] + [
@@ -54,8 +52,6 @@ def _generate_mem_controller_loadless(
     n_valid_ports = [f"TRUE" for _ in range(num_stores)]
     arbiter_args = ", ".join(
         p_valid_ports + address_ports + data_ports + n_valid_ports)
-
-    mc_in_ports = mc_in_ports if smv_input_symbols == None else smv_input_symbols
 
     return f"""
 MODULE {name}({mc_in_ports})
@@ -110,7 +106,7 @@ MODULE {name}({mc_in_ports})
 """
 
 
-def _generate_mem_controller_storeless(name, num_loads, data_type, addr_type, smv_input_symbols):
+def _generate_mem_controller_storeless(name, num_loads, data_type, addr_type):
     load_address_ports = [f"ldAddr_{n}" for n in range(num_loads)] + [
         f"ldAddr_{n}_valid" for n in range(num_loads)
     ]
@@ -131,7 +127,7 @@ def _generate_mem_controller_storeless(name, num_loads, data_type, addr_type, sm
     )
 
     return f"""
-MODULE {name}({smv_input_symbols})
+MODULE {name}({mc_in_ports})
 
   VAR
   inner_arbiter : {name}__read_memory_arbiter({arbiter_args});
@@ -165,7 +161,7 @@ MODULE {name}({smv_input_symbols})
 
 
 def _generate_mem_controller(
-    name, num_loads, num_stores, num_controls, data_type, addr_type, ctrl_type, smv_input_symbols
+    name, num_loads, num_stores, num_controls, data_type, addr_type, ctrl_type
 ):
     control_ports = [f"ctrl_{n}" for n in range(num_controls)] + [
         f"ctrl_{n}_valid" for n in range(num_controls)
@@ -209,7 +205,7 @@ def _generate_mem_controller(
     )
 
     return f"""
-MODULE {name}({smv_input_symbols})
+MODULE {name}({mc_in_ports})
 
   VAR
   inner_mc_loadless : {name}__mc_loadless({mc_loadless_in_ports});

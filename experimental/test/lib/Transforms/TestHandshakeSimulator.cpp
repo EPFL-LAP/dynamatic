@@ -13,31 +13,27 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
+
+// [START Boilerplate code for the MLIR pass]
+#include "experimental/test/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+namespace test {
+#define GEN_PASS_DEF_TESTHANDSHAKESIMULATOR
+#include "experimental/test/Transforms/Passes.h.inc"
+} // namespace test
+} // namespace experimental
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;
 
 namespace {
 
-struct TestHandshakeSimulatorOptions {};
-
 struct TestHandshakeSimulator
-    : public PassWrapper<TestHandshakeSimulator,
-                         OperationPass<mlir::ModuleOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestHandshakeSimulator)
-  using Base =
-      PassWrapper<TestHandshakeSimulator, OperationPass<mlir::ModuleOp>>;
-
-  TestHandshakeSimulator() : Base() {};
-  TestHandshakeSimulator(const TestHandshakeSimulator &other) = default;
-
-  StringRef getArgument() const final { return "exp-test-handshake-simulator"; }
-
-  StringRef getDescription() const final {
-    return "Test the Handshake simulator";
-  }
-
+    : public dynamatic::experimental::test::impl::TestHandshakeSimulatorBase<
+          TestHandshakeSimulator> {
   void runOnOperation() override {
     mlir::ModuleOp modOp = getOperation();
 
@@ -48,18 +44,5 @@ struct TestHandshakeSimulator
       return signalPassFailure();
     }
   }
-
-  TestHandshakeSimulator(const TestHandshakeSimulatorOptions &options)
-      : TestHandshakeSimulator() {}
 };
 } // namespace
-
-namespace dynamatic {
-namespace experimental {
-namespace test {
-void registerTestHandshakeSimulator() {
-  PassRegistration<TestHandshakeSimulator>();
-}
-} // namespace test
-} // namespace experimental
-} // namespace dynamatic
