@@ -96,11 +96,11 @@ private:
     /// Inputs for the MC, by kind.
     SmallVector<Value> mcCtrl, mcLdAddr, mcStAddr, mcStData;
     /// Basic blocks of the MC, with their control port and accesses.
-    SmallVector<Attribute> mcGroups;
+    SmallVector<handshake::MemGroupAttr> mcGroups;
     /// Inputs for the LSQ, by kind.
     SmallVector<Value> lsqCtrl, lsqLdAddr, lsqStAddr, lsqStData;
     /// Groups of the LSQ, with their accesses.
-    SmallVector<Attribute> lsqGroups;
+    SmallVector<handshake::MemGroupAttr> lsqGroups;
   };
 
   /// Groups a list of memory access ports by their group, which is a basic

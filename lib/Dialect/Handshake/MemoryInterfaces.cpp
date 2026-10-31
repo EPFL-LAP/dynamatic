@@ -99,8 +99,10 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   builder.setInsertionPointToStart(&funcOp.front());
   Location loc = memref.getLoc();
 
-  ArrayAttr mcGroups = builder.getArrayAttr(inputs.mcGroups);
-  ArrayAttr lsqGroups = builder.getArrayAttr(inputs.lsqGroups);
+  ArrayAttr mcGroups =
+      builder.getArrayAttr(to_vector_of<Attribute>(inputs.mcGroups));
+  ArrayAttr lsqGroups =
+      builder.getArrayAttr(to_vector_of<Attribute>(inputs.lsqGroups));
   if (needsMC && !needsLSQ) {
     // We only need a memory controller
     mcOp = builder.create<handshake::MemoryControllerOp>(
