@@ -1,11 +1,11 @@
 #ifndef DYNAMATIC_SUPPORT_FLOW_EXPRESSION_H
 #define DYNAMATIC_SUPPORT_FLOW_EXPRESSION_H
 
-#include "dynamatic/Analysis/IndexChannelAnalysis.h"
+#include "Gaussian.h"
+#include "IndexChannelAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <bitset>

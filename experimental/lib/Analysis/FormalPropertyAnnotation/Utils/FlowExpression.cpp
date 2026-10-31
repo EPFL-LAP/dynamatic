@@ -1,4 +1,4 @@
-#include "experimental/Support/FlowExpression.h"
+#include "FlowExpression.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 
