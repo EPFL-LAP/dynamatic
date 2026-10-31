@@ -3,6 +3,8 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 
+using namespace dynamatic::handshake;
+
 namespace dynamatic {
 IOGPathSet IOG::findUnitsOnPaths(Operation *startOp, Operation *endOp) const {
   IOGPathSet paths(startOp, endOp);
@@ -85,7 +87,6 @@ static SmallVector<SmallVector<Value>> allOf(ValueRange channels) {
 /// sent states of the forks. Each unit therefore turns one token of the IOG
 /// into one token of the IOG, or keeps it (e.g., a sink).
 static std::optional<IOGPortGroups> getIOGPortGroups(Operation *op) {
-  using namespace dynamatic::handshake;
   using Groups = std::optional<IOGPortGroups>;
   return llvm::TypeSwitch<Operation *, Groups>(op)
       .Case<EndOp>([](EndOp endOp) -> Groups {
@@ -250,7 +251,6 @@ struct IOGCandidate {
   }
 };
 
-using namespace dynamatic::handshake;
 class IOGFinder {
 public:
   IOGFinder(BlockArgument entry) {
