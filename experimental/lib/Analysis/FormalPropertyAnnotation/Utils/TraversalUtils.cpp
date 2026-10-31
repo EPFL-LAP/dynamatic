@@ -102,7 +102,8 @@ SmallVector<OpOperand *> dynamatic::getFlowPredecessors(OpResult result) {
 
 llvm::SetVector<Operation *>
 dynamatic::reachForward(ArrayRef<Value> starts,
-                        function_ref<bool(Operation *)> isBoundary) {
+                        function_ref<bool(Operation *)> isBoundary,
+                        function_ref<bool(Value)> isFollowed) {
   llvm::SetVector<Operation *> reached;
   // The channels are visited rather than the units, as the results that a
   // token can leave through depend on the operand it arrives on (see loads).
@@ -110,7 +111,7 @@ dynamatic::reachForward(ArrayRef<Value> starts,
   SmallVector<Value> worklist(starts);
   while (!worklist.empty()) {
     Value channel = worklist.pop_back_val();
-    if (!visited.insert(channel).second)
+    if ((isFollowed && !isFollowed(channel)) || !visited.insert(channel).second)
       continue;
     for (OpOperand &use : channel.getUses()) {
       Operation *user = use.getOwner();
@@ -124,13 +125,14 @@ dynamatic::reachForward(ArrayRef<Value> starts,
 
 llvm::SetVector<Operation *>
 dynamatic::reachBackward(ArrayRef<Value> starts,
-                         function_ref<bool(Operation *)> isBoundary) {
+                         function_ref<bool(Operation *)> isBoundary,
+                         function_ref<bool(Value)> isFollowed) {
   llvm::SetVector<Operation *> reached;
   llvm::DenseSet<Value> visited;
   SmallVector<Value> worklist(starts);
   while (!worklist.empty()) {
     Value channel = worklist.pop_back_val();
-    if (!visited.insert(channel).second)
+    if ((isFollowed && !isFollowed(channel)) || !visited.insert(channel).second)
       continue;
     auto result = dyn_cast<OpResult>(channel);
     // A function argument has no unit producing it.

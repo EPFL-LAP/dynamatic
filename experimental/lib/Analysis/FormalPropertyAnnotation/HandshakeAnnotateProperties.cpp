@@ -449,7 +449,7 @@ namespace {
 // 2. The fork is part of a path from start to end along the IOG
 std::vector<EagerForkSentNamer>
 findCopiedSents(const IOG &iog, Operation *startSlot, Operation *endSlot) {
-  auto pathSet = iog.findAllPaths(startSlot, endSlot);
+  auto pathSet = iog.findUnitsOnPaths(startSlot, endSlot);
   std::vector<EagerForkSentNamer> sents;
   std::vector<Operation *> stack;
   stack.push_back(pathSet.start);

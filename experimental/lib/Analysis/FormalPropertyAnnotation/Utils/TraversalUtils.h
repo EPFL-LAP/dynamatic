@@ -38,18 +38,22 @@ SmallVector<OpOperand *> getFlowPredecessors(OpResult result);
 
 /// The units that a token on any of the `starts` channels can reach by going
 /// forward along flow edges. A unit for which `isBoundary` holds is reached,
-/// but the walk does not continue past it.
+/// but the walk does not continue past it. If `isFollowed` is set, the walk
+/// only goes along the channels for which it holds (e.g., the channels of a
+/// subgraph), including the starts.
 llvm::SetVector<Operation *>
-reachForward(ArrayRef<Value> starts,
-             function_ref<bool(Operation *)> isBoundary);
+reachForward(ArrayRef<Value> starts, function_ref<bool(Operation *)> isBoundary,
+             function_ref<bool(Value)> isFollowed = nullptr);
 
 /// The units from which a token can reach any of the `starts` channels, found
 /// by going backward along flow edges. A unit for which `isBoundary` holds is
 /// reached, but the walk does not continue past it. The walk also stops at
-/// the arguments of the function.
+/// the arguments of the function. If `isFollowed` is set, the walk only goes
+/// along the channels for which it holds, including the starts.
 llvm::SetVector<Operation *>
 reachBackward(ArrayRef<Value> starts,
-              function_ref<bool(Operation *)> isBoundary);
+              function_ref<bool(Operation *)> isBoundary,
+              function_ref<bool(Value)> isFollowed = nullptr);
 
 /// A path that a token can take, described by the slots it goes through.
 struct SlotPath {

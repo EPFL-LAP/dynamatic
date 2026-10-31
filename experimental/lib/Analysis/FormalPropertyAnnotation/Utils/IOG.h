@@ -54,7 +54,10 @@ struct IOG {
   // behaves as expected.
   std::optional<int32_t>
   isExitBranch(handshake::ConditionalBranchOp branch) const;
-  IOGPathSet findAllPaths(Operation *startOp, Operation *endOp) const;
+  /// The units on the paths from `startOp` to `endOp` that only take channels
+  /// of the IOG, including `startOp` and `endOp`. Empty if there is no such
+  /// path.
+  IOGPathSet findUnitsOnPaths(Operation *startOp, Operation *endOp) const;
 
   inline bool contains(Operation *op) const { return units.contains(op); }
 
