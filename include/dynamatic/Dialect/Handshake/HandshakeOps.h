@@ -195,6 +195,11 @@ public:
   /// output is assumed to be at the next index), and the specific store kind.
   StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx);
 
+  /// Constructs the store port from a store operation and the indices of the
+  /// store's address and data outputs in the memory interface's inputs.
+  StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx,
+            unsigned dataInputIdx);
+
   /// Default copy constructor.
   StorePort(const StorePort &other) = default;
 
@@ -238,6 +243,14 @@ public:
   /// address and store data inputs are assumed to follow), and the index of the
   /// LSQ's load data input in the memory interface's results.
   LSQLoadStorePort(dynamatic::handshake::LSQOp lsqOp, unsigned loadAddrInputIdx,
+                   unsigned loadDataOutputIdx);
+
+  /// Constructs an LSQ load/store port from an LSQ operation, the indices of
+  /// the LSQ's load address, store address, and store data outputs in the
+  /// memory interface's inputs, and the index of the LSQ's load data input in
+  /// the memory interface's results.
+  LSQLoadStorePort(dynamatic::handshake::LSQOp lsqOp, unsigned loadAddrInputIdx,
+                   unsigned storeAddrInputIdx, unsigned storeDataInputIdx,
                    unsigned loadDataOutputIdx);
 
   /// Default copy constructor.

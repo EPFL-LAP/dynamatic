@@ -40,25 +40,25 @@ bool LSQOp::isMasterInterface() { return !isConnectedToMC(); }
 TypedValue<MemRefType> LSQOp::getMemRef() {
   if (handshake::MemoryControllerOp mcOp = getConnectedMC())
     return mcOp.getMemRef();
-  return cast<TypedValue<MemRefType>>(getInputs().front());
+  return getOwnMemRef();
 }
 
 TypedValue<ControlType> LSQOp::getMemStart() {
   if (MemoryControllerOp mcOp = getConnectedMC())
     return mcOp.getMemStart();
-  return cast<TypedValue<ControlType>>(getOperand(1));
+  return getOwnMemStart();
 }
 
 TypedValue<ControlType> LSQOp::getMemEnd() {
   if (MemoryControllerOp mcOp = getConnectedMC())
     return mcOp.getMemStart();
-  return cast<TypedValue<ControlType>>(getResults().back());
+  return getOwnMemEnd();
 }
 
 TypedValue<ControlType> LSQOp::getCtrlEnd() {
   if (MemoryControllerOp mcOp = getConnectedMC())
     return mcOp.getCtrlEnd();
-  return cast<TypedValue<ControlType>>(getOperands().back());
+  return getOwnCtrlEnd();
 }
 
 //===----------------------------------------------------------------------===//
