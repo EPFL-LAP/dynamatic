@@ -87,6 +87,10 @@ export_dot() {
   "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" "--label-type=uname" \
     > "$f_dot"
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
+
+  # Convert DOT graph to PNG
+  dot -Tpng "$f_dot" > "$f_png"
+  exit_on_fail "Failed to convert $2 DOT to PNG" "Converted $2 DOT to PNG"
   return 0
 }
 
@@ -100,6 +104,10 @@ export_cfg() {
   "$DYNAMATIC_EXPORT_CFG_BIN" "$f_cf" \
     > "$f_dot"
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
+
+  # Convert DOT graph to PNG
+  dot -Tpng "$f_dot" > "$f_png"
+  exit_on_fail "Failed to convert $2 DOT to PNG" "Converted $2 DOT to PNG"
   return 0
 }
 
