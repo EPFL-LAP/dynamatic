@@ -20,8 +20,8 @@ func.func @lsq_with_mc(%arg0: i1 {handshake.arg_name = "in0"},
   memref.store %c9, %arg1[%i3] {handshake.name = "store2", handshake.mem_interface = #handshake.mem_interface<LSQ: 1>} : memref<4xi32>
   cf.br ^bb3
 ^bb3:
-  // the start of mem0 (%arg2) produces an allocation token for the LSQ
-  // and one for the MC, each branched on %arg0 to bb1 or bb2.
+  // the start of mem0 produces an allocation token for the LSQ
+  // and one for the MC, each branched on in0 to bb1 or bb2.
   // the two branches look the same, so the LSQ is checked first,
   // and the MC then gets the other branch
 
@@ -29,10 +29,10 @@ func.func @lsq_with_mc(%arg0: i1 {handshake.arg_name = "in0"},
   // so its groups are allocated directly by the outputs of its branch
   // to bb1 and to bb2, with no lazy forks, and it takes no end input
   // CHECK-DAG: lsq[MC] groups(%[[LSQ_MEM0_START_TO_BB1:[^:]+]]: {{.*}}, %[[LSQ_MEM0_START_TO_BB2:[^:]+]]: {{.*}}) mc(
-  // CHECK-DAG: %[[LSQ_MEM0_START_TO_BB1]], %[[LSQ_MEM0_START_TO_BB2]] = cond_br %arg0, %arg2
+  // CHECK-DAG: %[[LSQ_MEM0_START_TO_BB1]], %[[LSQ_MEM0_START_TO_BB2]] = cond_br %in0, %mem0_start
 
   // the branch of the allocation token for the MC
-  // CHECK-DAG: %[[MC_MEM0_START_TO_BB1:[^ ]+]], %[[MC_MEM0_START_TO_BB2:[^ ]+]] = cond_br %arg0, %arg2
+  // CHECK-DAG: %[[MC_MEM0_START_TO_BB1:[^ ]+]], %[[MC_MEM0_START_TO_BB2:[^ ]+]] = cond_br %in0, %mem0_start
   // in bb1 and bb2, the allocation token goes into a lazy fork
   // CHECK-DAG: %[[BB1_LAZY_FORK:[0-9]+]]:2 = lazy_fork [2] %[[MC_MEM0_START_TO_BB1]]
   // CHECK-DAG: %[[BB2_LAZY_FORK:[0-9]+]]:2 = lazy_fork [2] %[[MC_MEM0_START_TO_BB2]]
@@ -44,6 +44,6 @@ func.func @lsq_with_mc(%arg0: i1 {handshake.arg_name = "in0"},
   // CHECK-DAG: %[[END_INPUT:[^ ]+]] = merge %[[BB1_LAZY_FORK]]#1, %[[BB2_LAZY_FORK]]#1
   // the MC takes the start of mem0, the bb2 count, the bb1 count,
   // and the output of the merge as its end input
-  // CHECK-DAG: mem_controller[%arg1 : memref<4xi32>] start(%arg2) groups(bb2 %[[BB2_COUNT]]: [{{.*}}], bb1 %[[BB1_COUNT]]: []) {{.*}}end(%[[END_INPUT]])
+  // CHECK-DAG: mem_controller[%mem0 : memref<4xi32>] start(%mem0_start) groups(bb2 %[[BB2_COUNT]]: [{{.*}}], bb1 %[[BB1_COUNT]]: []) {{.*}}end(%[[END_INPUT]])
   return
 }

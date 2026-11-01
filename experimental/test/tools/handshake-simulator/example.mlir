@@ -2,7 +2,7 @@
 // RUN: dynamatic-opt %s --exp-test-handshake-simulator --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   handshake.func @simpleBranch
-handshake.func @simpleBranch(%start: !handshake.control<>) -> !handshake.control<> {
+handshake.func @simpleBranch(%start: <>) -> (<>) {
   %br = br %start : <>
   end %br : <>
 }

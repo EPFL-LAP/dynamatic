@@ -17,8 +17,8 @@ func.func @if_else(%arg0: i1 {handshake.arg_name = "in0"}) -> i32 {
 ^bb3(%x: i32):
   // an init
   // CHECK-DAG: %[[INIT:[^ ]+]] = init %[[INIT_INPUT:[^ ]+]]
-  // a cond_br on %arg0, whose data input is the output of the init
-  // CHECK-DAG: %[[INIT_TO_BB1:[^ ]+]], %[[INIT_TO_BB2:[^ ]+]] = cond_br %arg0, %[[INIT]]
+  // a cond_br on in0, whose data input is the output of the init
+  // CHECK-DAG: %[[INIT_TO_BB1:[^ ]+]], %[[INIT_TO_BB2:[^ ]+]] = cond_br %in0, %[[INIT]]
   // a control merge of the outputs of the cond_br to bb1 and to bb2,
   // whose non-select output is the input of the init
   // CHECK-DAG: %[[INIT_INPUT]], %[[SELECT:[^ ]+]] = control_merge [%[[INIT_TO_BB1]], %[[INIT_TO_BB2]]]
@@ -68,11 +68,11 @@ func.func @if_else_then_loop(%arg0: i1 {handshake.arg_name = "in0"},
   %next = arith.addi %i, %c1 : i32
   cf.br ^bb4(%next : i32)
 ^bb9:
-  // the routing of %x depends only on the if-else on %arg0:
+  // the routing of %x depends only on the if-else on in0:
   // an init
   // CHECK-DAG: %[[INIT:[^ ]+]] = init %[[INIT_INPUT:[^ ]+]]
-  // a cond_br on %arg0, whose data input is the output of the init
-  // CHECK-DAG: %[[INIT_TO_BB1:[^ ]+]], %[[INIT_TO_BB2:[^ ]+]] = cond_br %arg0, %[[INIT]]
+  // a cond_br on in0, whose data input is the output of the init
+  // CHECK-DAG: %[[INIT_TO_BB1:[^ ]+]], %[[INIT_TO_BB2:[^ ]+]] = cond_br %in0, %[[INIT]]
   // a control merge of the outputs of the cond_br to bb1 and to bb2,
   // whose non-select output is the input of the init
   // CHECK-DAG: %[[INIT_INPUT]], %[[SELECT:[^ ]+]] = control_merge [%[[INIT_TO_BB1]], %[[INIT_TO_BB2]]]

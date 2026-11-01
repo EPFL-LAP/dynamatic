@@ -2,11 +2,11 @@
 // RUN: dynamatic-opt --handshake-set-buffering-properties="version=fpga20" --remove-operation-names %s --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   handshake.func @mergeBufferTwoInputs(
-// CHECK-SAME:                                         %[[VAL_0:.*]]: !handshake.control<>, ...) -> !handshake.control<> attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK-SAME:     %[[VAL_0:.*]]: <>) -> (out0: <>) {
 // CHECK:           %[[VAL_1:.*]]:2 = fork [2] %[[VAL_0]] {handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <>
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_1]]#0, %[[VAL_1]]#1 : <>
 // CHECK:         }
-handshake.func @mergeBufferTwoInputs(%start: !handshake.control<>) -> !handshake.control<> {
+handshake.func @mergeBufferTwoInputs(%start: <>) -> (<>) {
   %fork:2 = fork [2] %start : <>
   %merge = merge %fork#0, %fork#1 : <>
   end %merge : <>
@@ -15,13 +15,13 @@ handshake.func @mergeBufferTwoInputs(%start: !handshake.control<>) -> !handshake
 // -----
 
 // CHECK-LABEL:   handshake.func @mcUnbuffered(
-// CHECK-SAME:      %[[ARG0:.*]]: memref<64xi32>, %[[ARG1:.*]]: !handshake.channel<i32>, %[[ARG2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["memref", "addr", "start"], resNames = ["out0", "out1"]} {
+// CHECK-SAME:     %[[ARG0:.*]]: memref<64xi32>, %[[ARG1:.*]]: <i32>, %[[ARG2:.*]]: <>) -> (out0: <i32>, out1: <>) {
 // CHECK:           %[[VAL_0:.*]], %[[VAL_1:.*]] = mem_controller{{\[}}%[[ARG0]] : memref<64xi32>] start(%[[VAL_2:.*]]#0) groups(bb0: [load(%[[VAL_3:.*]])]) end(%[[VAL_2]]#1) {handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "2": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <i32>, <i32>
 // CHECK:           %[[VAL_2]]:2 = fork [2] %[[ARG2]] {handshake.bb = 0 : ui32, handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <>
 // CHECK:           %[[VAL_3]], %[[VAL_4:.*]] = load{{\[}}%[[ARG1]]] %[[VAL_0]] {handshake.bb = 0 : ui32, handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "1": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <i32>, <i32>, <i32>, <i32>
 // CHECK:           end %[[VAL_4]], %[[VAL_1]] : <i32>, <>
 // CHECK:         }
-handshake.func @mcUnbuffered(%memref: memref<64xi32>, %addr: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+handshake.func @mcUnbuffered(%memref: memref<64xi32>, %addr: <i32>, %start: <>) -> (<i32>, <>) {
   %ldData1, %done = mem_controller[%memref : memref<64xi32>] start(%fork#0) groups(bb0: [load(%ldAddrToMem)]) end(%fork#1) : <i32>, <i32>
   %fork:2 = fork [2] %start {handshake.bb = 0 : ui32} : <>
   %ldAddrToMem, %ldDataToSucc = load [%addr] %ldData1 {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
@@ -31,13 +31,13 @@ handshake.func @mcUnbuffered(%memref: memref<64xi32>, %addr: !handshake.channel<
 // -----
 
 // CHECK-LABEL:   handshake.func @lsqUnbuffered(
-// CHECK-SAME:      %[[ARG0:.*]]: memref<64xi32>, %[[ARG1:.*]]: !handshake.channel<i32>, %[[ARG2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["memref", "addr", "start"], resNames = ["out0", "out1"]} {
+// CHECK-SAME:     %[[ARG0:.*]]: memref<64xi32>, %[[ARG1:.*]]: <i32>, %[[ARG2:.*]]: <>) -> (out0: <i32>, out1: <>) {
 // CHECK:           %[[VAL_0:.*]], %[[VAL_1:.*]] = lsq{{\[}}%[[ARG0]] : memref<64xi32>] start(%[[VAL_2:.*]]#0) groups(%[[VAL_2]]#1: [load(%[[VAL_3:.*]])]) end(%[[VAL_2]]#2) {handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "2": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "3": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <i32>, <i32>
 // CHECK:           %[[VAL_2]]:3 = fork [3] %[[ARG2]] {handshake.bb = 0 : ui32, handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <>
 // CHECK:           %[[VAL_3]], %[[VAL_4:.*]] = load{{\[}}%[[ARG1]]] %[[VAL_0]] {handshake.bb = 0 : ui32, handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "1": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <i32>, <i32>, <i32>, <i32>
 // CHECK:           end %[[VAL_4]], %[[VAL_1]] : <i32>, <>
 // CHECK:         }
-handshake.func @lsqUnbuffered(%memref: memref<64xi32>, %addr: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+handshake.func @lsqUnbuffered(%memref: memref<64xi32>, %addr: <i32>, %start: <>) -> (<i32>, <>) {
   %ldData1, %done = lsq[%memref : memref<64xi32>] start(%fork#0) groups(%fork#1: [load(%ldAddrToMem)]) end(%fork#2) : <i32>, <i32>
   %fork:3 = fork [3] %start {handshake.bb = 0 : ui32} : <>
   %ldAddrToMem, %ldDataToSucc = load [%addr] %ldData1 {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
@@ -47,7 +47,7 @@ handshake.func @lsqUnbuffered(%memref: memref<64xi32>, %addr: !handshake.channel
 // -----
 
 // CHECK-LABEL:   handshake.func @lsqBufferControlPath(
-// CHECK-SAME:      %[[ARG0:.*]]: memref<64xi32>, %[[ARG1:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["memref", "start"], resNames = ["out0", "out1"]} {
+// CHECK-SAME:     %[[ARG0:.*]]: memref<64xi32>, %[[ARG1:.*]]: <>) -> (out0: <i32>, out1: <>) {
 // CHECK:           %[[VAL_0:.*]]:3, %[[VAL_1:.*]] = lsq{{\[}}%[[ARG0]] : memref<64xi32>] start(%[[VAL_2:.*]]#4) groups(%[[VAL_2]]#0: [load(%[[VAL_3:.*]])], %[[VAL_4:.*]]#0: [load(%[[VAL_5:.*]])], %[[VAL_6:.*]]#0: [load(%[[VAL_7:.*]])]) end(%[[VAL_6]]#2) {handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "2": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "3": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "4": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "5": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "6": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "7": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <i32>, <i32>
 // CHECK:           %[[VAL_8:.*]] = merge %[[ARG1]], %[[VAL_4]]#2 {handshake.bb = 1 : ui32, handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00, "1": [0,inf], [1,inf], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <>
 // CHECK:           %[[VAL_2]]:5 = lazy_fork [5] %[[VAL_8]] {handshake.bb = 1 : ui32, handshake.bufProps = #handshake<bufProps{"0": [0,inf], [0,inf], 1, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <>
@@ -65,7 +65,7 @@ handshake.func @lsqUnbuffered(%memref: memref<64xi32>, %addr: !handshake.channel
 // CHECK:           %[[VAL_7]], %[[VAL_17:.*]] = load{{\[}}%[[VAL_16]]] %[[VAL_0]]#2 {handshake.bb = 3 : ui32, handshake.bufProps = #handshake<bufProps{"1": [0,0], [0,0], 0, 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <i32>, <i32>, <i32>, <i32>
 // CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_17]], %[[VAL_1]] : <i32>, <>
 // CHECK:         }
-handshake.func @lsqBufferControlPath(%memref: memref<64xi32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+handshake.func @lsqBufferControlPath(%memref: memref<64xi32>, %start: <>) -> (<i32>, <>) {
   %ldData1, %ldData2, %ldData3, %done = lsq[%memref : memref<64xi32>] start(%lazyForkCtrl1#4) groups(%lazyForkCtrl1#0: [load(%ldAddrToMem1)], %lazyForkCtrl2#0: [load(%ldAddrToMem2)], %lazyForkCtrl3#0: [load(%ldAddrToMem3)]) end(%lazyForkCtrl3#2) : <i32>, <i32>
 // ^^bb0
 // ^^bb1 (from ^^bb0, ^bb2, to ^bb2, ^bb3):

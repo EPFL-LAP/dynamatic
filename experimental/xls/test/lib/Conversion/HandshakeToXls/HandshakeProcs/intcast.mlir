@@ -14,7 +14,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_intcast(%in: !handshake.channel<i32>) -> (!handshake.channel<i64>) {
+  handshake.func @proc_intcast(%in: <i32>) -> (<i64>) {
     %0 = extui %in : <i32> to <i64>
     end %0: <i64>
   }

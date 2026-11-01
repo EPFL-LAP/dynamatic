@@ -11,7 +11,6 @@ add_dynamatic_library(DynamaticSupport
   LINK_LIBS PUBLIC
   DynamaticSupportJSON
   DynamaticHandshake
-  DynamaticLinearAlgebra
   DynamaticHW
   MLIRIR
   MLIRSupport
@@ -25,4 +24,3 @@ add_subdirectory(Utils)
 add_subdirectory(ConstraintProgramming)
 add_subdirectory(BlifImporter)
 add_subdirectory(BlifExporter)
-add_subdirectory(LinearAlgebra)

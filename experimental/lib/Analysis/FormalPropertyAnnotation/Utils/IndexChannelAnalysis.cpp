@@ -1,4 +1,4 @@
-#include "dynamatic/Analysis/IndexChannelAnalysis.h"
+#include "IndexChannelAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"

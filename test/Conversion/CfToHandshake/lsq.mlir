@@ -5,9 +5,9 @@
 // CHECK-LABEL: handshake.func @if_else_stores
 func.func @if_else_stores(%arg0: i1 {handshake.arg_name = "in0"},
                           %arg1: memref<4xi32> {handshake.arg_name = "mem0"}) {
-  // the start of mem0 (%arg2) produces the allocation token,
-  // which goes through a branch on %arg0 to bb1 or bb2
-  // CHECK-DAG: %[[MEM0_START_TO_BB1:[^ ]+]], %[[MEM0_START_TO_BB2:[^ ]+]] = cond_br %arg0, %arg2
+  // the start of mem0 produces the allocation token,
+  // which goes through a branch on in0 to bb1 or bb2
+  // CHECK-DAG: %[[MEM0_START_TO_BB1:[^ ]+]], %[[MEM0_START_TO_BB2:[^ ]+]] = cond_br %in0, %mem0_start
   cf.cond_br %arg0, ^bb1, ^bb2
 ^bb1:
   // in bb1, the allocation token goes into a lazy fork
@@ -33,6 +33,6 @@ func.func @if_else_stores(%arg0: i1 {handshake.arg_name = "in0"},
   // the first output of the bb1 lazy fork to allocate the bb1 group,
   // the first output of the bb2 lazy fork to allocate the bb2 group,
   // and the output of the merge as its end input
-  // CHECK-DAG: lsq[%arg1 : memref<4xi32>] start(%arg2) groups(%[[BB1_LAZY_FORK]]#0: {{.*}}, %[[BB2_LAZY_FORK]]#0: {{.*}}) end(%[[END_INPUT]])
+  // CHECK-DAG: lsq[%mem0 : memref<4xi32>] start(%mem0_start) groups(%[[BB1_LAZY_FORK]]#0: {{.*}}, %[[BB2_LAZY_FORK]]#0: {{.*}}) end(%[[END_INPUT]])
   return
 }

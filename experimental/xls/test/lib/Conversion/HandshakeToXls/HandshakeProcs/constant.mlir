@@ -14,7 +14,7 @@
 // CHECK:         }
 
 module {
-  handshake.func @proc_constant(%in: !handshake.control<>) -> (!handshake.channel<i66>) {
+  handshake.func @proc_constant(%in: <>) -> (<i66>) {
     %1 = constant %in {value = 255 : i66} : <>, <i66>
     end %1: <i66>
   }
