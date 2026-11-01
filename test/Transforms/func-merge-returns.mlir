@@ -7,8 +7,7 @@ func.func @single_return(%arg0: i32) -> i32 {
   return %arg0 : i32
 }
 
-// Each return becomes a branch to one new exit block,
-// which passes on the returned values in order
+// A function with two returns
 // CHECK-LABEL: func.func @two_returns
 func.func @two_returns(%arg0: i1, %arg1: i32, %arg2: i32) -> (i32, i32) {
   cf.cond_br %arg0, ^bb1, ^bb2
@@ -27,7 +26,7 @@ func.func @two_returns(%arg0: i1, %arg1: i32, %arg2: i32) -> (i32, i32) {
   // CHECK-NEXT: return %[[FIRST]], %[[SECOND]]
 }
 
-// Returns with no values merge the same way
+// A function with two returns and no returned values
 // CHECK-LABEL: func.func @no_values
 func.func @no_values(%arg0: i1) {
   cf.cond_br %arg0, ^bb1, ^bb2
