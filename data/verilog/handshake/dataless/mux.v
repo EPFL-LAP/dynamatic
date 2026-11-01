@@ -17,13 +17,14 @@ module mux_dataless #(
   input  outs_ready
 );
   reg selectedData_valid;
+  wire tehb_ready;
   integer i;
 
   always @(*) begin
     selectedData_valid = 0;
 
     for (i = SIZE - 1; i >= 0 ; i = i - 1) begin
-      if (((i[SELECT_TYPE - 1 : 0] == index) & index_valid & ins_valid[i] & outs_ready) | ~ins_valid[i])
+      if (((i[SELECT_TYPE - 1 : 0] == index) & index_valid & ins_valid[i] & tehb_ready) | ~ins_valid[i])
         ins_ready[i] = 1;
       else
         ins_ready[i] = 0;
@@ -34,7 +35,15 @@ module mux_dataless #(
     end
   end
 
-  assign outs_valid = selectedData_valid;
-  assign index_ready = ~index_valid | (selectedData_valid & outs_ready);
+  assign index_ready = ~index_valid | (selectedData_valid & tehb_ready);
+
+  tehb_dataless tehb (
+    .clk        (clk               ),
+    .rst        (rst               ),
+    .ins_valid  (selectedData_valid),
+    .ins_ready  (tehb_ready        ),
+    .outs_valid (outs_valid        ),
+    .outs_ready (outs_ready        )
+  );
 
 endmodule

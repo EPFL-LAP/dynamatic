@@ -786,6 +786,7 @@
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/mux.v",
     "module-name": "mux_dataless",
+    "dependencies": ["tehb_dataless"],
     "hdl": "verilog"
   },
   {
@@ -796,6 +797,7 @@
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/mux.v",
+    "dependencies": ["tehb"],
     "hdl": "verilog"
   },
   {
