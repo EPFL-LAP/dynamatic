@@ -21,8 +21,6 @@ module merge # (
   integer i;
   integer cnt;
 
-  // the merge's output goes through a one slot break R buffer (tehb),
-  // like the VHDL merge
   wire tehb_ready;
 
   always @(*) begin

@@ -16,8 +16,6 @@ module merge_dataless #(
   reg [SIZE - 1 : 0] tmp_ready_out;
   integer i;
 
-  // the merge's output goes through a one slot break R buffer (tehb),
-  // like the VHDL merge
   wire tehb_ready;
 
   always @(*) begin
