@@ -370,15 +370,7 @@ struct StartToControlConnector {
                           const std::string &argName)
       : type(type), argName(argName) {}
 
-  void declareSignals(mlir::raw_indented_ostream &os,
-                      VerificationContext &ctx) {
-    // each control input gets its own handshake, sent once
-    // (see generateControlInputProcesses)
-    declareReg(ctx, os, "tb_" + argName + "_valid", std::nullopt, 0);
-    declareWire(ctx, os, "tb_" + argName + "_ready", std::nullopt,
-                std::nullopt);
-    declareReg(ctx, os, "tb_" + argName + "_started");
-  }
+  void declareSignals(mlir::raw_indented_ostream &os) {}
 
   void connectToDuv(Instance &duvInst) {
     // Driving the control-only interface signals:
@@ -460,6 +452,17 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   declareReg(ctx, os, "tb_clk", std::nullopt, 0);
   declareReg(ctx, os, "tb_rst", std::nullopt, 0);
 
+  // The interface that indicates each control input
+  // (the function start and the memory starts)
+  // and its testbench state signal.
+  for (auto &[type, argName] :
+       getInputArguments<handshake::ControlType>(funcOp)) {
+    declareReg(ctx, os, "tb_" + argName + "_valid", std::nullopt, 0);
+    declareWire(ctx, os, "tb_" + argName + "_ready", std::nullopt,
+                std::nullopt);
+    declareReg(ctx, os, "tb_" + argName + "_started");
+  }
+
   // The interface that indicates the global "done" signal.
   declareWire(ctx, os, "tb_global_valid");
   declareReg(ctx, os, "tb_global_ready");
@@ -476,7 +479,7 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   for (auto &[type, argName] :
        getInputArguments<handshake::ControlType>(funcOp)) {
     StartToControlConnector c(type, argName);
-    c.declareSignals(os, ctx);
+    c.declareSignals(os);
   }
 
   // Signals of the memory reference signals
