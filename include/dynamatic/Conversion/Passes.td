@@ -50,6 +50,26 @@ def ScfToCf : Pass<"lower-scf-to-cf", "mlir::ModuleOp"> {
 }
 
 //===----------------------------------------------------------------------===//
+// CfToHandshake
+//===----------------------------------------------------------------------===//
+
+def CfToHandshake : Pass<"lower-cf-to-handshake", "mlir::ModuleOp"> {
+  let summary = "Lowers func and cf dialects to handshake.";
+  let description = [{
+    Lowers func-level functions whose body have unstructured control flow into
+      their handshake counterparts,
+      which represent dataflow circuits that can ultimately be converted to an
+          RTL design.
+    Every consumer is routed with the control-network routing algorithm on a
+    CFG optimized to that consumer.
+    Functions must have a single return (see --func-merge-returns),
+    function arguments must have names (handshake.arg_name),
+    and memory accesses must have names (handshake.name).
+  }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
+}
+
+//===----------------------------------------------------------------------===//
 // FtdCfToHandshake
 //===----------------------------------------------------------------------===//
 
@@ -65,20 +85,6 @@ def FtdCfToHandshake : Pass<"ftd-lower-cf-to-handshake", "mlir::ModuleOp"> {
     This pass aims at implementing this work, by substituting the current `CfToHandshake` pass.
     As the algorithm does not require any parameter, no input is necessary. This pass can 
     be used through the flag "--fast-token-delivery" at compile tile in dynamatic.
-  }];
-  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
-}
-
-//===----------------------------------------------------------------------===//
-// CfToHandshake
-//===----------------------------------------------------------------------===//
-
-def CfToHandshake : Pass<"lower-cf-to-handshake", "mlir::ModuleOp"> {
-  let summary = "Lowers func and cf dialects to handshake, routing every "
-                "consumer on its own optimized CFG";
-  let description = [{
-    Every consumer is routed with the control-network routing algorithm on a
-    CFG optimized to that consumer.
   }];
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }

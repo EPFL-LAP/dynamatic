@@ -96,15 +96,13 @@ struct MemoryInterfaceInputs {
   Value ctrlEnd;
 };
 
-/// Routes the block uses of each optimized CFG,
-/// and the single memory token of each memory interface on its optimized
-/// CFG, starting from its region's memStart.
-/// Returns, per memory region with accesses, what its memory routing
-/// delivers to its interfaces.
+/// Routes the non-memory cfgs,
+/// and routes the inputs to each memory interface on its MC cfg or LSQ cfg.
+/// Returns the memory interface inputs, keyed by memref.
 MapVector<MemrefValue, MemoryInterfaceInputs> routeCfgs(
     Region &body, const BlockToCond &blockToCond,
     const MapVector<MemrefValue, ControlValue> &memStarts,
-    ArrayRef<Cfg> useCfgs,
+    ArrayRef<Cfg> nonMemoryCfgs,
     MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> &memoryCfgs,
     OpBuilder &builder);
 

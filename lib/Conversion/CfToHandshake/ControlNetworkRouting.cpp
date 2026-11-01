@@ -17,36 +17,67 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::cf_to_handshake;
 
 namespace {
-/// Whether two edges are the same edge of the function's CFG,
-/// even when they belong to different copies of it.
+/// Check if two cfg edges are the same:
+/// both edges start at the same basic block,
+/// both edges end at the same basic block,
+/// and both edges are taken on the same side of the branch
 static bool isSameEdge(const CfgEdge &first, const CfgEdge &second) {
   return first.from == second.from && first.to == second.to &&
          first.condition == second.condition;
 }
 
-/// The outputs of a control network:
-/// the select of each basic block with two or more predecessors,
-/// and the edge each index of the select stands for
+/// The output of a control network:
+/// a dict mapping from basic block to control merge select output,
+/// and a dict mapping from basic block to control merge input order
+/// (a multiplexer which uses the select from a control merge
+/// must have inputs in the same order as that control merge)
 struct Selects {
   DenseMap<Block *, Value> select;
-  // copies of the edges, since the control network's CFG is a copy
-  DenseMap<Block *, SmallVector<CfgEdge>> edges;
+  DenseMap<Block *, SmallVector<CfgEdge>> controlMergeInputOrders;
 
-  /// The select of a basic block,
-  /// and the routing's edges into it, sorted in the order of the select
+  /// Uses block as a key to get the control merge select output
+  /// for multiplexers in that block.
+  /// Also takes the cfg edges into the basic block
+  /// (the annotated cfg edges,
+  /// which hold the live outs we need to multiplex between),
+  /// and returns them in the input order of the control merge
+  /// (the dataless cfg edges of the control network),
+  /// so that the multiplexers can mirror that order
   std::pair<Value, SmallVector<const CfgEdge *>>
-  getSelect(Block *block, ArrayRef<const CfgEdge *> inEdges) const {
+  getSelect(Block *block, ArrayRef<const CfgEdge *> annotatedEdges) const {
+    // only basic blocks with a control merge have a select
     assert(select.contains(block) && "basic block has no control merge");
-    SmallVector<const CfgEdge *> sortedInEdges;
-    for (const CfgEdge &selectEdge : edges.lookup(block)) {
-      for (const CfgEdge *inEdge : inEdges) {
-        if (isSameEdge(selectEdge, *inEdge))
-          sortedInEdges.push_back(inEdge);
+
+    // the input order of this basic block's control merge
+    SmallVector<CfgEdge> inputOrder = controlMergeInputOrders.lookup(block);
+
+    // we fill this with the annotated cfg edges,
+    // sorted into the input order of the control merge
+    SmallVector<const CfgEdge *> annotatedEdgesSorted;
+
+    // for each of the control merge inputs (stored as a dataless cfg edge),
+    // find the annotated cfg edge it corresponds to
+    // and insert it into the list
+    // as we iterate the control merge inputs in order,
+    // the list will then hold the annotated cfg edges in order
+    // (they're probably in order already
+    // but it's better not to rely on that blindly)
+    for (const CfgEdge &controlMergeInput : inputOrder) {
+      for (const CfgEdge *annotatedEdge : annotatedEdges) {
+        if (isSameEdge(controlMergeInput, *annotatedEdge)) {
+          annotatedEdgesSorted.push_back(annotatedEdge);
+          break;
+        }
       }
     }
-    assert(sortedInEdges.size() == inEdges.size() &&
+
+    // check we built annotatedEdgesSorted correctly
+    assert(annotatedEdgesSorted.size() == annotatedEdges.size() &&
            "edges into the basic block differ from the control merge's");
-    return {select.lookup(block), sortedInEdges};
+
+    // return the control merge select output,
+    // and the annotated cfg edges in the input order of the control merge
+    return {select.lookup(block), annotatedEdgesSorted};
   }
 };
 
@@ -220,7 +251,7 @@ static Selects buildControlNetwork(const Cfg &cfg,
       // for the basic block's multiplexers
       selects.select[block] = cmergeOp.getIndex();
       for (ControlLiveOut liveOut : incomingLiveOuts)
-        selects.edges[block].push_back(*liveOut);
+        selects.controlMergeInputOrders[block].push_back(*liveOut);
 
       // the value in the basic block comes from the cmerge output
       routedIn = cmergeOp.getResult();
@@ -679,17 +710,26 @@ MapVector<MemrefValue, MemoryInterfaceInputs>
 dynamatic::experimental::cf_to_handshake::routeCfgs(
     Region &body, const BlockToCond &blockToCond,
     const MapVector<MemrefValue, ControlValue> &memStarts,
-    ArrayRef<Cfg> useCfgs,
+    ArrayRef<Cfg> nonMemoryCfgs,
     MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> &memoryCfgs,
     OpBuilder &builder) {
-  for (const Cfg &cfg : useCfgs)
+  // route the non-memory cfgs
+  for (const Cfg &cfg : nonMemoryCfgs)
     route(cfg, blockToCond, builder);
 
+  // data structure to return the memory interface inputs, keyed by memref
   MapVector<MemrefValue, MemoryInterfaceInputs> memoryInputs;
+
+  // for each memref's MC cfg and/or LSQ cfg
   for (auto &[key, memoryCfg] : memoryCfgs) {
+    // unpack for which memref, and whether the cfg is for its MC or its LSQ
     auto [memref, mcOrLsq] = key;
+
+    // route the inputs to the memory interface and store them in memoryInputs
     buildMemoryRouting(memoryCfg, mcOrLsq, memoryInputs[memref], blockToCond,
                        memStarts.lookup(memref), builder);
   }
+
+  // return the memory interface inputs, keyed by memref
   return memoryInputs;
 }

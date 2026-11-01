@@ -973,20 +973,20 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   //
   // using small vector on the heap over std::vector
   // based on the programmers manual
-  SmallVector<Cfg, 0> useCfgs;
+  SmallVector<Cfg, 0> nonMemoryCfgs;
   for (const SetVector<BlockUse> &blockUseSet : blockUseSets)
-    useCfgs.push_back(buildCfg(base, blockUseSet));
+    nonMemoryCfgs.push_back(buildCfg(base, blockUseSet));
 
   // for each cfg, optimize based on the block uses annotated on it
-  for (Cfg &cfg : useCfgs)
+  for (Cfg &cfg : nonMemoryCfgs)
     optimizeCfg(cfg);
   // for each memory cfg, optimize
   for (auto &[key, memoryCfg] : memoryCfgs)
     optimizeCfg(memoryCfg.cfg);
 
   // run the control-network routing algorithm once per cfg
-  MapVector<MemrefValue, MemoryInterfaceInputs> memoryInputs =
-      routeCfgs(body, blockToCond, memStarts, useCfgs, memoryCfgs, builder);
+  MapVector<MemrefValue, MemoryInterfaceInputs> memoryInputs = routeCfgs(
+      body, blockToCond, memStarts, nonMemoryCfgs, memoryCfgs, builder);
 
   // label every op with the number of its basic block (its bb attribute).
   // the memory interface builder reads it off each memory access

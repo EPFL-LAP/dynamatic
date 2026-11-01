@@ -31,7 +31,7 @@ using mlir::TypedValue;
 /// in a deterministic order.
 SetVector<BlockUse> collectBlockUses(Region &body);
 
-/// Checks whether the block produces the value
+/// Checks whether the basic block produces the value
 bool isProducedIn(Value value, Block *block);
 
 /// Builds the CFG for routing these block uses:
@@ -81,6 +81,7 @@ void optimizeCfg(Cfg &cfg);
 } // namespace dynamatic
 
 namespace llvm {
+/// Lets the McOrLsq enum be used as a DenseMap key
 template <>
 struct DenseMapInfo<dynamatic::experimental::cf_to_handshake::McOrLsq> {
   using McOrLsq = dynamatic::experimental::cf_to_handshake::McOrLsq;
