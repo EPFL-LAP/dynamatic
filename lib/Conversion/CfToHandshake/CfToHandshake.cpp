@@ -804,40 +804,35 @@ static void convertLoadsAndStores(
   }
 }
 
-/// Each memory control comes out of a lazy fork, whose other output passes the
+/// Often,
+/// memory controls come out of a lazy fork, whose other output passes the
 /// memory token on. That continuing output gets one buffer slot of capacity,
 /// so the lazy fork can give the control to the interface without waiting for
 /// the next consumer of the token to be ready.
-///
-/// The last memory control of an LSQ may have nowhere to continue on to,
-/// if an MC provides the "mem done" signal.
-/// Rather than this clean-up step receiving controls
-/// both with and without lazy forks,
-/// the memory routing places the lazy fork unconditionally.
-/// If we discover a lazy fork with no consumer on its continuing output,
-/// we remove the lazy fork.
+/// Otherwise, it means, due to the CFG,
+/// this is one of the possible very last memory controls.
+/// Since the memory control token doesn't continue on, there's no lazy fork
 static void bufferContinuingTokens(const DenseMap<unsigned, Value> &controls) {
   for (auto [blockNumber, control] : controls) {
+    // if ther's a lazy fork
     auto forkOp = control.getDefiningOp<handshake::LazyForkOp>();
-    assert(forkOp && "memory control does not come from a lazy fork");
+    if (!forkOp) {
+      continue;
+    }
     assert(forkOp->getNumResults() == 2 &&
            "memory control lazy fork must have two outputs");
 
-    // the last LSQ control, when an MC provides "mem done",
-    // has no consumer on its continuing output, so needs no lazy fork
-    if (forkOp->getResult(1).use_empty()) {
-      // the interface takes the fork's input directly
-      forkOp->getResult(0).replaceAllUsesWith(forkOp->getOperand(0));
-
-      // and we remove the lazy fork
-      forkOp->erase();
-      continue;
-    }
-
-    // otherwise, the continuing output gets
+    // the continuing output gets
     // at least one buffer slot of capacity
-    Channel channel(forkOp->getResult(1), /*updateProps=*/true);
-    channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+    for (Value result : forkOp->getResults()) {
+      // the continuing output is the one
+      // thats not the memory control
+      if (result == control) {
+        continue;
+      }
+      Channel channel(result, /*updateProps=*/true);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+    }
   }
 }
 
@@ -1013,7 +1008,7 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   }
   // for each memory cfg, optimize
   for (auto &[key, memoryCfg] : memoryCfgs) {
-    optimizeCfg(memoryCfg.cfg);
+    optimizeMemoryCfg(memoryCfg);
   }
 
   // run the control-network routing algorithm once per cfg

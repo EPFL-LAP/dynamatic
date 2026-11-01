@@ -583,6 +583,13 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
   // so the TempCons is guaranteed to point to the real producer
   TempCons endReader;
 
+  // We also need to reliably find the producers of control tokens
+  // that go directly into a non-take-end LSQ (an LSQ connected to an MC),
+  // rather than through a lazy fork.
+  // This is mutually exclusive to the above endReader,
+  // as this only happens for non-take-end LSQs
+  DenseMap<unsigned, TempCons> directToLSQReaders;
+
   // for each basic block
   for (Block *block : cfg.blocks) {
     // on the memory network, there is only one input into the basic block,
@@ -642,6 +649,19 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
     // in non-interfacing blocks, the single memory token just passes through
     Value sdpOut = routedIn;
 
+    // for a non-take-end LSQ (an LSQ connected to an MC),
+    // we optimize the CFG to allow multiple exit basic blocks.
+    // If this is such an exit basic block,
+    // the token goes directly into the LSQ and is not routed further
+    if (memoryCfg.interfacingBlocks.contains(block) &&
+        cfg.getOutEdges(block).empty() && !memoryCfg.takesEnd) {
+      builder.setInsertionPoint(block->getTerminator());
+      // Use a temp consumer to reliably find the producers of control tokens
+      // that go directly into an LSQ
+      directToLSQReaders[getBlockNumber(block)] = TempCons(builder, sdpOut);
+      continue;
+    }
+
     // in an interfacing basic block, the straight data path is a lazy fork:
     // one output to the interface, one passing the token on
     if (memoryCfg.interfacingBlocks.contains(block)) {
@@ -654,8 +674,11 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
     SmallVector<ControlLiveOut> outgoingLiveOuts = cfg.getOutEdges(block);
 
     if (outgoingLiveOuts.empty()) {
-      // the token leaves the network at the exit, as the end control
+      assert(memoryCfg.takesEnd &&
+             "only an interface taking the mem end routes to the exit");
       builder.setInsertionPoint(block->getTerminator());
+
+      // the token leaves the network at the exit, as the end control
       // use a TempCons to be able to reliably find the producer
       // no matter what it is or what happens to it later
       endReader = TempCons(builder, sdpOut);
@@ -703,14 +726,24 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
     }
   }
 
-  // the producer of the end control is now final
-  // so we get its output value from the end reader,
-  // if this interface is the one taking the end
   if (memoryCfg.takesEnd) {
+    // if this memory cfg routes the end token
+
+    // the producer of the end control is now final
+    // so we get its output value from the end reader
     inputs.ctrlEnd = endReader.getValue();
+    // and remove the end reader from the IR
+    endReader.erase();
+  } else {
+    // otherwise, tokens which go directly into a non-take-end LSQ
+    // (an LSQ connected to an MC)
+    // rather than through a lazy fork
+    // can now be reliably found from the readers
+    for (auto &[blockNumber, directToLSQReader] : directToLSQReaders) {
+      controls[blockNumber] = directToLSQReader.getValue();
+      directToLSQReader.erase();
+    }
   }
-  // and remove the end reader from the IR
-  endReader.erase();
 }
 
 MapVector<MemrefValue, MemoryInterfaceInputs>

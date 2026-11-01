@@ -518,9 +518,57 @@ static bool bypassBlock(Cfg &cfg) {
   return true;
 }
 
+// Extra optimization just for LSQ CFGs
+// when the LSQ is connected to an MC
+// (LSQ then doesn't have a mem end input)
+// This avoids extra lazy forks that route
+// the LSQs control token to the exit BB
+// for no reason
+static void pruneExitBB(Cfg &cfg) {
+  // after optimizing, every predecessor of the exit
+  // should contain memory accesses
+  for (CfgEdge *inEdge : cfg.getInEdges(cfg.exit)) {
+    assert(cfg.needed.contains(inEdge->from) &&
+           "predecessor of an unneeded exit is not needed after optimizing");
+  }
+
+  // remove the exit basic block from the cfg
+  while (!cfg.getInEdges(cfg.exit).empty()) {
+    cfg.removeEdge(cfg.getInEdges(cfg.exit).front());
+  }
+  cfg.blocks.remove(cfg.exit);
+}
+
 void dynamatic::experimental::cf_to_handshake::optimizeCfg(Cfg &cfg) {
   bool changed = true;
   while (changed) {
     changed = mergeSides(cfg) || removeSelfLoop(cfg) || bypassBlock(cfg);
+  }
+}
+
+void dynamatic::experimental::cf_to_handshake::optimizeMemoryCfg(
+    MemoryInterfaceCfg &memoryCfg) {
+  // pull the actual cfg out of the memory cfg struct
+  Cfg &cfg = memoryCfg.cfg;
+
+  // whether this memory interface does not take the mem end
+  // (an LSQ which connects to an MC)
+  bool noEnd = !memoryCfg.takesEnd;
+
+  // whether this memory interface has no memory accesses in the exit block
+  bool noAccessesInExit = !memoryCfg.interfacingBlocks.contains(cfg.exit);
+
+  // if both, we shouldn't route to the exit
+  // because of the init op, this only applies to memory cfgs
+  if (noEnd && noAccessesInExit) {
+    cfg.needed.remove(cfg.exit);
+  }
+
+  optimizeCfg(cfg);
+
+  // extra optimization
+  // to avoid routing to exit basic block
+  if (noEnd && noAccessesInExit) {
+    pruneExitBB(cfg);
   }
 }

@@ -76,6 +76,9 @@ collectMemoryInterfaceCfgs(
 /// one rewrite at a time, until none applies.
 void optimizeCfg(Cfg &cfg);
 
+/// Optimizes a memory interface CFG for routing
+void optimizeMemoryCfg(MemoryInterfaceCfg &memoryCfg);
+
 } // namespace cf_to_handshake
 } // namespace experimental
 } // namespace dynamatic
