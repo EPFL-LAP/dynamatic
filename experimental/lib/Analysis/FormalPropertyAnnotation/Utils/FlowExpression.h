@@ -1,7 +1,6 @@
 #ifndef DYNAMATIC_SUPPORT_FLOW_EXPRESSION_H
 #define DYNAMATIC_SUPPORT_FLOW_EXPRESSION_H
 
-#include "Gaussian.h"
 #include "IndexChannelAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -22,7 +21,7 @@
 // 3. No name is necessary, as each variable is uniquely defined by the metadata
 // 4. Dedicated conversion function to put multiple flow expressions into a
 // matrix, with an ordering according to whether the variables are annotatable
-// in SMV for use with Gaussian elimination
+// in SMV for use with the elimination of variables
 
 namespace dynamatic {
 namespace handshake {
@@ -299,7 +298,9 @@ private:
 struct FlowSystem {
   VariableRegistry registry;
   size_t nLambdas;
-  MatIntType matrix;
+  /// The equations, one row per equation with one coefficient per variable,
+  /// in the order of the registry.
+  std::vector<SmallVector<int64_t>> equations;
 
   FlowSystem() = default;
   FlowSystem(const std::vector<FlowExpression> &exprs);

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Utils/Elimination.h"
 #include "Utils/FlowExpression.h"
-#include "Utils/Gaussian.h"
 #include "Utils/IOG.h"
 #include "Utils/IndexChannelAnalysis.h"
 #include "Utils/TraversalUtils.h"
@@ -395,41 +395,27 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
     return failure();
   }
 
-  // Create a matrix, and map all variables to an column index
+  // Map all variables to a column index, the lambdas first
   FlowSystem indices(extractor.equations);
-  MatIntType &matrix = indices.matrix;
 
   // Verify that the registry data structure is correct
   assert(indices.registry.verify());
 
-  // bring to row-echelon form
-  gaussianElimination(matrix);
-
-  size_t rows = matrix.size1();
-  for (size_t row = 0; row < rows; ++row) {
-    bool canAnnotate = true;
-    for (size_t col = 0; col < indices.nLambdas; ++col) {
-      if (matrix(row, col) != 0) {
-        canAnnotate = false;
-        break;
-      }
-    }
-
-    if (!canAnnotate) {
-      continue;
-    }
-
+  // The equations over the internal states only, without the lambdas, which
+  // cannot be annotated
+  std::vector<SmallVector<int64_t>> implied = eliminateVariables(
+      indices.equations, indices.registry.size(), indices.nLambdas);
+  for (const SmallVector<int64_t> &row : implied) {
     // The row is an equation over internal states only: the sum of the
     // internal states weighted by the coefficients of the row is 0, e.g.:
     //   (((toint(fork4.outs_0_sent) * 1) + (toint(fork4.outs_1_sent) * -1)
     //     + (toint((fork5.outs_0_sent & (fork5.ins = TRUE))) * -1)) = 0)
     // The terms are in column order, which is the same in every run.
     std::vector<PropertyExpr> terms;
-    for (size_t col = indices.nLambdas; col < indices.registry.size(); ++col) {
-      int coef = matrix(row, col);
+    for (auto [i, coef] : llvm::enumerate(row)) {
       if (coef == 0)
         continue;
-      const FlowVariable &var = indices.registry.getVar(col);
+      const FlowVariable &var = indices.registry.getVar(indices.nLambdas + i);
       auto *state = std::get_if<FlowInternalState>(&var.variable);
       assert(state && "annotatable flow variable without internal state");
       // A variable that tracks the tokens of one value only counts the state

@@ -1,7 +1,7 @@
 add_dynamatic_library(DynamaticFormalPropertyAnnotation
   HandshakeAnnotateProperties.cpp
+  Utils/Elimination.cpp
   Utils/FlowExpression.cpp
-  Utils/Gaussian.cpp
   Utils/IndexChannelAnalysis.cpp
   Utils/IOG.cpp
   Utils/TraversalUtils.cpp
@@ -13,6 +13,7 @@ add_dynamatic_library(DynamaticFormalPropertyAnnotation
   MLIRIR
   MLIRMemRefDialect
   MLIRFuncDialect
+  MLIRPresburger
   MLIRSupport
   MLIRTransformUtils
   DynamaticHandshake
