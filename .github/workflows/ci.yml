@@ -30,14 +30,14 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          sudo ./llvm.sh 23
           sudo apt-get -y update
-          sudo apt-get -y install clang-format-20
+          sudo apt-get -y install clang-format-23
           sudo rm /usr/bin/clang-format
-          sudo ln -s $(which clang-format-20) /usr/bin/clang-format
+          sudo ln -s $(which clang-format-23) /usr/bin/clang-format
           clang-format --version
           git fetch origin main --no-recurse-submodules
-          git clang-format-20 --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
+          git clang-format-23 --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
 
       - name: check-format-python
         if: success() || failure()

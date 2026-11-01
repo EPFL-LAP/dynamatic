@@ -12,7 +12,7 @@ Note that both clang-format and autopep8 checks used in the GitHub Actions workf
 
 ## clang-format
 
-The CI workflow uses clang-format 20, and it is recommended that you use the same version locally. This is because version differences between formatters can cause issues (e.g. some version may prefer `ctor() {}`, while another may prefer `ctor(){}`) You can also always see `.github/workflows/ci.yml` and double check that you have the correct version that is used there.
+The CI workflow uses clang-format 23, and it is recommended that you use the same version locally. This is because version differences between formatters can cause issues (e.g. some version may prefer `ctor() {}`, while another may prefer `ctor(){}`) You can also always see `.github/workflows/ci.yml` and double check that you have the correct version that is used there.
 
 The style used by clang-format is determined by the `.clang-format` file in the project root directory.
 
