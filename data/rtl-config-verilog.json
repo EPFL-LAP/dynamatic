@@ -841,6 +841,7 @@
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/merge.v",
     "module-name": "merge_dataless",
+    "dependencies": ["tehb_dataless"],
     "hdl": "verilog"
   },
   {
@@ -850,6 +851,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/merge.v",
+    "dependencies": ["tehb"],
     "hdl": "verilog"
   },
   {
