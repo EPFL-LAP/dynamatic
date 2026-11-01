@@ -525,11 +525,14 @@ static bool bypassBlock(Cfg &cfg) {
 // the LSQs control token to the exit BB
 // for no reason
 static void pruneExitBB(Cfg &cfg) {
-  // after optimizing, every predecessor of the exit
-  // should contain memory accesses
+  // only if every predecessor of the exit contains memory accesses:
+  // an unneeded predecessor still decides between the exit and another
+  // successor (e.g. the back edge of a loop), and without the exit
+  // that decision would be lost, so the exit stays
   for (CfgEdge *inEdge : cfg.getInEdges(cfg.exit)) {
-    assert(cfg.needed.contains(inEdge->from) &&
-           "predecessor of an unneeded exit is not needed after optimizing");
+    if (!cfg.needed.contains(inEdge->from)) {
+      return;
+    }
   }
 
   // remove the exit basic block from the cfg

@@ -674,8 +674,13 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
     SmallVector<ControlLiveOut> outgoingLiveOuts = cfg.getOutEdges(block);
 
     if (outgoingLiveOuts.empty()) {
-      assert(memoryCfg.takesEnd &&
-             "only an interface taking the mem end routes to the exit");
+      // a non-take-end LSQ (an LSQ connected to an MC)
+      // can still route to an exit it does not need,
+      // when the exit could not be pruned:
+      // the token is then simply not used here
+      if (!memoryCfg.takesEnd) {
+        continue;
+      }
       builder.setInsertionPoint(block->getTerminator());
 
       // the token leaves the network at the exit, as the end control
