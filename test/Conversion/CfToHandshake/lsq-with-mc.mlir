@@ -1,4 +1,4 @@
-// RUN: dynamatic-opt %s --lower-cf-to-handshake --remove-operation-names | FileCheck %s
+// RUN: dynamatic-opt %s --lower-cf-to-handshake --remove-operation-names --split-input-file | FileCheck %s
 
 // An if-else with an LSQ store in the true branch,
 // and an MC store and an LSQ store in the false branch
@@ -46,4 +46,48 @@ func.func @lsq_with_mc(%arg0: i1 {handshake.arg_name = "in0"},
   // and the output of the merge as its end input
   // CHECK-DAG: mem_controller[%mem0 : memref<4xi32>] start(%mem0_start) groups(bb2 %[[BB2_COUNT]]: [{{.*}}], bb1 %[[BB1_COUNT]]: []) {{.*}}end(%[[END_INPUT]])
   return
+}
+
+// -----
+
+// An MC load before a loop nest, and the only LSQ group in the inner loop.
+// The non-take-end LSQ (an LSQ connected to an MC) does not need the exit,
+// but the exit cannot be pruned: the end of the outer loop decides
+// between going back around and leaving, and that decision must stay
+// CHECK-LABEL: handshake.func @lsq_in_loop_nest
+func.func @lsq_in_loop_nest(%arg0: memref<4xi32> {handshake.arg_name = "mem0"}) -> i32 {
+  %c0 = arith.constant 0 : index
+  %v0 = memref.load %arg0[%c0] {handshake.name = "load0", handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  cf.br ^bb1(%c0 : index)
+^bb1(%i: index):
+  %z = arith.constant 0 : index
+  cf.br ^bb2(%z : index)
+^bb2(%j: index):
+  %one = arith.constant 1 : index
+  %four = arith.constant 4 : index
+  %v = memref.load %arg0[%j] {handshake.name = "load1", handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<4xi32>
+  memref.store %v, %arg0[%j] {handshake.name = "store0", handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<4xi32>
+  %jn = arith.addi %j, %one : index
+  %jc = arith.cmpi ult, %jn, %four : index
+  cf.cond_br %jc, ^bb2(%jn : index), ^bb3
+^bb3:
+  %one2 = arith.constant 1 : index
+  %four2 = arith.constant 4 : index
+  %in = arith.addi %i, %one2 : index
+  %ic = arith.cmpi ult, %in, %four2 : index
+  cf.cond_br %ic, ^bb1(%in : index), ^bb4
+^bb4:
+  // the LSQ group is allocated by the first output of a lazy fork
+  // CHECK-DAG: lsq[MC] groups(%[[LSQ_LAZY_FORK:[0-9]+]]#0: {{.*}}) mc(
+  // in bb2, the allocation token of the LSQ is merged
+  // from the start of mem0, the inner loop going back around,
+  // and the outer loop going back around
+  // CHECK-DAG: %[[LSQ_LAZY_FORK]]:2 = lazy_fork [2] %[[LSQ_TOKEN:[^ ]+]] {handshake.bb = 2
+  // CHECK-DAG: %[[LSQ_TOKEN]] = merge %mem0_start, %[[INNER_BACK:[^ ]+]], %[[OUTER_BACK:[^ ]+]] {handshake.bb = 2
+  // the second output of the lazy fork goes through the inner loop branch
+  // CHECK-DAG: %[[INNER_BACK]], %[[LSQ_TO_BB3:[^ ]+]] = cond_br %{{[^,]+}}, %[[LSQ_LAZY_FORK]]#1
+  // and then through the outer loop branch in bb3,
+  // whose output leaving the loop is not used
+  // CHECK-DAG: %[[OUTER_BACK]], %{{[^ ]+}} = cond_br %{{[^,]+}}, %[[LSQ_TO_BB3]] {handshake.bb = 3
+  return %v0 : i32
 }
