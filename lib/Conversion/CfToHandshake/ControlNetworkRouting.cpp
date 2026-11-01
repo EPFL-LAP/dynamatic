@@ -102,8 +102,9 @@ public:
 
   // remove the readers from the IR once routing is done
   ~ControlLiveOutToProd() {
-    for (auto &[liveOut, reader] : liveOutToReader)
+    for (auto &[liveOut, reader] : liveOutToReader) {
       reader.erase();
+    }
   }
 
 private:
@@ -131,8 +132,9 @@ public:
 
   // remove the readers from the IR once routing is done
   ~LiveOutToProd() {
-    for (auto &[liveOut, reader] : liveOutToReader)
+    for (auto &[liveOut, reader] : liveOutToReader) {
       reader.erase();
+    }
   }
 
 private:
@@ -167,13 +169,15 @@ static Selects buildControlNetwork(const Cfg &cfg,
     // check if it has 2 or more predecessors
     // whose edges carry live-outs into it
     SmallVector<const CfgEdge *> inEdges = cfg.getInEdges(block);
-    if (inEdges.size() >= 2 && !inEdges.front()->liveOuts.empty())
+    if (inEdges.size() >= 2 && !inEdges.front()->liveOuts.empty()) {
       hasOutput = true;
+    }
   }
 
   // return early if the control network is not needed
-  if (!hasOutput)
+  if (!hasOutput) {
     return selects;
+  }
 
   Cfg controlNetworkCfg = cfg;
 
@@ -250,8 +254,9 @@ static Selects buildControlNetwork(const Cfg &cfg,
       // record the select, and the edge each of its indices stands for,
       // for the basic block's multiplexers
       selects.select[block] = cmergeOp.getIndex();
-      for (ControlLiveOut liveOut : incomingLiveOuts)
+      for (ControlLiveOut liveOut : incomingLiveOuts) {
         selects.controlMergeInputOrders[block].push_back(*liveOut);
+      }
 
       // the value in the basic block comes from the cmerge output
       routedIn = cmergeOp.getResult();
@@ -264,9 +269,10 @@ static Selects buildControlNetwork(const Cfg &cfg,
     // is almost always just a wire
     Value sdpOut = routedIn;
     // but in the entry block, it's an init op
-    if (block == controlNetworkCfg.entry)
+    if (block == controlNetworkCfg.entry) {
       sdpOut = handshake::InitOp::create(builder, loc, controlType, sdpOut)
                    .getResult();
+    }
 
     // in the control network, a basic block has either one or two live-outs
     // because the basic block has one output to send (the control token)
@@ -438,8 +444,9 @@ static void buildRouting(const Cfg &cfg, const BlockToCond &blockToCond,
   // (coming from the temp live-outs)
   // we want the straight data paths
   // in that basic block to use the routed input
-  for (BlockUse blockUse : cfg.blockUses)
+  for (BlockUse blockUse : cfg.blockUses) {
     blockUse.replaceAllUsesWith(routedIns[blockUse]);
+  }
 
   // for each basic block
   for (Block *block : cfg.blocks) {
@@ -714,8 +721,9 @@ dynamatic::experimental::cf_to_handshake::routeCfgs(
     MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> &memoryCfgs,
     OpBuilder &builder) {
   // route the non-memory cfgs
-  for (const Cfg &cfg : nonMemoryCfgs)
+  for (const Cfg &cfg : nonMemoryCfgs) {
     route(cfg, blockToCond, builder);
+  }
 
   // data structure to return the memory interface inputs, keyed by memref
   MapVector<MemrefValue, MemoryInterfaceInputs> memoryInputs;

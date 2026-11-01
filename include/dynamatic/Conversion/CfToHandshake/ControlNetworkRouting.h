@@ -73,10 +73,12 @@ public:
   /// of the CondBranchOp conditions,
   /// once the branches are erased
   void eraseTemps() {
-    for (auto &[block, condReader] : blockToCondReader)
+    for (auto &[block, condReader] : blockToCondReader) {
       condReader.erase();
-    for (auto &[block, tempProd] : blockToTempProd)
+    }
+    for (auto &[block, tempProd] : blockToTempProd) {
       tempProd.erase();
+    }
   }
 
 private:

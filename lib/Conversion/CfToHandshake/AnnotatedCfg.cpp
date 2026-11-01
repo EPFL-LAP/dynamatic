@@ -32,8 +32,9 @@ dynamatic::experimental::cf_to_handshake::collectBlockUses(Region &body) {
     // the block args of the entry block are function arguments
     // we treat these as producers in the entry block for routing
     // not consumers which need an input
-    if (block.isEntryBlock())
+    if (block.isEntryBlock()) {
       continue;
+    }
     // for all other blocks, a subset of the SSA maximized block args
     // are the block uses we need
     for (BlockArgument arg : block.getArguments()) {
@@ -52,8 +53,9 @@ dynamatic::experimental::cf_to_handshake::collectBlockUses(Region &body) {
         // Branch condition block uses are detected
         // through the operands of the TempCons "condition readers"
         // placed by BlockToCond
-        if (isa<cf::BranchOp, cf::CondBranchOp>(op))
+        if (isa<cf::BranchOp, cf::CondBranchOp>(op)) {
           continue;
+        }
         // store block use in set
         uses.insert(arg);
         break;
@@ -73,8 +75,9 @@ bool dynamatic::experimental::cf_to_handshake::isProducedIn(Value value,
                                                             Block *block) {
   // an operation result is produced in the operation's block:
   // check if the given block is equal to the operation's block
-  if (Operation *producer = value.getDefiningOp())
+  if (Operation *producer = value.getDefiningOp()) {
     return producer->getBlock() == block;
+  }
 
   // if a value has no producing op,
   // it comes from a block arg
@@ -107,17 +110,19 @@ static Value findLiveOutProducerFromBranch(const CfgEdge &edge,
   unsigned argIdx = blockInput.getArgNumber();
 
   // unconditional branches have only one set of operands
-  if (auto brOp = dyn_cast<cf::BranchOp>(terminator))
+  if (auto brOp = dyn_cast<cf::BranchOp>(terminator)) {
     return brOp.getDestOperands()[argIdx];
+  }
 
   // conditional branches have two sets of operands
   auto condBrOp = cast<cf::CondBranchOp>(terminator);
 
   // we pick the set of operands based on the edge condition
-  if (*edge.condition)
+  if (*edge.condition) {
     return condBrOp.getTrueOperand(argIdx);
-  else
+  } else {
     return condBrOp.getFalseOperand(argIdx);
+  }
 }
 
 Cfg dynamatic::experimental::cf_to_handshake::buildCfg(
@@ -135,8 +140,9 @@ Cfg dynamatic::experimental::cf_to_handshake::buildCfg(
 
   // We need every basic block of each block use
   // we want to route
-  for (BlockUse blockUse : blockUses)
+  for (BlockUse blockUse : blockUses) {
     cfg.needed.insert(blockUse.getOwner());
+  }
 
   // The routing algorithm processes many block args
   // but it does something different if the block arg
@@ -170,8 +176,9 @@ Cfg dynamatic::experimental::cf_to_handshake::buildCfg(
     BlockInput blockInput = blockInputsToTrace.pop_back_val();
 
     // skip a block input that has already been traced
-    if (blockInputsTraced.contains(blockInput))
+    if (blockInputsTraced.contains(blockInput)) {
       continue;
+    }
 
     // mark it as traced
     blockInputsTraced.insert(blockInput);
@@ -189,9 +196,9 @@ Cfg dynamatic::experimental::cf_to_handshake::buildCfg(
 
       // if the predecessor produces it, we have found a producer,
       // and can mark the producer's block as needed.
-      if (isProducedIn(liveOut, edge->from))
+      if (isProducedIn(liveOut, edge->from)) {
         cfg.needed.insert(edge->from);
-      else {
+      } else {
         // Otherwise the live-out must be a block input of the predecessor,
         // to trace next.
         // the cast and asserts ensure that the live-out really
@@ -226,8 +233,9 @@ static Cfg buildMemoryInterfaceCfg(const Cfg &base, ArrayRef<Block *> blocks) {
   cfg.needed.insert(cfg.exit);
 
   // every block the token is produced or consumed in is needed
-  for (Block *block : blocks)
+  for (Block *block : blocks) {
     cfg.needed.insert(block);
+  }
 
   return cfg;
 }
@@ -250,8 +258,9 @@ dynamatic::experimental::cf_to_handshake::collectMemoryInterfaceCfgs(
     // collect the loads and stores to this region
     SmallVector<Operation *> accesses;
     for (Operation *user : memref.getUsers()) {
-      if (isa<memref::LoadOp, memref::StoreOp>(user))
+      if (isa<memref::LoadOp, memref::StoreOp>(user)) {
         accesses.push_back(user);
+      }
     }
 
     // if the region has a memory controller,
@@ -267,9 +276,10 @@ dynamatic::experimental::cf_to_handshake::collectMemoryInterfaceCfgs(
       auto label = getDialectAttr<handshake::MemInterfaceAttr>(access);
       assert(label && "memory access must carry its interface label");
       // if any access needs an MC
-      if (label.connectsToMC())
+      if (label.connectsToMC()) {
         // we must route for the MC
         buildRoutingForMemoryController = true;
+      }
     }
 
     // the MC's control inputs are the start, store counts and the end
@@ -277,8 +287,9 @@ dynamatic::experimental::cf_to_handshake::collectMemoryInterfaceCfgs(
       // collect all blocks with stores to the MC
       SetVector<Block *> storeBlocks;
       for (Operation *access : accesses) {
-        if (isa<memref::StoreOp>(access))
+        if (isa<memref::StoreOp>(access)) {
           storeBlocks.insert(access->getBlock());
+        }
       }
 
       // start at the entry block, for the start input
@@ -302,9 +313,10 @@ dynamatic::experimental::cf_to_handshake::collectMemoryInterfaceCfgs(
     for (Operation *access : accesses) {
       // check if they connect to an LSQ
       auto label = getDialectAttr<handshake::MemInterfaceAttr>(access);
-      if (label.connectsToLSQ())
+      if (label.connectsToLSQ()) {
         // if so, add their block to the list
         lsqBlocks.insert(access->getBlock());
+      }
     }
     // if any basic block connects to the LSQ
     if (!lsqBlocks.empty()) {
@@ -315,8 +327,9 @@ dynamatic::experimental::cf_to_handshake::collectMemoryInterfaceCfgs(
       lsqBlocks.insert(entryBlock);
 
       // without a memory controller, the LSQ also takes the end
-      if (!buildRoutingForMemoryController)
+      if (!buildRoutingForMemoryController) {
         lsqBlocks.insert(returnBlock);
+      }
 
       MemoryInterfaceCfg lsqCfg;
       lsqCfg.cfg = buildMemoryInterfaceCfg(base, lsqBlocks.getArrayRef());
@@ -340,8 +353,9 @@ static bool carriesLiveOut(const CfgEdge &edge, const LiveOut &liveOut) {
   for (const LiveOut &carried : edge.liveOuts) {
     // check if it matches the given live-out
     if (carried.liveOut == liveOut.liveOut &&
-        carried.blockInput == liveOut.blockInput)
+        carried.blockInput == liveOut.blockInput) {
       return true;
+    }
   }
   return false;
 }
@@ -349,15 +363,17 @@ static bool carriesLiveOut(const CfgEdge &edge, const LiveOut &liveOut) {
 /// Whether two edges carry the same live-outs, in any order.
 static bool haveSameLiveOuts(const CfgEdge &first, const CfgEdge &second) {
   // edges carrying different numbers of live-outs differ
-  if (first.liveOuts.size() != second.liveOuts.size())
+  if (first.liveOuts.size() != second.liveOuts.size()) {
     return false;
+  }
 
   // otherwise, every live-out of the first must be on the second.
   // an edge never carries the same live-out twice,
   // so this also covers the second's live-outs
   for (const LiveOut &liveOut : first.liveOuts) {
-    if (!carriesLiveOut(second, liveOut))
+    if (!carriesLiveOut(second, liveOut)) {
       return false;
+    }
   }
   return true;
 }
@@ -373,20 +389,23 @@ static bool mergeSides(Cfg &cfg) {
     // if the basic block doesn't have two edges,
     // merging doesn't apply
     SmallVector<CfgEdge *> outEdges = cfg.getOutEdges(block);
-    if (outEdges.size() != 2)
+    if (outEdges.size() != 2) {
       continue;
+    }
 
     // get the two edges
     CfgEdge *first = outEdges[0];
     CfgEdge *second = outEdges[1];
 
     // can't merge if they don't go to the same block
-    if (first->to != second->to)
+    if (first->to != second->to) {
       continue;
+    }
 
     // can't merge if the live-outs aren't the same
-    if (!haveSameLiveOuts(*first, *second))
+    if (!haveSameLiveOuts(*first, *second)) {
       continue;
+    }
 
     // if they are, both edges are equivalent
     // convert the first to unconditional and remove the second
@@ -406,8 +425,9 @@ static bool removeSelfLoop(Cfg &cfg) {
   // walk the basic blocks
   for (Block *block : cfg.blocks) {
     // a needed block keeps its loop
-    if (cfg.needed.contains(block))
+    if (cfg.needed.contains(block)) {
       continue;
+    }
 
     // walk all the out edges of an unneeded block
     for (CfgEdge *edge : cfg.getOutEdges(block)) {
@@ -433,19 +453,22 @@ static bool bypassBlock(Cfg &cfg) {
   // walk the basic blocks
   for (Block *block : cfg.blocks) {
     // a needed block must stay
-    if (cfg.needed.contains(block))
+    if (cfg.needed.contains(block)) {
       continue;
+    }
 
     // only blocks with one successor can be bypassed
-    if (cfg.getOutEdges(block).size() != 1)
+    if (cfg.getOutEdges(block).size() != 1) {
       continue;
+    }
 
     candidates.insert(block);
   }
 
   // if there is nothing to bypass, nothing changes
-  if (candidates.empty())
+  if (candidates.empty()) {
     return false;
+  }
 
   // bypass the first candidate
   Block *block = candidates.front();
@@ -497,6 +520,7 @@ static bool bypassBlock(Cfg &cfg) {
 
 void dynamatic::experimental::cf_to_handshake::optimizeCfg(Cfg &cfg) {
   bool changed = true;
-  while (changed)
+  while (changed) {
     changed = mergeSides(cfg) || removeSelfLoop(cfg) || bypassBlock(cfg);
+  }
 }

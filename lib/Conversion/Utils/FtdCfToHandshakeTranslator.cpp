@@ -74,8 +74,9 @@ static Type channelifyType(Type type) {
       .Case<IndexType, IntegerType, FloatType>(
           [](auto type) { return handshake::ChannelType::get(type); })
       .Case<MemRefType>([](MemRefType memrefType) -> Type {
-        if (!isa<IndexType>(memrefType.getElementType()))
+        if (!isa<IndexType>(memrefType.getElementType())) {
           return memrefType;
+        }
         IntegerType elemType = IntegerType::get(memrefType.getContext(), 32);
         return MemRefType::get(memrefType.getShape(), elemType);
       })
@@ -104,12 +105,14 @@ static FunctionType lowerFunctionType(func::FuncOp funcOp,
   SmallVector<Type, 2> resTypes;
   unsigned numMemories = numInternalArrays;
   for (Type argType : funcOp.getArgumentTypes()) {
-    if (isa<MemRefType>(argType))
+    if (isa<MemRefType>(argType)) {
       ++numMemories;
+    }
     argTypes.push_back(channelifyType(argType));
   }
-  for (Type resType : funcOp.getResultTypes())
+  for (Type resType : funcOp.getResultTypes()) {
     resTypes.push_back(channelifyType(resType));
+  }
 
   auto ctrlType = handshake::ControlType::get(funcOp.getContext());
   argTypes.append(numMemories + 1, ctrlType);
@@ -134,8 +137,9 @@ static SmallVector<NamedAttribute> deriveNewAttributes(
     // The symbol and function type attributes are set directly by the
     // Handshake function constructor, all others are forwarded directly
     if (attrName == SymbolTable::getSymbolAttrName() ||
-        attrName == funcOp.getFunctionTypeAttrName())
+        attrName == funcOp.getFunctionTypeAttrName()) {
       continue;
+    }
 
     // Argument names need to be augmented with the additional start argument
     if (attrName == funcOp.getArgAttrsAttrName()) {
@@ -147,15 +151,17 @@ static SmallVector<NamedAttribute> deriveNewAttributes(
         std::optional<NamedAttribute> name =
             argDict.getNamed("handshake.arg_name");
         assert(name && "missing name key in arg attribute");
-        if (isa<MemRefType>(argType))
+        if (isa<MemRefType>(argType)) {
           memRegionNames.push_back(cast<StringAttr>(name->getValue()).str());
+        }
         argNames.push_back(name->getValue());
       }
       for (auto [memref, internalArrayID] : memrefToInternalArrayID) {
         memRegionNames.push_back("ram" + std::to_string(internalArrayID));
       }
-      for (StringRef mem : memRegionNames)
+      for (StringRef mem : memRegionNames) {
         argNames.push_back(StringAttr::get(ctx, mem + "_start"));
+      }
       argNames.push_back(StringAttr::get(ctx, "start"));
       attributes.emplace_back(StringAttr::get(ctx, "argNames"),
                               ArrayAttr::get(ctx, argNames));
@@ -168,8 +174,9 @@ static SmallVector<NamedAttribute> deriveNewAttributes(
   // Regular function results have default names
   SmallVector<Attribute> resNames;
   unsigned numFuncResults = funcOp.getFunctionType().getNumResults();
-  for (size_t idx = 0; idx < numFuncResults; ++idx)
+  for (size_t idx = 0; idx < numFuncResults; ++idx) {
     resNames.push_back(StringAttr::get(ctx, "out" + std::to_string(idx)));
+  }
 
   if (!hasArgNames) {
     SmallVector<Attribute> argNames;
@@ -187,16 +194,18 @@ static SmallVector<NamedAttribute> deriveNewAttributes(
     for (auto [memref, internalArrayID] : memrefToInternalArrayID) {
       memRegionNames.push_back("ram" + std::to_string(internalArrayID));
     }
-    for (StringRef memName : memRegionNames)
+    for (StringRef memName : memRegionNames) {
       argNames.push_back(StringAttr::get(ctx, memName + "_start"));
+    }
     argNames.push_back(StringAttr::get(ctx, "start"));
     attributes.emplace_back(StringAttr::get(ctx, "argNames"),
                             ArrayAttr::get(ctx, argNames));
   }
 
   // Use the same memory names as the arguments as the base for the result names
-  for (StringRef memName : memRegionNames)
+  for (StringRef memName : memRegionNames) {
     resNames.push_back(StringAttr::get(ctx, memName + "_end"));
+  }
   resNames.push_back(StringAttr::get(ctx, "end"));
   attributes.emplace_back(StringAttr::get(ctx, "resNames"),
                           ArrayAttr::get(ctx, resNames));
@@ -207,11 +216,13 @@ static SmallVector<NamedAttribute> deriveNewAttributes(
 /// zero. Used as the initial contents of RAMs replacing allocas.
 static DenseElementsAttr getZeroFilledDenseAttr(ShapedType type) {
   Type elemType = type.getElementType();
-  if (auto intTy = dyn_cast<IntegerType>(elemType))
+  if (auto intTy = dyn_cast<IntegerType>(elemType)) {
     return DenseElementsAttr::get(type, APInt(intTy.getWidth(), 0));
-  if (auto floatTy = dyn_cast<FloatType>(elemType))
+  }
+  if (auto floatTy = dyn_cast<FloatType>(elemType)) {
     return DenseElementsAttr::get(
         type, APFloat::getZero(floatTy.getFloatSemantics(), false));
+  }
   llvm::report_fatal_error("Unknown base element type!");
 }
 
@@ -222,8 +233,9 @@ SmallVector<Value> FtdCfToHandshakeTranslator::lookup(ValueRange values) {
 
 void FtdCfToHandshakeTranslator::transferName(Operation *cfOp,
                                               Operation *newOp) {
-  if (namer.hasName(cfOp))
+  if (namer.hasName(cfOp)) {
     namer.replaceOp(cfOp, newOp);
+  }
 }
 
 void FtdCfToHandshakeTranslator::setBlock(Operation *op, Block *block) {
@@ -255,8 +267,9 @@ LogicalResult FtdCfToHandshakeTranslator::translate() {
       cfFunc.getLoc(), cfFunc.getName(),
       lowerFunctionType(cfFunc, memrefToInternalArrayID.size()),
       deriveNewAttributes(cfFunc, memrefToInternalArrayID));
-  if (cfFunc.isExternal())
+  if (cfFunc.isExternal()) {
     return success();
+  }
 
   // The arguments of the Handshake function's entry block are the original
   // function's arguments followed by the memory start signals and the global
@@ -310,8 +323,9 @@ LogicalResult FtdCfToHandshakeTranslator::translate() {
 LogicalResult FtdCfToHandshakeTranslator::translateBody() {
   Block *body = funcOp.getBodyBlock();
   Block *cfEntry = &cfFunc.front();
-  for (BlockArgument arg : cfEntry->getArguments())
+  for (BlockArgument arg : cfEntry->getArguments()) {
     valueMap.map(arg, body->getArgument(arg.getArgNumber()));
+  }
   blockCtrl[cfEntry] = body->getArguments().back();
 
   // The entry block is the entry's staging block
@@ -325,25 +339,30 @@ LogicalResult FtdCfToHandshakeTranslator::translateBody() {
     }
   }
   computePredecessors();
-  if (failed(initTranslation()))
+  if (failed(initTranslation())) {
     return failure();
+  }
 
   // Translate blocks in reverse post-order so that values are translated
   // before their uses (unreachable blocks go last)
   SetVector<Block *> order;
-  for (Block *block : llvm::ReversePostOrderTraversal<Block *>(cfEntry))
+  for (Block *block : llvm::ReversePostOrderTraversal<Block *>(cfEntry)) {
     order.insert(block);
-  for (Block &block : cfFunc)
+  }
+  for (Block &block : cfFunc) {
     order.insert(&block);
+  }
 
   for (Block *block : order) {
-    if (failed(translateBlock(block)))
+    if (failed(translateBlock(block))) {
       return failure();
+    }
   }
   resolveMerges();
 
-  if (failed(createMemInterfaces()))
+  if (failed(createMemInterfaces())) {
     return failure();
+  }
   finalizeBlocks();
   flattenBody();
   createEnd();
@@ -366,8 +385,9 @@ void FtdCfToHandshakeTranslator::computePredecessors() {
   // predecessor block, then by successor index (rather than in the order of
   // the block's uses), which determines the order of the merges' operands
   for (Block &block : cfFunc) {
-    for (auto [succIdx, succ] : llvm::enumerate(block.getSuccessors()))
+    for (auto [succIdx, succ] : llvm::enumerate(block.getSuccessors())) {
       preds[succ].emplace_back(&block, succIdx);
+    }
   }
 }
 
@@ -376,8 +396,9 @@ void FtdCfToHandshakeTranslator::computePredecessors() {
 static SmallVector<Value> makeMergeOperands(BackedgeBuilder &edgeBuilder,
                                             unsigned numPreds, Type type) {
   SmallVector<Value> operands;
-  for (unsigned i = 0; i < numPreds; ++i)
+  for (unsigned i = 0; i < numPreds; ++i) {
     operands.push_back(edgeBuilder.get(type));
+  }
   return operands;
 }
 
@@ -399,12 +420,14 @@ LogicalResult FtdCfToHandshakeTranslator::translateBlock(Block *block) {
   // of a block), so it is reset before each operation
   Block *staging = stagingBlock[block];
   builder.setInsertionPointToEnd(staging);
-  if (!block->isEntryBlock() && failed(createMerges(block)))
+  if (!block->isEntryBlock() && failed(createMerges(block))) {
     return failure();
+  }
   for (Operation &op : block->without_terminator()) {
     builder.setInsertionPointToEnd(staging);
-    if (failed(translateOp(&op)))
+    if (failed(translateOp(&op))) {
       return failure();
+    }
   }
   builder.setInsertionPointToEnd(staging);
   return translateTerminator(block->getTerminator());
@@ -465,8 +488,9 @@ LogicalResult FtdCfToHandshakeTranslator::translateOp(Operation *op) {
 
 LogicalResult
 FtdCfToHandshakeTranslator::translateTerminator(Operation *termOp) {
-  if (!isa<cf::BranchOp, cf::CondBranchOp, func::ReturnOp>(termOp))
+  if (!isa<cf::BranchOp, cf::CondBranchOp, func::ReturnOp>(termOp)) {
     return termOp->emitError() << "unsupported block terminator";
+  }
   Block *block = termOp->getBlock();
   if (isa<func::ReturnOp>(termOp)) {
     returns.emplace_back(blockID[block], lookup(termOp->getOperands()));
@@ -493,19 +517,22 @@ FtdCfToHandshakeTranslator::translateTerminator(Operation *termOp) {
   // Insert a branch-like operation for each unique value flowing out of the
   // block
   Value cond;
-  if (auto condBrOp = dyn_cast<cf::CondBranchOp>(termOp))
+  if (auto condBrOp = dyn_cast<cf::CondBranchOp>(termOp)) {
     cond = getBranchCondition(condBrOp);
+  }
   Location loc = termOp->getLoc();
   DenseMap<Value, Operation *> branches;
   for (auto &[_, values] : valuesPerSuccIdx) {
     for (Value val : values) {
-      if (branches.contains(val))
+      if (branches.contains(val)) {
         continue;
+      }
       Operation *brOp;
-      if (cond)
+      if (cond) {
         brOp = builder.create<handshake::ConditionalBranchOp>(loc, cond, val);
-      else
+      } else {
         brOp = builder.create<handshake::BranchOp>(loc, val);
+      }
       setBlock(brOp, block);
       branches[val] = brOp;
     }
@@ -515,8 +542,9 @@ FtdCfToHandshakeTranslator::translateTerminator(Operation *termOp) {
   // successor index determines the conditional branch's result)
   for (auto &[succIdx, values] : valuesPerSuccIdx) {
     SmallVector<Value> &outValues = edgeValues[{block, succIdx}];
-    for (Value val : values)
+    for (Value val : values) {
       outValues.push_back(branches[val]->getResult(succIdx));
+    }
   }
   return success();
 }
@@ -526,8 +554,9 @@ void FtdCfToHandshakeTranslator::resolveMerges() {
   // backedges
   for (auto &[block, ops] : mergeOps) {
     for (auto [edgeIdx, edge] : llvm::enumerate(preds[block])) {
-      for (auto [mergeOp, val] : llvm::zip_equal(ops, edgeValues.at(edge)))
+      for (auto [mergeOp, val] : llvm::zip_equal(ops, edgeValues.at(edge))) {
         mergeOp.setDataOperand(edgeIdx, val);
+      }
     }
   }
 }
@@ -535,16 +564,18 @@ void FtdCfToHandshakeTranslator::resolveMerges() {
 template <typename DstOp>
 LogicalResult FtdCfToHandshakeTranslator::translateOneToOne(Operation *op) {
   SmallVector<Type> resTypes;
-  for (Type resType : op->getResultTypes())
+  for (Type resType : op->getResultTypes()) {
     resTypes.push_back(channelifyType(resType));
+  }
   // Copy the discardable attributes, and the inherent attributes that the
   // Handshake operation also has (e.g., the predicate of comparisons). Other
   // inherent attributes (e.g., overflow flags) have no meaning in Handshake
   SmallVector<NamedAttribute> attrs(op->getDiscardableAttrs());
   for (StringRef name : DstOp::getAttributeNames()) {
     if (std::optional<Attribute> attr = op->getInherentAttr(name);
-        attr && *attr)
+        attr && *attr) {
       attrs.emplace_back(builder.getStringAttr(name), *attr);
+    }
   }
   auto newOp = builder.create<DstOp>(op->getLoc(), resTypes,
                                      lookup(op->getOperands()), attrs);
@@ -557,8 +588,9 @@ LogicalResult FtdCfToHandshakeTranslator::translateOneToOne(Operation *op) {
 template <typename ExtOp>
 LogicalResult FtdCfToHandshakeTranslator::translateIndexCast(Operation *op) {
   auto getWidth = [](Type type) -> unsigned {
-    if (isa<IndexType>(type))
+    if (isa<IndexType>(type)) {
       return 32;
+    }
     return type.getIntOrFloatBitWidth();
   };
   unsigned srcWidth = getWidth(op->getOperand(0).getType());
@@ -637,8 +669,9 @@ FtdCfToHandshakeTranslator::translateUndef(LLVM::UndefOp undefOp) {
 LogicalResult
 FtdCfToHandshakeTranslator::addMemPort(Operation *cfOp, Value memref,
                                        handshake::MemPortOpInterface portOp) {
-  if (!memInfo.count(memref))
+  if (!memInfo.count(memref)) {
     return cfOp->emitError() << "unknown memory region";
+  }
   memPorts.push_back({cfOp, memref, portOp});
   return success();
 }
@@ -651,8 +684,9 @@ LogicalResult FtdCfToHandshakeTranslator::translateLoad(memref::LoadOp loadOp) {
               "it should connect to.";
   }
   OperandRange indices = loadOp.getIndices();
-  if (indices.size() != 1)
+  if (indices.size() != 1) {
     return loadOp->emitError() << "load must be unidimensional";
+  }
 
   // The data input comes from the memory interface, which is created later
   Type dataTy = channelifyType(loadOp.getMemRefType().getElementType());
@@ -675,8 +709,9 @@ FtdCfToHandshakeTranslator::translateStore(memref::StoreOp storeOp) {
               "it should connect to.";
   }
   OperandRange indices = storeOp.getIndices();
-  if (indices.size() != 1)
+  if (indices.size() != 1) {
     return storeOp->emitError() << "store must be unidimensional";
+  }
 
   auto newOp = builder.create<handshake::StoreOp>(
       storeOp.getLoc(), valueMap.lookup(indices.front()),
@@ -711,8 +746,9 @@ LogicalResult FtdCfToHandshakeTranslator::translateGetGlobal(
   // The global's initial value is attached to the RAM replacing the global
   auto global = SymbolTable::lookupNearestSymbolFrom<memref::GlobalOp>(
       getGlobalOp, getGlobalOp.getNameAttr());
-  if (!global)
+  if (!global) {
     return getGlobalOp->emitError() << "reference to unknown global";
+  }
   // A const global array becomes an internal read-only memory unit.
   // A non-const global array is rejected:
   // it is not guaranteed to be reset to an initial value per invocation,
@@ -759,11 +795,13 @@ static LogicalResult verifyInitCall(func::CallOp initCallOp) {
   for (Value res : initCallOp.getResults()) {
     Operation *firstUser = nullptr;
     for (Operation *user : res.getUsers()) {
-      if (user->getBlock() != block)
+      if (user->getBlock() != block) {
         return user->emitError() << "uses the result of an __init call "
                                     "defined in another block";
-      if (!firstUser || user->isBeforeInBlock(firstUser))
+      }
+      if (!firstUser || user->isBeforeInBlock(firstUser)) {
         firstUser = user;
+      }
     }
     if (!isa_and_present<func::CallOp>(firstUser)) {
       return initCallOp->emitError()
@@ -776,13 +814,15 @@ static LogicalResult verifyInitCall(func::CallOp initCallOp) {
 
 LogicalResult FtdCfToHandshakeTranslator::translateCall(func::CallOp callOp) {
   // __init calls are translated along with the placeholder call that uses them
-  if (isInitCall(callOp))
+  if (isInitCall(callOp)) {
     return verifyInitCall(callOp);
+  }
 
   Operation *callee =
       SymbolTable::lookupNearestSymbolFrom(callOp, callOp.getCalleeAttr());
-  if (!callee)
+  if (!callee) {
     return callOp->emitError() << "call references unknown function";
+  }
 
   Block *block = callOp->getBlock();
   SmallVector<Type> resultTypes;
@@ -801,8 +841,9 @@ LogicalResult FtdCfToHandshakeTranslator::translateCall(func::CallOp callOp) {
     // The callee is a placeholder function whose arguments are inputs, outputs,
     // or parameters, as indicated by their name
     auto calledFuncOp = dyn_cast<func::FuncOp>(callee);
-    if (!calledFuncOp)
+    if (!calledFuncOp) {
       return callOp->emitError() << "call does not reference a function";
+    }
 
     FunctionType calledType = calledFuncOp.getFunctionType();
     SmallVector<Type> newInputs, newResults;
@@ -863,15 +904,17 @@ LogicalResult FtdCfToHandshakeTranslator::translateCall(func::CallOp callOp) {
   // The instance has an extra control-only start input coming from the call's
   // block, and an extra control-only end output
   operands.push_back(blockCtrl[block]);
-  for (Type &type : resultTypes)
+  for (Type &type : resultTypes) {
     type = channelifyType(type);
+  }
   resultTypes.push_back(handshake::ControlType::get(builder.getContext()));
 
   auto instOp = builder.create<handshake::InstanceOp>(
       callOp.getLoc(), callOp.getCallee(), resultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
-  for (NamedAttribute param : parameters)
+  for (NamedAttribute param : parameters) {
     instOp->setAttr(param.getName(), param.getValue());
+  }
   setBlock(instOp, block);
   transferName(callOp, instOp);
 
@@ -883,18 +926,21 @@ LogicalResult FtdCfToHandshakeTranslator::translateCall(func::CallOp callOp) {
 
   // All users of the values produced by the __init calls now use the outputs
   // of the instance
-  for (auto [resIdx, argIdx] : llvm::enumerate(outputIndices))
+  for (auto [resIdx, argIdx] : llvm::enumerate(outputIndices)) {
     valueMap.map(callOp.getOperand(argIdx), instOp.getResult(resIdx));
-  if (callOp.getNumResults() != 0)
+  }
+  if (callOp.getNumResults() != 0) {
     valueMap.map(callOp.getResult(0), instOp.getResult(0));
+  }
   return success();
 }
 
 LogicalResult FtdCfToHandshakeTranslator::translateGeneric(Operation *op) {
   // Operations from dialects that must be fully lowered cannot be kept as is
   if (isa<arith::ArithDialect, math::MathDialect, func::FuncDialect,
-          cf::ControlFlowDialect, BuiltinDialect>(op->getDialect()))
+          cf::ControlFlowDialect, BuiltinDialect>(op->getDialect())) {
     return op->emitError() << "unsupported operation";
+  }
 
   Operation *newOp = builder.clone(*op, valueMap);
   setBlock(newOp, op->getBlock());
@@ -902,8 +948,9 @@ LogicalResult FtdCfToHandshakeTranslator::translateGeneric(Operation *op) {
 }
 
 LogicalResult FtdCfToHandshakeTranslator::createMemInterfaces() {
-  if (memInfo.empty())
+  if (memInfo.empty()) {
     return success();
+  }
 
   // Associate each memory port with the interface it should connect to. Ports
   // are considered in program order (blocks were translated in reverse
@@ -916,10 +963,11 @@ LogicalResult FtdCfToHandshakeTranslator::createMemInterfaces() {
     Block *block = port.cfOp->getBlock();
     portBlock[port.portOp] = block;
     MemAccesses &accesses = memInfo.find(port.memref)->second;
-    if (memAttr.connectsToMC())
+    if (memAttr.connectsToMC()) {
       accesses.mcPorts[block].push_back(port.portOp);
-    else
+    } else {
       accesses.lsqPorts[*memAttr.getLsqGroup()].push_back(port.portOp);
+    }
   }
 
   // Find the control value indicating the last control flow decision in the
@@ -928,8 +976,9 @@ LogicalResult FtdCfToHandshakeTranslator::createMemInterfaces() {
   assert(!returns.empty() && "no returns in function");
   SmallVector<Block *> retBlocks;
   for (Block &block : cfFunc) {
-    if (isa<func::ReturnOp>(block.getTerminator()))
+    if (isa<func::ReturnOp>(block.getTerminator())) {
       retBlocks.push_back(&block);
+    }
   }
   Value ctrlEnd;
   if (retBlocks.size() == 1) {
@@ -938,8 +987,9 @@ LogicalResult FtdCfToHandshakeTranslator::createMemInterfaces() {
     // Merge the control signals of all blocks with a return, at the beginning
     // of the last of these blocks
     SmallVector<Value> controls;
-    for (Block *block : retBlocks)
+    for (Block *block : retBlocks) {
       controls.push_back(blockCtrl[block]);
+    }
     Block *lastRetBlock = retBlocks.back();
     builder.setInsertionPointToStart(stagingBlock[lastRetBlock]);
     auto mergeOp = builder.create<handshake::MergeOp>(
@@ -951,8 +1001,9 @@ LogicalResult FtdCfToHandshakeTranslator::createMemInterfaces() {
   // Create a mapping between each block and its control value in the right
   // format for the memory interface builder
   DenseMap<unsigned, Value> ctrlVals;
-  for (auto [block, id] : blockID)
+  for (auto [block, id] : blockID) {
     ctrlVals.insert({id, blockCtrl[block]});
+  }
 
   // Each memory region is independent from the others
   for (auto &[memref, memAccesses] : memInfo) {
@@ -963,9 +1014,11 @@ LogicalResult FtdCfToHandshakeTranslator::createMemInterfaces() {
                                       memAccesses.memStart, ctrlEnd, ctrlVals,
                                       ctrlVals);
 
-    for (auto &[_, mcBlockOps] : memAccesses.mcPorts)
-      for (handshake::MemPortOpInterface portOp : mcBlockOps)
+    for (auto &[_, mcBlockOps] : memAccesses.mcPorts) {
+      for (handshake::MemPortOpInterface portOp : mcBlockOps) {
         memBuilder.addMCPort(portOp);
+      }
+    }
 
     // An LSQ group is allocated by the control signal of a single block, so
     // all of its ports must belong to that block. Ports are already in program
@@ -983,20 +1036,23 @@ LogicalResult FtdCfToHandshakeTranslator::createMemInterfaces() {
 
 #ifndef NDEBUG
       // Verify that no two groups have the same control signal
-      if (auto [_, newCtrl] = controlBlocks.insert(groupBlock); !newCtrl)
+      if (auto [_, newCtrl] = controlBlocks.insert(groupBlock); !newCtrl) {
         return groupOps.front()->emitError()
                << "Inconsistent LSQ group for memory interface the operation "
                   "references. No two groups can have the same control signal.";
+      }
 #endif
 
-      for (handshake::MemPortOpInterface portOp : groupOps)
+      for (handshake::MemPortOpInterface portOp : groupOps) {
         memBuilder.addLSQPort(group, portOp);
+      }
     }
 
     handshake::MemoryControllerOp mcOp;
     handshake::LSQOp lsqOp;
-    if (failed(memBuilder.instantiateInterfaces(builder, mcOp, lsqOp)))
+    if (failed(memBuilder.instantiateInterfaces(builder, mcOp, lsqOp))) {
       return failure();
+    }
   }
   return success();
 }
@@ -1013,8 +1069,9 @@ void FtdCfToHandshakeTranslator::createEnd() {
   // its data inputs
   llvm::stable_sort(returns, llvm::less_first());
   size_t exitBlockID = blockID.size();
-  if (returns.size() == 1)
+  if (returns.size() == 1) {
     exitBlockID -= 1;
+  }
 
   // The terminator's operands are, in order
   // 1. the original function's results
@@ -1028,8 +1085,9 @@ void FtdCfToHandshakeTranslator::createEnd() {
     Location mergeLoc = body->empty() ? loc : body->back().getLoc();
     for (size_t i = 0, e = returns.front().second.size(); i < e; ++i) {
       SmallVector<Value, 4> mergeOperands;
-      for (auto &[_, operands] : returns)
+      for (auto &[_, operands] : returns) {
         mergeOperands.push_back(operands[i]);
+      }
       auto mergeOp =
           builder.create<handshake::MergeOp>(mergeLoc, mergeOperands);
       setBB(mergeOp, exitBlockID);
@@ -1075,10 +1133,12 @@ LogicalResult dynamatic::ftdLowerFuncsToHandshake(
   // Translate all functions in order. __init functions only declare the
   // outputs of placeholder functions and are removed afterwards
   for (auto funcOp : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>())) {
-    if (funcOp.getSymName().starts_with("__init"))
+    if (funcOp.getSymName().starts_with("__init")) {
       continue;
-    if (failed(translateFunc(funcOp)))
+    }
+    if (failed(translateFunc(funcOp))) {
       return failure();
+    }
     funcOp.erase();
   }
 

@@ -363,8 +363,8 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
 else
 
-  # handshake transformations, without the LSQ minimization passes: operand
-  # routing is incompatible with them for now
+  # handshake transformations, without the LSQ minimization passes
+  # (shrink it or shed it), which need rebuilding for the new routing
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
@@ -438,18 +438,13 @@ else
   else
     CALCULATE_PATH_DELAYS_FLAG=""
   fi
-  # FTD circuits need FTD-specific backedge identification
-  BUFFER_FTD=0
-  if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
-    BUFFER_FTD=1
-  fi
   # To enable debug information, make sure that Dynamatic is built with Debug
   # mode and add "--debug-only=<DEBUG_TYPE>" to the binary call below. Check
   # out the value of <DEBUG_TYPE> in the cpp source files.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG ftd=$BUFFER_FTD \
+    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG ftd=$FAST_TOKEN_DELIVERY \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     ${LSQ_SIZING_PASS:+"$LSQ_SIZING_PASS"} \
     ${SHARING_PASS:+"$SHARING_PASS"} \

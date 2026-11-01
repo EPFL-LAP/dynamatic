@@ -372,8 +372,13 @@ struct StartToControlConnector {
 
   void declareSignals(mlir::raw_indented_ostream &os,
                       VerificationContext &ctx) {
-    // every control input gets its own handshake,
-    // driven by its own TB start process
+    // the function start uses the TB start signals, declared separately
+    if (argName == "start") {
+      return;
+    }
+
+    // a memory start gets its own handshake, sent once
+    // (see generateMemStartProcesses)
     declareReg(ctx, os, "tb_" + argName + "_valid", std::nullopt, 0);
     declareWire(ctx, os, "tb_" + argName + "_ready", std::nullopt,
                 std::nullopt);
@@ -382,14 +387,19 @@ struct StartToControlConnector {
 
   void connectToDuv(Instance &duvInst) {
     // Driving the control-only interface signals:
-    // each control input (the function start and the memory starts)
-    // is driven by its own TB start signal, so it is sent exactly once
-    // (see generateControlInputProcesses).
-    //
-    // [HACK] generate_idle_signal relies on the function start
-    // being named "start", reading tb_start_valid.
-    duvInst.connect(argName + "_valid", "tb_" + argName + "_valid")
-        .connect(argName + "_ready", "tb_" + argName + "_ready");
+    if (argName == "start") {
+      // Function start: it is driven by the TB start signal (to ensure that
+      // the function is strictly executed only once).
+      //
+      // [HACK] We hardcode the name "start" for the function start signal.
+      duvInst.connect(argName + "_valid", "tb_start_valid")
+          .connect(argName + "_ready", "tb_start_ready");
+    } else {
+      // Memory arguments: they are driven by their own TB signals,
+      // so that each is sent only once (see generateMemStartProcesses).
+      duvInst.connect(argName + "_valid", "tb_" + argName + "_valid")
+          .connect(argName + "_ready", "tb_" + argName + "_ready");
+    }
   }
 };
 
@@ -462,6 +472,13 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
 
   declareReg(ctx, os, "tb_clk", std::nullopt, 0);
   declareReg(ctx, os, "tb_rst", std::nullopt, 0);
+
+  // The interface that indicates the global "start" signal.
+  declareReg(ctx, os, "tb_start_valid", std::nullopt, 0);
+  declareWire(ctx, os, "tb_start_ready", std::nullopt, std::nullopt);
+
+  // Testbench state signal.
+  declareReg(ctx, os, "tb_started");
 
   // The interface that indicates the global "done" signal.
   declareWire(ctx, os, "tb_global_valid");
@@ -703,14 +720,19 @@ end
   }
 }
 
-// Each control input (the function start and the memory starts)
-// is sent exactly once:
+// Each memory start is sent exactly once, like the function start
+// (see generate_start_signal):
 // held low during reset, raised on the first clock edge after it,
 // and dropped once the circuit accepts it.
-static void generateControlInputProcesses(mlir::raw_indented_ostream &os,
-                                          VerificationContext &ctx) {
+static void generateMemStartProcesses(mlir::raw_indented_ostream &os,
+                                      VerificationContext &ctx) {
   for (auto &[type, argName] :
        getInputArguments<handshake::ControlType>(ctx.funcOp)) {
+    // the function start is driven by generate_start_signal
+    if (argName == "start") {
+      continue;
+    }
+
     if (ctx.simLanguage == VHDL) {
       os << llvm::formatv(R"(
 generate_{0}_signal : process(tb_clk, tb_rst)
@@ -783,7 +805,7 @@ void vhdlTbCodegen(VerificationContext &ctx) {
     deriveGlobalCompletionSignal(os, ctx);
     getOutputTagGeneration(os, ctx);
     os << VHDL_COMMON_TB_BODY;
-    generateControlInputProcesses(os, ctx);
+    generateMemStartProcesses(os, ctx);
     generateTimeoutProcess(os, ctx);
     os.unindent();
     os << "end architecture behavior;\n";
@@ -799,7 +821,7 @@ void vhdlTbCodegen(VerificationContext &ctx) {
     deriveGlobalCompletionSignal(os, ctx);
     getOutputTagGeneration(os, ctx);
     os << VERILOG_COMMON_TB_BODY;
-    generateControlInputProcesses(os, ctx);
+    generateMemStartProcesses(os, ctx);
     generateTimeoutProcess(os, ctx);
     os.unindent();
     os << "endmodule\n";

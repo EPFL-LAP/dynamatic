@@ -76,19 +76,22 @@ static Type getHandshakeType(Type type) {
   Type i32Type = IntegerType::get(ctx, 32);
 
   // an index value becomes a channel of a 32-bit integer
-  if (isa<IndexType>(type))
+  if (isa<IndexType>(type)) {
     return handshake::ChannelType::get(i32Type);
+  }
 
   // integer and float values become channels of themselves
-  if (isa<IntegerType, FloatType>(type))
+  if (isa<IntegerType, FloatType>(type)) {
     return handshake::ChannelType::get(type);
+  }
 
   // a memory region (an array argument) is not routed:
   // it stays a memref, for the memory interfaces
   if (auto memrefType = dyn_cast<MemRefType>(type)) {
     // an array of anything but index is unchanged
-    if (!isa<IndexType>(memrefType.getElementType()))
+    if (!isa<IndexType>(memrefType.getElementType())) {
       return memrefType;
+    }
 
     // an array of index has its loads produce index values,
     // which become channels, so they must be 32-bit integers:
@@ -97,8 +100,9 @@ static Type getHandshakeType(Type type) {
   }
 
   // handshake types are already lowered
-  if (isa<handshake::ChannelType, handshake::ControlType>(type))
+  if (isa<handshake::ChannelType, handshake::ControlType>(type)) {
     return type;
+  }
 
   llvm_unreachable("type has no handshake lowering");
 }
@@ -194,20 +198,23 @@ static HandshakeFunction createHandshakeFunction(func::FuncOp funcOp,
 
   // after them come a start control per memory region, then the start
   // for each memory region
-  for (const std::string &memName : memNames)
+  for (const std::string &memName : memNames) {
     // name its start control after it
     argNames.push_back(StringAttr::get(ctx, memName + "_start"));
+  }
   // and name the start control last
   argNames.push_back(StringAttr::get(ctx, "start"));
 
   // for each original result
-  for (unsigned idx = 0; idx < funcOp.getNumResults(); ++idx)
+  for (unsigned idx = 0; idx < funcOp.getNumResults(); ++idx) {
     // give it a default name by its position
     resNames.push_back(StringAttr::get(ctx, "out" + std::to_string(idx)));
+  }
   // for each memory region
-  for (const std::string &memName : memNames)
+  for (const std::string &memName : memNames) {
     // name its end control after it
     resNames.push_back(StringAttr::get(ctx, memName + "_end"));
+  }
   // and name the end control last
   resNames.push_back(StringAttr::get(ctx, "end"));
 
@@ -215,11 +222,13 @@ static HandshakeFunction createHandshakeFunction(func::FuncOp funcOp,
   // and every control is dataless
   SmallVector<Type> argTypes, resTypes;
   // for each original argument, its channel type
-  for (Type type : funcOp.getArgumentTypes())
+  for (Type type : funcOp.getArgumentTypes()) {
     argTypes.push_back(getHandshakeType(type));
+  }
   // for each original result, its channel type
-  for (Type type : funcOp.getResultTypes())
+  for (Type type : funcOp.getResultTypes()) {
     resTypes.push_back(getHandshakeType(type));
+  }
   // a start control per memory region
   argTypes.append(memNames.size(), controlType);
   // and the start
@@ -256,8 +265,9 @@ static HandshakeFunction createHandshakeFunction(func::FuncOp funcOp,
 
   // convert every block argument to its handshake type
   for (Block &block : newFuncOp.getBody()) {
-    for (BlockArgument arg : block.getArguments())
+    for (BlockArgument arg : block.getArguments()) {
       arg.setType(getHandshakeType(arg.getType()));
+    }
   }
 
   // in MLIR, a function's arguments are its entry block's arguments,
@@ -288,14 +298,16 @@ static HandshakeFunction createHandshakeFunction(func::FuncOp funcOp,
 static bool isSourcable(Operation *op) {
   // only a constant can be sourced:
   // uninitialized variables are triggered by start
-  if (!isa<arith::ConstantOp>(op))
+  if (!isa<arith::ConstantOp>(op)) {
     return false;
+  }
 
   // inherited list of the ops that need this
   for (Operation *user : op->getUsers()) {
     if (isa<cf::BranchOp, cf::CondBranchOp, memref::LoadOp, memref::StoreOp>(
-            user))
+            user)) {
       return false;
+    }
   }
 
   return true;
@@ -306,8 +318,9 @@ static bool isSourcable(Operation *op) {
 /// as index does everywhere in this pass (see getHandshakeType).
 static TypedAttr getConstantValue(arith::ConstantOp cstOp, OpBuilder &builder) {
   TypedAttr value = cstOp.getValue();
-  if (!isa<IndexType>(value.getType()))
+  if (!isa<IndexType>(value.getType())) {
     return value;
+  }
   return IntegerAttr::get(builder.getIntegerType(32),
                           cast<IntegerAttr>(value).getValue().trunc(32));
 }
@@ -317,12 +330,15 @@ static TypedAttr getConstantValue(arith::ConstantOp cstOp, OpBuilder &builder) {
 /// Returns null for a type with no zero.
 static TypedAttr getUndefinedValue(LLVM::UndefOp undefOp, OpBuilder &builder) {
   Type type = undefOp.getRes().getType();
-  if (isa<IndexType>(type))
+  if (isa<IndexType>(type)) {
     return builder.getIntegerAttr(builder.getIntegerType(32), 0);
-  if (isa<IntegerType>(type))
+  }
+  if (isa<IntegerType>(type)) {
     return builder.getIntegerAttr(type, 0);
-  if (auto floatType = dyn_cast<FloatType>(type))
+  }
+  if (auto floatType = dyn_cast<FloatType>(type)) {
     return builder.getFloatAttr(floatType, 0.0);
+  }
   return nullptr;
 }
 
@@ -340,24 +356,28 @@ static LogicalResult convertConstants(Region &body, Value start,
   for (Block &block : body) {
     for (Operation &op : llvm::make_early_inc_range(block)) {
       // only constants and undefined values are converted here
-      if (!isa<arith::ConstantOp, LLVM::UndefOp>(op))
+      if (!isa<arith::ConstantOp, LLVM::UndefOp>(op)) {
         continue;
+      }
       Location loc = op.getLoc();
       builder.setInsertionPoint(&op);
 
       // the value the handshake constant produces
       TypedAttr value;
-      if (auto cstOp = dyn_cast<arith::ConstantOp>(op))
+      if (auto cstOp = dyn_cast<arith::ConstantOp>(op)) {
         value = getConstantValue(cstOp, builder);
-      else
+      } else {
         value = getUndefinedValue(cast<LLVM::UndefOp>(op), builder);
-      if (!value)
+      }
+      if (!value) {
         return op.emitError() << "operation has unsupported result type";
+      }
 
       // what triggers it: a source, or start
       Value trigger = start;
-      if (isSourcable(&op))
+      if (isSourcable(&op)) {
         trigger = handshake::SourceOp::create(builder, loc).getResult();
+      }
 
       // replace the original with the handshake constant,
       // which takes over its uses
@@ -371,8 +391,9 @@ static LogicalResult convertConstants(Region &body, Value start,
 
 /// The type a channel carries, or the type itself if it is not a channel.
 static Type getDataType(Type type) {
-  if (auto channelType = dyn_cast<handshake::ChannelType>(type))
+  if (auto channelType = dyn_cast<handshake::ChannelType>(type)) {
     return channelType.getDataType();
+  }
   return type;
 }
 
@@ -636,8 +657,9 @@ static LogicalResult replaceArithOp(Operation &op, TypeRange resultTypes,
 
   // if we dont get a replacement handshake channel,
   // conversion to handshake has failed
-  if (failed(replacement))
+  if (failed(replacement)) {
     return failure();
+  }
 
   // rewire the IR that all consumers of the original
   // read from the replacement handshake channel
@@ -656,20 +678,23 @@ static LogicalResult convertArithAndMath(Region &body, OpBuilder &builder) {
     // when we convert an op, we invalidate the iterator, so use early inc
     for (Operation &op : llvm::make_early_inc_range(block)) {
       // we are only converting the arith and math ops in this step
-      if (!isa<arith::ArithDialect, math::MathDialect>(op.getDialect()))
+      if (!isa<arith::ArithDialect, math::MathDialect>(op.getDialect())) {
         continue;
+      }
 
       // handle MLIR builder stuff
       builder.setInsertionPoint(&op);
 
       // the result types of the handshake op
       SmallVector<Type> resultTypes;
-      for (Type type : op.getResultTypes())
+      for (Type type : op.getResultTypes()) {
         resultTypes.push_back(getHandshakeType(type));
+      }
 
       // replace the op with its handshake equivalent
-      if (failed(replaceArithOp(op, resultTypes, builder)))
+      if (failed(replaceArithOp(op, resultTypes, builder))) {
         return failure();
+      }
     }
   }
   return success();
@@ -692,8 +717,9 @@ static void convertLoadsAndStores(
     // converting loads and stores breaks a normal iterator
     for (Operation &op : llvm::make_early_inc_range(block)) {
       // only loads and stores
-      if (!isa<memref::LoadOp, memref::StoreOp>(op))
+      if (!isa<memref::LoadOp, memref::StoreOp>(op)) {
         continue;
+      }
       // handle insertion point
       builder.setInsertionPoint(&op);
 
@@ -932,11 +958,13 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
       collectMemoryInterfaceCfgs(base, memStarts);
 
   // convert constants
-  if (failed(convertConstants(body, start, builder)))
+  if (failed(convertConstants(body, start, builder))) {
     return failure();
+  }
   // convert arith and math
-  if (failed(convertArithAndMath(body, builder)))
+  if (failed(convertArithAndMath(body, builder))) {
     return failure();
+  }
 
   // convert loads and stores
   // storing which handshake loads and stores belong to which memref
@@ -951,8 +979,9 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // conversion, so the new block arguments take handshake types, and start's
   // uses by the constants get block arguments too
   SSAMaximizationStrategy strategy;
-  if (failed(maximizeSSA(body, strategy)))
+  if (failed(maximizeSSA(body, strategy))) {
     return failure();
+  }
 
   // collect all block uses that must be routed
   SetVector<BlockUse> blockUses = collectBlockUses(body);
@@ -974,15 +1003,18 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // using small vector on the heap over std::vector
   // based on the programmers manual
   SmallVector<Cfg, 0> nonMemoryCfgs;
-  for (const SetVector<BlockUse> &blockUseSet : blockUseSets)
+  for (const SetVector<BlockUse> &blockUseSet : blockUseSets) {
     nonMemoryCfgs.push_back(buildCfg(base, blockUseSet));
+  }
 
   // for each cfg, optimize based on the block uses annotated on it
-  for (Cfg &cfg : nonMemoryCfgs)
+  for (Cfg &cfg : nonMemoryCfgs) {
     optimizeCfg(cfg);
+  }
   // for each memory cfg, optimize
-  for (auto &[key, memoryCfg] : memoryCfgs)
+  for (auto &[key, memoryCfg] : memoryCfgs) {
     optimizeCfg(memoryCfg.cfg);
+  }
 
   // run the control-network routing algorithm once per cfg
   MapVector<MemrefValue, MemoryInterfaceInputs> memoryInputs = routeCfgs(
@@ -992,8 +1024,9 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // the memory interface builder reads it off each memory access
   // to group them, so it has to be set before the interfaces are built
   for (Block &block : body) {
-    for (Operation &op : block)
+    for (Operation &op : block) {
       setBB(&op, getBlockNumber(&block));
+    }
   }
 
   // build the memory interfaces (MCs and LSQs),
@@ -1042,8 +1075,9 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
     // but it's used elsewhere, so not changing it for now
     handshake::MemoryControllerOp mcOp;
     handshake::LSQOp lsqOp;
-    if (failed(memBuilder.instantiateInterfaces(builder, mcOp, lsqOp)))
+    if (failed(memBuilder.instantiateInterfaces(builder, mcOp, lsqOp))) {
       return failure();
+    }
 
     // take the end signal from the MC if it exists
     // or the LSQ if it does not
@@ -1059,8 +1093,9 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // the loads under the hood,
   // we need to just erase the temporary producers
   // rather than the typical resolution approach
-  for (TempProd &dataTemp : loadDataTemps)
+  for (TempProd &dataTemp : loadDataTemps) {
     dataTemp.erase();
+  }
 
   // Now we need to replace the func.return op
   // with a handshake.end op
@@ -1082,8 +1117,9 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   endOperands.push_back(start);
 
   // Erase the cf.br, cf.cond_br and func.return operations
-  for (Block &block : body)
+  for (Block &block : body) {
     block.getTerminator()->erase();
+  }
 
   // erase the BlockToCond temporaries,
   // now that the cf.cond_br ops are erased
@@ -1098,8 +1134,9 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   Block &entry = body.front();
   for (Block &block : llvm::make_early_inc_range(llvm::drop_begin(body))) {
     // After routing, the block args should have no uses
-    for (BlockArgument arg : block.getArguments())
+    for (BlockArgument arg : block.getArguments()) {
       assert(arg.use_empty() && "block argument still has a use");
+    }
 
     // move the operations to the entry block
     entry.getOperations().splice(entry.end(), block.getOperations());
@@ -1156,8 +1193,9 @@ struct CfToHandshakePass
     // a single function, with no calls, is supported for now
     SmallVector<func::FuncOp> funcOps;
     for (auto funcOp : modOp.getOps<func::FuncOp>()) {
-      if (!funcOp.isExternal())
+      if (!funcOp.isExternal()) {
         funcOps.push_back(funcOp);
+      }
     }
     if (funcOps.size() != 1) {
       modOp.emitError() << "cf to handshake supports a single function only";
@@ -1173,18 +1211,21 @@ struct CfToHandshakePass
     // Convert all CF internal array ops to RAM ops as step 1.
     // This is helpful for internal array processing,
     // as it makes the memrefs easy to process
-    if (failed(convertInternalArrays(funcOp, namer, builder)))
+    if (failed(convertInternalArrays(funcOp, namer, builder))) {
       return signalPassFailure();
+    }
 
     // remove global ops
     // (both internal arrays and external functions have been processed)
     for (auto globalOp :
-         llvm::make_early_inc_range(modOp.getOps<memref::GlobalOp>()))
+         llvm::make_early_inc_range(modOp.getOps<memref::GlobalOp>())) {
       globalOp.erase();
+    }
 
     // run cf to handshake on the one function
-    if (failed(lowerFunction(funcOp, namer, builder)))
+    if (failed(lowerFunction(funcOp, namer, builder))) {
       return signalPassFailure();
+    }
 
     // name all unnamed operations in the IR
     if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))

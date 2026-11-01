@@ -17,8 +17,9 @@ using namespace dynamatic::experimental::cf_to_handshake;
 
 const LiveOut *CfgEdge::getLiveOut(BlockInput blockInput) const {
   for (const LiveOut &liveOut : liveOuts) {
-    if (liveOut.blockInput == blockInput)
+    if (liveOut.blockInput == blockInput) {
       return &liveOut;
+    }
   }
   llvm_unreachable("edge carries no live-out to this block input");
 }
@@ -27,8 +28,9 @@ const LiveOut *CfgEdge::getLiveOut(BlockInput blockInput) const {
 SmallVector<CfgEdge *> Cfg::getOutEdges(Block *block) {
   SmallVector<CfgEdge *> outEdges;
   for (CfgEdge &edge : edges) {
-    if (edge.from == block)
+    if (edge.from == block) {
       outEdges.push_back(&edge);
+    }
   }
   return outEdges;
 }
@@ -36,8 +38,9 @@ SmallVector<CfgEdge *> Cfg::getOutEdges(Block *block) {
 SmallVector<const CfgEdge *> Cfg::getOutEdges(Block *block) const {
   SmallVector<const CfgEdge *> outEdges;
   for (const CfgEdge &edge : edges) {
-    if (edge.from == block)
+    if (edge.from == block) {
       outEdges.push_back(&edge);
+    }
   }
   return outEdges;
 }
@@ -46,8 +49,9 @@ SmallVector<const CfgEdge *> Cfg::getOutEdges(Block *block) const {
 SmallVector<CfgEdge *> Cfg::getInEdges(Block *block) {
   SmallVector<CfgEdge *> inEdges;
   for (CfgEdge &edge : edges) {
-    if (edge.to == block)
+    if (edge.to == block) {
       inEdges.push_back(&edge);
+    }
   }
   return inEdges;
 }
@@ -55,8 +59,9 @@ SmallVector<CfgEdge *> Cfg::getInEdges(Block *block) {
 SmallVector<const CfgEdge *> Cfg::getInEdges(Block *block) const {
   SmallVector<const CfgEdge *> inEdges;
   for (const CfgEdge &edge : edges) {
-    if (edge.to == block)
+    if (edge.to == block) {
       inEdges.push_back(&edge);
+    }
   }
   return inEdges;
 }

@@ -27,9 +27,11 @@ using namespace mlir;
 using namespace dynamatic;
 
 /// Gives the function a single return.
-/// First we add a new basic block at the end of the cfg.
-/// It takes the returned values from cf.br ops to its block args,
-/// and then places a return op which reads from its block args
+/// We add a new basic block at the end of the function,
+/// with one block arg per returned value,
+/// and a return op which returns those block args.
+/// Each original return op becomes a cf.br to the new basic block,
+/// passing its returned values as the block args.
 static void mergeReturns(func::FuncOp funcOp, OpBuilder &builder) {
   // get the original return ops
   SmallVector<func::ReturnOp> returnOps(funcOp.getOps<func::ReturnOp>());
@@ -80,8 +82,9 @@ struct FuncMergeReturnsPass
   void runOnOperation() override {
     OpBuilder builder(&getContext());
     for (func::FuncOp funcOp : getOperation().getOps<func::FuncOp>()) {
-      if (funcOp.isExternal())
+      if (funcOp.isExternal()) {
         continue;
+      }
       mergeReturns(funcOp, builder);
     }
   };

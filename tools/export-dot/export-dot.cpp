@@ -28,7 +28,6 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -102,10 +101,6 @@ static StringRef getArrowheadStyle(OpOperand &oprd) {
 /// operand of a memory interface. Returns an empty reference if the memref
 /// cannot be found in the arguments.
 static StringRef getMemName(Value memref) {
-  // a RAM op's memory is named after the RAM op
-  if (auto ramOp = memref.getDefiningOp<handshake::RAMOp>())
-    return getUniqueName(ramOp);
-
   Operation *parentOp = memref.getParentBlock()->getParentOp();
   handshake::FuncOp funcOp = dyn_cast<handshake::FuncOp>(parentOp);
   for (auto [name, funArg] :
@@ -284,49 +279,6 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   mlir::DenseMap<unsigned, DOTGraph::Subgraph *> bbSubgraphs;
   DOTGraph::Subgraph *root = &builder.getRoot();
 
-  // The anonymous subgraphs pinned to the top and bottom rank of each block
-  // cluster, holding the routing dots of the edges crossing blocks
-  mlir::DenseMap<unsigned, DOTGraph::Subgraph *> bbTopRank, bbBottomRank;
-  unsigned numRoutingDots = 0;
-
-  // newrank lets dot honour rank constraints inside clusters; the two
-  // spacings are in inches
-  root->addAttr("newrank", "true");
-  root->addAttr("nodesep", "0.5");
-  root->addAttr("ranksep", "0.75");
-  // More crossing-reduction iterations than dot's default
-  root->addAttr("mclimit", "4");
-
-  // Returns the cluster of a block, creating it on first use with its two
-  // rank subgraphs
-  auto getBlockCluster = [&](unsigned bb) -> DOTGraph::Subgraph & {
-    if (auto subIt = bbSubgraphs.find(bb); subIt != bbSubgraphs.end())
-      return *subIt->second;
-    std::string name = "cluster" + std::to_string(bb);
-    DOTGraph::Subgraph &bbSub = builder.addSubgraph(name, *root);
-    bbSub.addAttr("label", "BB " + std::to_string(bb));
-    bbSub.addAttr("style", "rounded");
-    bbSubgraphs.insert({bb, &bbSub});
-
-    DOTGraph::Subgraph &top = builder.addSubgraph("", bbSub);
-    top.addAttr("rank", "min");
-    bbTopRank.insert({bb, &top});
-    DOTGraph::Subgraph &bottom = builder.addSubgraph("", bbSub);
-    bottom.addAttr("rank", "max");
-    bbBottomRank.insert({bb, &bottom});
-    return bbSub;
-  };
-
-  // Adds a routing dot to a rank subgraph and returns its name
-  auto addRoutingDot = [&](DOTGraph::Subgraph &rankSub) -> std::string {
-    std::string name = "dot_" + std::to_string(numRoutingDots++);
-    DOTGraph::Node *dot = builder.addNode(name, rankSub);
-    dot->addAttr("shape", "point");
-    dot->addAttr("width", "0.08");
-    dot->addAttr("color", "blue");
-    return name;
-  };
-
   auto addNode = [&](Operation *op,
                      DOTGraph::Subgraph &subgraph) -> LogicalResult {
     // The node's DOT "mlir_op" attribute
@@ -343,19 +295,12 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     if (isa<handshake::CmpIOp, handshake::CmpFOp>(op))
       mlirOpName += prettyLabel;
 
-    // The node's DOT "shape" attribute. A sink is drawn as a stub, a point
-    // without a label, since it only marks a dropped output and a full box
-    // would pull the layout apart around branches with an unused side.
+    // The node's DOT "shape" attribute
     StringRef shape;
-    bool isStub = isa<handshake::SinkOp>(op);
-    if (isStub) {
-      shape = "point";
-      prettyLabel = "";
-    } else if (isa<handshake::ArithOpInterface>(op)) {
+    if (isa<handshake::ArithOpInterface>(op))
       shape = "oval";
-    } else {
+    else
       shape = "box";
-    }
 
     // The node's DOT "style" attribute
     std::string style = "filled";
@@ -372,336 +317,85 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     node->addAttr("fillcolor", getNodeColor(op));
     node->addAttr("shape", shape);
     node->addAttr("style", style);
-    if (isStub)
-      node->addAttr("width", "0.15");
     return success();
   };
 
-  // A memory controller is not drawn as one node but as abstractions placed
-  // in the blocks they belong to: one node per block storing to it, taking
-  // that block's count and the stores' addresses and data; one node per
-  // load, taking the address and giving the data; and one node for the end,
-  // taking the controller's start and end controls and giving its memory
-  // end. These map each controller operand and result to its node, and each
-  // abstraction node to the block it is drawn in.
-  llvm::DenseMap<std::pair<Operation *, unsigned>, std::string> mcOperandNodes;
-  llvm::DenseMap<std::pair<Operation *, unsigned>, std::string> mcResultNodes;
-  llvm::StringMap<std::optional<unsigned>> abstractionBlocks;
-
-  // A function argument is drawn once per block that consumes it, so each
-  // use knows the name of the copy it connects to
-  llvm::DenseMap<OpOperand *, std::string> argUseNodes;
-
-  // The block an operation is drawn in: its own, or for a sink or a buffer
-  // without one the block of the first operation with a block up its operand
-  // chain, since buffers inherit the block of their consumer and a buffer
-  // feeding a memory controller gets none
-  auto getDrawBlock = [&](Operation *op) -> std::optional<unsigned> {
-    std::optional<unsigned> bb = getLogicBB(op);
-    while (!bb && isa<handshake::SinkOp, handshake::BufferOp>(op)) {
-      op = op->getOperand(0).getDefiningOp();
-      if (!op)
-        break;
-      bb = getLogicBB(op);
-    }
-    return bb;
-  };
-
-  // The block the consumer side of a use is drawn in. A function result is
-  // drawn in the block of its producer.
-  auto getUseBlock = [&](OpOperand &oprd) -> std::optional<unsigned> {
-    Operation *userOp = oprd.getOwner();
-    if (isa<handshake::MemoryControllerOp>(userOp))
-      return abstractionBlocks[mcOperandNodes[{userOp,
-                                               oprd.getOperandNumber()}]];
-    if (isa<handshake::EndOp>(userOp)) {
-      if (Operation *producer = oprd.get().getDefiningOp())
-        return getDrawBlock(producer);
-      return std::nullopt;
-    }
-    return getDrawBlock(userOp);
-  };
-
-  // The DOT endpoints of an operand edge: node and port names and indices
-  // on both sides
-  struct EdgeEndpoints {
-    std::string srcNodeName, srcPortName, dstNodeName, dstPortName;
-    unsigned srcIdx, dstIdx;
-  };
-
-  auto getEndpoints = [&](OpOperand &oprd) -> EdgeEndpoints {
+  auto addEdge = [&](OpOperand &oprd, DOTGraph::Subgraph &subgraph) -> void {
     Value val = oprd.get();
     Operation *dstOp = oprd.getOwner();
-    EdgeEndpoints ends;
 
     // Determine the edge's source
+    std::string srcNodeName, srcPortName;
+    unsigned srcIdx;
     if (auto res = dyn_cast<OpResult>(val)) {
       Operation *srcOp = res.getDefiningOp();
-      ends.srcIdx = res.getResultNumber();
-      if (isa<handshake::MemoryControllerOp>(srcOp))
-        ends.srcNodeName = mcResultNodes[{srcOp, ends.srcIdx}];
-      else
-        ends.srcNodeName = getUniqueName(srcOp).str();
-      ends.srcPortName =
-          cast<handshake::NamedIOInterface>(srcOp).getResultName(ends.srcIdx);
+      srcNodeName = getUniqueName(srcOp).str();
+      srcIdx = res.getResultNumber();
+      srcPortName =
+          cast<handshake::NamedIOInterface>(srcOp).getResultName(srcIdx);
     } else {
       Operation *parentOp = val.getParentBlock()->getParentOp();
-      ends.srcIdx = cast<BlockArgument>(val).getArgNumber();
-      ends.srcPortName =
-          cast<handshake::NamedIOInterface>(parentOp).getOperandName(
-              ends.srcIdx);
-      ends.srcNodeName = argUseNodes.lookup(&oprd);
-      if (ends.srcNodeName.empty())
-        ends.srcNodeName = ends.srcPortName;
+      srcIdx = cast<BlockArgument>(val).getArgNumber();
+      srcNodeName = srcPortName =
+          cast<handshake::NamedIOInterface>(parentOp).getOperandName(srcIdx);
     }
 
     // Determine the edge's destination
-    ends.dstIdx = oprd.getOperandNumber();
+    std::string dstNodeName, dstPortName;
+    unsigned dstIdx;
     if (isa<handshake::EndOp>(dstOp)) {
       Operation *parentOp = dstOp->getParentOp();
-      ends.dstNodeName = ends.dstPortName =
-          cast<handshake::NamedIOInterface>(parentOp).getResultName(
-              ends.dstIdx);
-    } else if (isa<handshake::MemoryControllerOp>(dstOp)) {
-      ends.dstNodeName = mcOperandNodes[{dstOp, ends.dstIdx}];
-      ends.dstPortName =
-          cast<handshake::NamedIOInterface>(dstOp).getOperandName(ends.dstIdx);
+      dstIdx = oprd.getOperandNumber();
+      dstNodeName = dstPortName =
+          cast<handshake::NamedIOInterface>(parentOp).getResultName(dstIdx);
     } else {
-      ends.dstNodeName = getUniqueName(dstOp).str();
-      ends.dstPortName =
-          cast<handshake::NamedIOInterface>(dstOp).getOperandName(ends.dstIdx);
+      dstNodeName = getUniqueName(dstOp).str();
+      dstIdx = oprd.getOperandNumber();
+      dstPortName =
+          cast<handshake::NamedIOInterface>(dstOp).getOperandName(dstIdx);
     }
-    return ends;
-  };
 
-  // The attributes every edge of an operand's connection gets. The port
-  // attributes go on the whole connection, so a routed connection has them
-  // on each of its segments.
-  auto setEdgeAttrs = [&](DOTGraph::Edge &edge, OpOperand &oprd,
-                          const EdgeEndpoints &ends) -> void {
-    edge.addAttr("from", ends.srcPortName);
-    edge.addAttr("from_idx", std::to_string(ends.srcIdx));
-    edge.addAttr("to", ends.dstPortName);
-    edge.addAttr("to_idx", std::to_string(ends.dstIdx));
+    DOTGraph::Edge &edge = builder.addEdge(srcNodeName, dstNodeName, subgraph);
+    edge.addAttr("from", srcPortName);
+    edge.addAttr("from_idx", std::to_string(srcIdx));
+    edge.addAttr("to", dstPortName);
+    edge.addAttr("to_idx", std::to_string(dstIdx));
     edge.addAttr("style", getStyle(oprd.get()));
-    edge.addAttr("penwidth", "2");
     edge.addAttr("dir", "both");
     edge.addAttr("arrowtail", "none");
     edge.addAttr("arrowhead", getArrowheadStyle(oprd));
-    if (isBackedge(oprd.get(), oprd.getOwner()))
+    if (isBackedge(val, dstOp))
       edge.addAttr("color", "blue");
   };
 
-  auto addEdge = [&](OpOperand &oprd, DOTGraph::Subgraph &subgraph) -> void {
-    EdgeEndpoints ends = getEndpoints(oprd);
-    DOTGraph::Edge &edge =
-        builder.addEdge(ends.srcNodeName, ends.dstNodeName, subgraph);
-    setEdgeAttrs(edge, oprd, ends);
-    // Edges inside a block are weighted so that dot keeps them short and
-    // vertical, widening the drawing rather than bending them
-    if (&subgraph != root)
-      edge.addAttr("weight", "4");
-  };
-
-  // An edge between two blocks is routed through a dot on the bottom rank
-  // of the source block and a dot on the top rank of the destination block,
-  // so that it leaves the source cluster at its bottom, enters the
-  // destination cluster at its top, and keeps the clusters apart
-  auto addRoutedEdge = [&](OpOperand &oprd, unsigned srcBB,
-                           unsigned dstBB) -> void {
-    EdgeEndpoints ends = getEndpoints(oprd);
-    std::string bottomDot = addRoutingDot(*bbBottomRank[srcBB]);
-    std::string topDot = addRoutingDot(*bbTopRank[dstBB]);
-
-    // All three segments are weighted like edges inside a block, so that the
-    // whole connection stays vertical
-    DOTGraph::Edge &toBottom =
-        builder.addEdge(ends.srcNodeName, bottomDot, *bbSubgraphs[srcBB]);
-    setEdgeAttrs(toBottom, oprd, ends);
-    toBottom.addAttr("arrowhead", "none");
-    toBottom.addAttr("weight", "4");
-
-    DOTGraph::Edge &across = builder.addEdge(bottomDot, topDot, *root);
-    setEdgeAttrs(across, oprd, ends);
-    across.addAttr("arrowhead", "none");
-    across.addAttr("minlen", "4");
-    across.addAttr("weight", "4");
-
-    DOTGraph::Edge &toDst =
-        builder.addEdge(topDot, ends.dstNodeName, *bbSubgraphs[dstBB]);
-    setEdgeAttrs(toDst, oprd, ends);
-    toDst.addAttr("weight", "4");
-  };
-
-  // Adds an abstraction node of a memory controller to the cluster of its
-  // block, or to the root when it has none
-  auto addAbstractionNode = [&](StringRef name, StringRef label,
-                                handshake::MemoryControllerOp mcOp,
-                                std::optional<unsigned> bb) -> void {
-    DOTGraph::Subgraph &subgraph = bb ? getBlockCluster(*bb) : *root;
-    DOTGraph::Node *node = builder.addNode(name, subgraph);
-    node->addAttr("mlir_op", mcOp->getName().getStringRef());
-    node->addAttr("label", label);
-    node->addAttr("fillcolor", "lightsalmon");
-    node->addAttr("shape", "box");
-    node->addAttr("style", "filled, dashed");
-    abstractionBlocks[name] = bb;
-  };
-
-  for (auto mcOp : funcOp.getOps<handshake::MemoryControllerOp>()) {
-    std::string mcName = getUniqueName(mcOp).str();
-    MCPorts ports = mcOp.getPorts();
-
-    for (MCBlock &block : ports.getBlocks()) {
-      // A block with only loads has no count and no store, so no block node
-      std::string name = mcName + "_bb" + std::to_string(block.blockID);
-      std::string label = mcName + "\\nbb" + std::to_string(block.blockID);
-      if (block->ctrlPort || block->hasAnyPort<StorePort>())
-        addAbstractionNode(name, label, mcOp, block.blockID);
-      if (block->ctrlPort)
-        mcOperandNodes[{mcOp, block->ctrlPort->getCtrlInputIndex()}] = name;
-      for (MemoryPort &port : block->accessPorts) {
-        if (auto storePort = dyn_cast<StorePort>(port)) {
-          mcOperandNodes[{mcOp, storePort->getAddrInputIndex()}] = name;
-          mcOperandNodes[{mcOp, storePort->getDataInputIndex()}] = name;
-        } else if (auto loadPort = dyn_cast<LoadPort>(port)) {
-          // A load gets its own node, since its data comes back out
-          std::string loadName =
-              mcName + "_" + getUniqueName(loadPort->getLoadOp()).str();
-          addAbstractionNode(loadName, mcName + "\\nload", mcOp,
-                             getDrawBlock(loadPort->getLoadOp()));
-          mcOperandNodes[{mcOp, loadPort->getAddrInputIndex()}] = loadName;
-          mcResultNodes[{mcOp, loadPort->getDataOutputIndex()}] = loadName;
-        }
-      }
-    }
-
-    // A controller behind an LSQ takes the LSQ's load address, store address
-    // and store data and gives it the load data back. That side is one node,
-    // drawn where the LSQ is: outside the blocks.
-    if (ports.connectsToLSQ()) {
-      LSQLoadStorePort lsqPort = ports.getLSQPort();
-      std::string lsqName = mcName + "_lsq";
-      addAbstractionNode(lsqName, mcName + "\\nlsq", mcOp, std::nullopt);
-      mcOperandNodes[{mcOp, lsqPort.getLoadAddrInputIndex()}] = lsqName;
-      mcOperandNodes[{mcOp, lsqPort.getStoreAddrInputIndex()}] = lsqName;
-      mcOperandNodes[{mcOp, lsqPort.getStoreDataInputIndex()}] = lsqName;
-      mcResultNodes[{mcOp, lsqPort.getLoadDataOutputIndex()}] = lsqName;
-    }
-
-    // The end node takes the end control and gives the memory end; it is
-    // drawn where that control comes from.
-    std::string endName = mcName + "_end";
-    std::optional<unsigned> endBlock;
-    if (Operation *endProducer = mcOp.getCtrlEnd().getDefiningOp())
-      endBlock = getDrawBlock(endProducer);
-    addAbstractionNode(endName, mcName + "\\nend", mcOp, endBlock);
-    for (OpOperand &oprd : mcOp->getOpOperands()) {
-      if (oprd.get() == mcOp.getCtrlEnd())
-        mcOperandNodes[{mcOp, oprd.getOperandNumber()}] = endName;
-    }
-    mcResultNodes[{mcOp, cast<OpResult>(mcOp.getMemEnd()).getResultNumber()}] =
-        endName;
-
-    // The start node takes the memory start, which comes from a function
-    // argument, either directly or through a fork when the memory start also
-    // feeds something else; it is drawn in the entry block
-    std::string startName = mcName + "_start";
-    addAbstractionNode(startName, mcName + "\\nstart", mcOp, /*bb=*/0);
-    for (OpOperand &oprd : mcOp->getOpOperands()) {
-      if (oprd.get() == mcOp.getMemStart())
-        mcOperandNodes[{mcOp, oprd.getOperandNumber()}] = startName;
-    }
-  }
-
-  // A back edge is routed so that every segment still points down in rank,
-  // which keeps dot from reordering the loop: the source goes down to a dot
-  // on its block's bottom rank, an invisible dot outside all clusters joins
-  // that dot and a dot on the destination block's top rank, and the latter
-  // feeds the destination. The segments keep the blue of back edges.
-  auto addBackEdge = [&](OpOperand &oprd, unsigned srcBB,
-                         unsigned dstBB) -> void {
-    EdgeEndpoints ends = getEndpoints(oprd);
-    std::string bottomDot = addRoutingDot(*bbBottomRank[srcBB]);
-    std::string topDot = addRoutingDot(*bbTopRank[dstBB]);
-    std::string outerDot = "dot_" + std::to_string(numRoutingDots++);
-    DOTGraph::Node *outer = builder.addNode(outerDot, *root);
-    outer->addAttr("shape", "point");
-    outer->addAttr("width", "0");
-    outer->addAttr("height", "0");
-    outer->addAttr("style", "invis");
-
-    DOTGraph::Edge &toBottom =
-        builder.addEdge(ends.srcNodeName, bottomDot, *bbSubgraphs[srcBB]);
-    setEdgeAttrs(toBottom, oprd, ends);
-    toBottom.addAttr("arrowhead", "none");
-
-    DOTGraph::Edge &outerToBottom = builder.addEdge(outerDot, bottomDot, *root);
-    setEdgeAttrs(outerToBottom, oprd, ends);
-    outerToBottom.addAttr("arrowhead", "none");
-
-    DOTGraph::Edge &topToOuter = builder.addEdge(topDot, outerDot, *root);
-    setEdgeAttrs(topToOuter, oprd, ends);
-    topToOuter.addAttr("arrowhead", "none");
-
-    DOTGraph::Edge &toDst =
-        builder.addEdge(topDot, ends.dstNodeName, *bbSubgraphs[dstBB]);
-    setEdgeAttrs(toDst, oprd, ends);
-  };
-
-  // Create nodes and outgoing edges for all function arguments. An argument
-  // is drawn once in every block that consumes it, and once in the root for
-  // its consumers outside blocks.
+  // Create nodes and outgoing edges for all function arguments
   std::string funcOpName = funcOp->getName().getStringRef().str();
   for (const auto &[idx, arg] : llvm::enumerate(funcOp.getArguments())) {
-    // Arguments with memref types are represented by memory interfaces
-    // inside the function, and are not displayed
     if (isa<MemRefType>(arg.getType()))
+      // Arguments with memref types are represented by memory interfaces
+      // inside the function so they are not displayed
       continue;
 
+    // Create a node for the argument
     StringRef argName = funcOp.getArgName(idx);
-    llvm::StringSet<> created;
-    for (OpOperand &oprd : arg.getUses()) {
-      std::optional<unsigned> useBlock = getUseBlock(oprd);
-      std::string nodeName = argName.str();
-      DOTGraph::Subgraph *subgraph = root;
-      if (useBlock) {
-        nodeName += "_bb" + std::to_string(*useBlock);
-        subgraph = &getBlockCluster(*useBlock);
-      }
-      if (created.insert(nodeName).second) {
-        DOTGraph::Node *node = builder.addNode(nodeName, *subgraph);
-        if (!node)
-          return funcOp.emitError()
-                 << "failed to create node for argument " << idx;
-        node->addAttr("label", argName);
-        node->addAttr("mlir_op", funcOpName);
-        node->addAttr("shape", "diamond");
-        node->addAttr("style", getStyle(arg));
-      }
-      argUseNodes[&oprd] = nodeName;
-      addEdge(oprd, *subgraph);
-    }
+    DOTGraph::Node *node = builder.addNode(argName, *root);
+    if (!node)
+      return funcOp.emitError() << "failed to create node for argument " << idx;
+    node->addAttr("label", argName);
+    node->addAttr("mlir_op", funcOpName);
+    node->addAttr("shape", "diamond");
+    node->addAttr("style", getStyle(arg));
+
+    // Create edges between the argument and operand uses in the function
+    for (OpOperand &oprd : arg.getUses())
+      addEdge(oprd, *root);
   }
 
-  // Create nodes for all function results, each in the block of its
-  // producer. A memory end is drawn in the block of its memory controller's
-  // end node.
+  // Create nodes for all function results
   ValueRange results = funcOp.getBodyBlock()->getTerminator()->getOperands();
   for (const auto &[idx, res] : llvm::enumerate(results)) {
     StringRef resName = funcOp.getResName(idx);
-    DOTGraph::Subgraph *subgraph = root;
-    if (Operation *producer = res.getDefiningOp()) {
-      std::optional<unsigned> bb;
-      if (isa<handshake::MemoryControllerOp>(producer))
-        bb = abstractionBlocks[mcResultNodes[{
-            producer, cast<OpResult>(res).getResultNumber()}]];
-      else
-        bb = getDrawBlock(producer);
-      if (bb)
-        subgraph = &getBlockCluster(*bb);
-    }
-    DOTGraph::Node *node = builder.addNode(resName, *subgraph);
+    DOTGraph::Node *node = builder.addNode(resName, *root);
     if (!node)
       return funcOp.emitError() << "failed to create node for argument " << idx;
     node->addAttr("label", resName);
@@ -711,44 +405,39 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   }
 
   for (Operation &op : funcOp.getOps()) {
-    // The end is drawn as the function's result nodes. A source only
-    // triggers a constant; it is not drawn and neither is its edge, so the
-    // constant appears with no input. A memory controller is drawn as its
-    // abstraction nodes, added above. A RAM op, like a memref argument, is
-    // represented by its memory interfaces, which are labelled with its name,
-    // so it is not drawn and neither is its edge.
-    if (isa<handshake::EndOp, handshake::SourceOp, handshake::RAMOp>(op))
+    if (isa<handshake::EndOp>(op))
       continue;
-    bool isController = isa<handshake::MemoryControllerOp>(op);
 
-    std::optional<unsigned> bb = getDrawBlock(&op);
-    if (!isController) {
-      DOTGraph::Subgraph *bbSub = bb ? &getBlockCluster(*bb) : root;
-      if (failed(addNode(&op, *bbSub)))
-        return failure();
+    // Determine the subgraph in which to insert the operation
+    DOTGraph::Subgraph *bbSub = root;
+    std::optional<unsigned> bb = getLogicBB(&op);
+    if (bb) {
+      if (auto subIt = bbSubgraphs.find(*bb); subIt != bbSubgraphs.end()) {
+        bbSub = subIt->second;
+      } else {
+        std::string name = "cluster" + std::to_string(*bb);
+        bbSub = &builder.addSubgraph(name, *root);
+        bbSub->addAttr("label", "BB " + std::to_string(*bb));
+        bbSubgraphs.insert({*bb, bbSub});
+      }
     }
 
-    // Create an edge for each use of each result of the operation. An edge
-    // between two different blocks is routed through the blocks' rank dots;
-    // an edge within a block stays in its cluster; anything else goes in
-    // the root.
+    // Create a node for the operation
+    if (failed(addNode(&op, *bbSub)))
+      return failure();
+
+    // Create an edge for each use of each result of the operation
     for (OpResult res : op.getResults()) {
-      std::optional<unsigned> srcBB = bb;
-      if (isController)
-        srcBB = abstractionBlocks[mcResultNodes[{&op, res.getResultNumber()}]];
       for (OpOperand &oprd : res.getUses()) {
-        std::optional<unsigned> dstBB = getUseBlock(oprd);
-        if (srcBB && dstBB && isBackedge(res, oprd.getOwner())) {
-          getBlockCluster(*dstBB);
-          addBackEdge(oprd, *srcBB, *dstBB);
-        } else if (srcBB && dstBB && *srcBB != *dstBB) {
-          getBlockCluster(*dstBB);
-          addRoutedEdge(oprd, *srcBB, *dstBB);
-        } else if (srcBB && dstBB) {
-          addEdge(oprd, getBlockCluster(*srcBB));
-        } else {
-          addEdge(oprd, *root);
+        // Determine the subgraph in which to insert the edge
+        DOTGraph::Subgraph *edgeSub = root;
+        if (bbSub != root) {
+          Operation *userOp = oprd.getOwner();
+          std::optional<unsigned> userBB = getLogicBB(userOp);
+          if (userBB && bb == userBB && !isa<handshake::EndOp>(userOp))
+            edgeSub = bbSub;
         }
+        addEdge(oprd, *edgeSub);
       }
     }
   }
