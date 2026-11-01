@@ -397,7 +397,7 @@ public:
                           "'ghdl' (GHDL), 'vsim' (default option: ModelSim), "
                           "'xsim' (Vivado), 'verilator' (Verilator)"});
     addOption({TIMEOUT, "The timeout for the simulation in cycles. Use 0 "
-                        "(default) for no timeout"});
+                        "for no timeout (default 500000)"});
   }
   CommandResult execute(CommandArguments &args) override;
 };
@@ -852,7 +852,7 @@ CommandResult Simulate::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  std::size_t timeout = 0;
+  std::size_t timeout = 500'000;
   std::string simulator = "vsim";
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
 
