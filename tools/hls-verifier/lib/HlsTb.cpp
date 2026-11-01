@@ -374,21 +374,11 @@ struct StartToControlConnector {
 
   void connectToDuv(Instance &duvInst) {
     // Driving the control-only interface signals:
-    if (argName == "start") {
-      // Function start: it is driven by the TB start signal (to ensure that
-      // the function is strictly executed only once).
-      //
-      // [HACK] We hardcode the name "start" for the function start signal.
-      duvInst.connect(argName + "_valid", "tb_start_valid")
-          .connect(argName + "_ready", "tb_start_ready");
-    } else {
-      // Memory arguments: they are driven by valid = "constant_1", their
-      // ready signals are ignored.
-      //
-      // [TODO] Should this handshake also happen only once per TB transaction?
-      duvInst.connect(argName + "_valid", SignalAssignment::CONST_ONE)
-          .connect(argName + "_ready", SignalAssignment::OPEN);
-    }
+    // each control input (the function start and the memory starts)
+    // is driven by its own TB signals, so that it is sent only once
+    // (see generateControlInputProcesses).
+    duvInst.connect(argName + "_valid", "tb_" + argName + "_valid")
+        .connect(argName + "_ready", "tb_" + argName + "_ready");
   }
 };
 
@@ -462,12 +452,16 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   declareReg(ctx, os, "tb_clk", std::nullopt, 0);
   declareReg(ctx, os, "tb_rst", std::nullopt, 0);
 
-  // The interface that indicates the global "start" signal.
-  declareReg(ctx, os, "tb_start_valid", std::nullopt, 0);
-  declareWire(ctx, os, "tb_start_ready", std::nullopt, std::nullopt);
-
-  // Testbench state signal.
-  declareReg(ctx, os, "tb_started");
+  // The interface that indicates each control input
+  // (the function start and the memory starts)
+  // and its testbench state signal.
+  for (auto &[type, argName] :
+       getInputArguments<handshake::ControlType>(funcOp)) {
+    declareReg(ctx, os, "tb_" + argName + "_valid", std::nullopt, 0);
+    declareWire(ctx, os, "tb_" + argName + "_ready", std::nullopt,
+                std::nullopt);
+    declareReg(ctx, os, "tb_" + argName + "_started");
+  }
 
   // The interface that indicates the global "done" signal.
   declareWire(ctx, os, "tb_global_valid");
@@ -709,6 +703,54 @@ end
   }
 }
 
+// Each control input (the function start and the memory starts)
+// is sent exactly once:
+// held low during reset, raised on the first clock edge after it,
+// and dropped once the circuit accepts it.
+static void generateControlInputProcesses(mlir::raw_indented_ostream &os,
+                                          VerificationContext &ctx) {
+  for (auto &[type, argName] :
+       getInputArguments<handshake::ControlType>(ctx.funcOp)) {
+    if (ctx.simLanguage == VHDL) {
+      os << llvm::formatv(R"(
+generate_{0}_signal : process(tb_clk, tb_rst)
+begin
+  if (tb_rst = '1') then
+    tb_{0}_valid <= '0';
+    tb_{0}_started <= '0';
+  elsif rising_edge(tb_clk) then
+    if (tb_{0}_started = '0') then
+      tb_{0}_valid <= '1';
+      tb_{0}_started <= '1';
+    else
+      tb_{0}_valid <= tb_{0}_valid and (not tb_{0}_ready);
+    end if;
+  end if;
+end process generate_{0}_signal;
+)",
+                          argName);
+    } else {
+      os << llvm::formatv(R"(
+// Equivalent of VHDL generate_{0}_signal
+always @(posedge tb_clk or posedge tb_rst) begin
+    if (tb_rst) begin
+        tb_{0}_valid <= 1'b0;
+        tb_{0}_started <= 1'b0;
+    end else begin
+        if (!tb_{0}_started) begin
+            tb_{0}_valid <= 1'b1;
+            tb_{0}_started <= 1'b1;
+        end else begin
+            tb_{0}_valid <= tb_{0}_valid & (~tb_{0}_ready);
+        end
+    end
+end
+)",
+                          argName);
+    }
+  }
+}
+
 void vhdlTbCodegen(VerificationContext &ctx) {
 
   std::error_code ec;
@@ -741,6 +783,7 @@ void vhdlTbCodegen(VerificationContext &ctx) {
     deriveGlobalCompletionSignal(os, ctx);
     getOutputTagGeneration(os, ctx);
     os << VHDL_COMMON_TB_BODY;
+    generateControlInputProcesses(os, ctx);
     generateTimeoutProcess(os, ctx);
     os.unindent();
     os << "end architecture behavior;\n";
@@ -756,6 +799,7 @@ void vhdlTbCodegen(VerificationContext &ctx) {
     deriveGlobalCompletionSignal(os, ctx);
     getOutputTagGeneration(os, ctx);
     os << VERILOG_COMMON_TB_BODY;
+    generateControlInputProcesses(os, ctx);
     generateTimeoutProcess(os, ctx);
     os.unindent();
     os << "endmodule\n";

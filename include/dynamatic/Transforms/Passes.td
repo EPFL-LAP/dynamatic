@@ -105,6 +105,16 @@ def FuncSetArgNames : Pass<"func-set-arg-names", "mlir::ModuleOp"> {
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
+def FuncMergeReturns : Pass<"func-merge-returns", "mlir::ModuleOp"> {
+  let summary = "Gives every function a single return";
+  let description = [{
+    When a function has more than one return, the pass adds a new last basic
+    block that takes the returned values as its block arguments and returns
+    them, and turns every original return into a branch to that block.
+  }];
+  let dependentDialects = ["mlir::cf::ControlFlowDialect"];
+}
+
 //===----------------------------------------------------------------------===//
 // Handshake passes
 //===----------------------------------------------------------------------===//
@@ -310,8 +320,7 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     Option<"dumpMILPModels", "dump-milp-models", "bool", "false",
     "If true, dump MILP models into a directory named 'buffer-placement'.">,
     Option<"ftd", "ftd", "bool", "false",
-    "If true, use FTD-specific CFDFC extraction and backedge "
-    "identification.">,
+    "If true, use FTD-specific backedge identification.">,
     Option<"calculatePathDelays", "calculate-path-delays", "bool", "false",
     "After buffer placement, re-run the MILP with the buffering decisions "
     "locked in to calculate the path delays the MILP believes are present in "

@@ -773,6 +773,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("SIZE", resType.getNumElements());
       })
       .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
+        addType("DATA_TYPE", initOp->getOperand(0));
         auto paramsAttr =
             initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
         if (paramsAttr) {
