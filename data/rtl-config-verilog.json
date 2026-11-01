@@ -813,7 +813,7 @@
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/control_merge.v",
     "module-name": "control_merge_dataless",
-    "dependencies": ["merge_dataless", "tehb", "fork_dataless"],
+    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless"],
     "hdl": "verilog"
   },
   {
@@ -1063,6 +1063,13 @@
   },
   {
     "generic": "$DYNAMATIC/data/verilog/support/mc_support.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "merge_notehb_dataless",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/merge_notehb.v",
+    "module-name": "merge_notehb_dataless",
     "hdl": "verilog"
   },
   {
