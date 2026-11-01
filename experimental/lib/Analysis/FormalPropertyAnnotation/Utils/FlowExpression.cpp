@@ -1,5 +1,6 @@
 #include "FlowExpression.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Support/Attribute.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace dynamatic {
@@ -653,6 +654,13 @@ LogicalResult FlowEquationExtractor::extractStoreOp(StoreOp storeOp) {
                           ChannelLambda(storeOp.getAddressResult()));
 
   equations.push_back(addrInput - addrOutput);
+
+  // A memory controller takes the address and the data of a store together:
+  // lambda_addr = lambda_data
+  // TODO: The stores that go to an LSQ are not related yet.
+  auto memInterface = getDialectAttr<MemInterfaceAttr>(storeOp);
+  if (memInterface && memInterface.connectsToMC())
+    equations.push_back(addrInput - dataInput);
 
   return success();
 }

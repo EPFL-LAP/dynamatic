@@ -46,3 +46,21 @@ handshake.func @countLoop(%n: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
   sink %ctrlFalse {handshake.name = "sink0"} : <>
   end {handshake.bb = 2 : ui32, handshake.name = "end0"} %iFalse, %startFork#0 : <i32>, <>
 }
+
+// RUN: dynamatic-opt %s \
+// RUN:   --handshake-annotate-properties="json-path=%t.flow.json annotate-list=ReconvergentPathFlow" \
+// RUN:   --exp-test-print-formal-properties="json-path=%t.flow.json" -o /dev/null \
+// RUN:   | FileCheck %s --check-prefix=FLOW
+
+handshake.func @store(%mem: memref<100xi32>, %memStart: <>, %start: <>) -> (mem_end: <>, end: <>) {
+  %ctrl:5 = fork [5] %start {handshake.bb = 0 : ui32, handshake.name = "fork10"} : <>
+  %count = constant %ctrl#0 {value = 1 : i32, handshake.bb = 0 : ui32, handshake.name = "constant10"} : <>, <i32>
+  %addr = constant %ctrl#1 {value = 0 : i7, handshake.bb = 0 : ui32, handshake.name = "constant11"} : <>, <i7>
+  %data = constant %ctrl#2 {value = 5 : i32, handshake.bb = 0 : ui32, handshake.name = "constant12"} : <>, <i32>
+  // The memory controller takes the address and the data of the store
+  // together, so the fork sends the copies to both of them together
+  // FLOW: ReconvergentPathFlow: (((toint(fork10.outs_1_sent) * 1) + (toint(fork10.outs_2_sent) * -1)) = 0)
+  %stAddr, %stData = store[%addr] %data {handshake.bb = 0 : ui32, handshake.mem_interface = #handshake.mem_interface<MC>, handshake.name = "store10"} : <i7>, <i32>, <i7>, <i32>
+  %memEnd = mem_controller[%mem : memref<100xi32>] start(%memStart) groups(bb0 %count: [store(%stAddr, %stData)]) end(%ctrl#3) {handshake.name = "mem_controller10"} : <i7>, <i32>, <i32>
+  end {handshake.bb = 0 : ui32, handshake.name = "end10"} %memEnd, %ctrl#4 : <>, <>
+}
