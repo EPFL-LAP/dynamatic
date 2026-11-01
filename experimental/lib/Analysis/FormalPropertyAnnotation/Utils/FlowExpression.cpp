@@ -684,15 +684,12 @@ FlowSystem::FlowSystem(const std::vector<FlowExpression> &exprs) {
     }
   }
 
-  // matrix with one row per equation, and column per variable
-  matrix = MatIntZero(exprs.size(), registry.size());
-
-  // insert equations into the matrix
-  for (auto [row, expr] : llvm::enumerate(exprs)) {
-    for (auto &[key, value] : expr.terms) {
-      unsigned index = registry.getIndex(key);
-      matrix(row, index) = (int)value;
-    }
+  // One row per equation, and one column per variable
+  for (const FlowExpression &expr : exprs) {
+    SmallVector<int64_t> row(registry.size(), 0);
+    for (auto &[key, value] : expr.terms)
+      row[registry.getIndex(key)] = value;
+    equations.push_back(std::move(row));
   }
 }
 
