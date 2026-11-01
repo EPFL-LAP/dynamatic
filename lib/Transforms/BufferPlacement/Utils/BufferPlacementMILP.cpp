@@ -1017,6 +1017,72 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
   }
 }
 
+/// Returns the group allocation channel into the LSQ for the group that
+/// 'accessOp' (a load or store) belongs to, or nothing if 'accessOp' is
+/// connected to an MC
+static std::optional<OpResult> findGroupAllocation(Operation *accessOp,
+                                                   Value address) {
+  handshake::MemoryOpInterface memOp = findMemInterface(address);
+  if (!isa_and_present<handshake::LSQOp>(memOp))
+    return std::nullopt;
+  auto lsqOp = cast<handshake::LSQOp>(memOp);
+
+  // find the group whose access ports include this load or store
+  LSQPorts ports = lsqOp.getPorts();
+  for (LSQGroup &group : ports.getGroups())
+    for (MemoryPort &port : group->accessPorts)
+      if (port.portOp == accessOp)
+        return cast<OpResult>(
+            lsqOp->getOperand(group->ctrlPort->getCtrlInputIndex()));
+
+  llvm_unreachable("load or store connected to an LSQ is in no LSQ group");
+}
+
+void BufferPlacementMILP::addLSQAllocationConstraints(CFDFC &cfdfc) {
+  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  for (Operation *unit : cfdfc.units) {
+    // the address result of a load or store, and the operand index of
+    // its address input
+    OpResult address;
+    unsigned addressOperandIdx;
+    if (auto loadOp = dyn_cast<handshake::LoadOp>(unit)) {
+      address = cast<OpResult>(loadOp.getAddressResult());
+      addressOperandIdx = loadOp.getAddressMutable().getOperandNumber();
+    } else if (auto storeOp = dyn_cast<handshake::StoreOp>(unit)) {
+      address = cast<OpResult>(storeOp.getAddressResult());
+      addressOperandIdx = storeOp.getAddressMutable().getOperandNumber();
+    } else {
+      continue;
+    }
+
+    std::optional<OpResult> allocation = findGroupAllocation(unit, address);
+    if (!allocation)
+      continue;
+
+    // a CFDFC takes every op in its blocks, and the lazy fork of a group
+    // is in the same block as the loads and stores of the group
+    Operation *allocOp = allocation->getOwner();
+    assert(cfdfc.units.contains(allocOp) &&
+           "group allocation of a load or store is not in its CFDFC");
+
+    // The LSQ only accepts an address one cycle after the group
+    // allocation arrives, but the LSQ is not part of the CFDFC.
+    // The load or store passes its address straight to the LSQ,
+    // so the address must reach the load or store at least one cycle
+    // after the allocation leaves its producer.
+    // The retiming variable of the address input is used, not of the
+    // address result: on a load, the result side comes after the full
+    // load latency.
+    // A token may wait on this edge, so it is an inequality
+    CPVar &retAlloc =
+        cfVars.getUnitVarsFor(allocOp).getRetOut(allocation->getResultNumber());
+    CPVar &retAddress =
+        cfVars.getUnitVarsFor(unit).getRetIn(addressOperandIdx);
+    model->addConstr(retAddress - retAlloc >= cfVars.throughput * 1,
+                     "throughput_lsqAllocation_" + getUniqueName(unit).str());
+  }
+}
+
 void BufferPlacementMILP::addBlackboxConstraints(
     Value channel, const std::map<unsigned int, double> &addDelays,
     const std::map<unsigned int, double> &cmpDelays) {

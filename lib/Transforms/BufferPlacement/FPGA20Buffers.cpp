@@ -202,6 +202,7 @@ void FPGA20Buffers::setup() {
     addSteadyStateReachabilityConstraints(*cfdfc);
     addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
+    addLSQAllocationConstraints(*cfdfc);
   }
 
   // Add the MILP objective and mark the MILP ready to be optimized

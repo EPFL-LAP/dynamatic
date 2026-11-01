@@ -161,7 +161,7 @@ FailureOr<double> TimingDatabase::getLatency(Operation *op,
   }
   double latency = *latencyOrFail;
 
-  // FIXME: We compensante for the fact that the LSQ has roughly 3 extra cycles
+  // FIXME: We compensante for the fact that the LSQ has roughly 2 extra cycles
   // of latency on loads compared to an MC here because our timing models are
   // currenty unable to account for this. It's obviosuly very bad to
   // special-case this here so we should find a way to properly express this
@@ -169,7 +169,7 @@ FailureOr<double> TimingDatabase::getLatency(Operation *op,
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
     auto memOp = findMemInterface(loadOp.getAddressResult());
     if (isa_and_present<handshake::LSQOp>(memOp))
-      latency += 3;
+      latency += 2;
   }
   return latency;
 }
