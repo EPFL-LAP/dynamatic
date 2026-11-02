@@ -159,6 +159,13 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t lazy_fork -p bitwidth=$BITWIDTH size=$SIZE extra_signals=$EXTRA_SIGNALS"
   },
   {
+    "name": "handshake.init",
+    "parameters": [
+      { "name": "INITIAL_VALUE", "type": "unsigned" }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t init -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS initial_value=$INITIAL_VALUE"
+  },
+  {
     "name": "handshake.sink",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t sink -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
