@@ -286,6 +286,7 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
+  --func-merge-returns \
   --sort-blocks-rpo \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
@@ -340,7 +341,7 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
-    --func-maximize-ssa --lower-cf-to-handshake \
+    --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
@@ -370,9 +371,9 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
 else
 
-  # handshake transformations
+  # handshake transformations, without the LSQ minimization passes
+  # (shrink it or shed it), which need rebuilding for the new routing
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
