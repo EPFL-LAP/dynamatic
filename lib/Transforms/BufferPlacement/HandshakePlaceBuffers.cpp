@@ -514,7 +514,7 @@ findBackwardChannelPerCyclicRegion(handshake::FuncOp funcOp) {
     for (const CircuitEdge &edge : edges) {
       if (!sccNodes.contains(edge.src) || !sccNodes.contains(edge.dst))
         continue;
-      if (!isBackedge(edge.channel, /*endpoints=*/nullptr, /*ftd=*/true))
+      if (!isBackedge(edge.channel, /*ftd=*/true))
         continue;
       if (!isBackedgeSourceLike(edge.src))
         continue;

@@ -108,12 +108,11 @@ bool getBBEndpoints(Value val, BBEndpoints &endpoints);
 /// When `ftd` is true, compare-like operations are additionally treated as
 /// loop-feedback sources, and `not` operations may be traversed when following
 /// the channel to a merge-like operation.
-bool isBackedge(Value val, Operation *user, BBEndpoints *endpoints = nullptr,
-                bool ftd = false);
+bool isBackedge(Value val, Operation *user, bool ftd = false);
 
 /// Determines whether the value is a backedge. The value must have a single
 /// user (the function will assert if that is not the case).
-bool isBackedge(Value val, BBEndpoints *endpoints = nullptr, bool ftd = false);
+bool isBackedge(Value val, bool ftd = false);
 
 /// Represents an arc in the implicit CFG of a Handshake function i.e., a set of
 /// edges (represented by `mlir::OpOperand`s) in the circuit graph that connect

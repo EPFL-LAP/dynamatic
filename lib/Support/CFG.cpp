@@ -239,14 +239,11 @@ bool dynamatic::getBBEndpoints(Value val, BBEndpoints &endpoints) {
   return getBBEndpoints(val, *users.begin(), endpoints);
 }
 
-bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints,
-                           bool ftd) {
+bool dynamatic::isBackedge(Value val, Operation *user, bool ftd) {
   // Get the value's BB endpoints
   BBEndpoints bbs;
   if (!getBBEndpoints(val, user, bbs))
     return false;
-  if (endpoints)
-    *endpoints = bbs;
 
   // Block IDs are ordered in original program order, so an edge going from a
   // higher block ID to a lower block ID is a backedge
@@ -272,11 +269,11 @@ bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints,
          *srcBB == bbs.srcBB;
 }
 
-bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints, bool ftd) {
+bool dynamatic::isBackedge(Value val, bool ftd) {
   auto users = val.getUsers();
   assert(std::distance(users.begin(), users.end()) == 1 &&
          "value must have a single user");
-  return isBackedge(val, *users.begin(), endpoints, ftd);
+  return isBackedge(val, *users.begin(), ftd);
 }
 
 namespace {
