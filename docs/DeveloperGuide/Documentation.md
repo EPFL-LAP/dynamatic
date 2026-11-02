@@ -6,9 +6,9 @@ It is rendered to an HTML web page using [`mdbook`](https://rust-lang.github.io/
 
 ## Compiling the Documentation
 
-To render and view the documentation locally, please install [`mdbook`](https://github.com/rust-lang/mdBook), and the [`mdbook-alerts`](https://github.com/lambdalisue/rs-mdbook-alerts) plugin
+To render and view the documentation locally, please install [`mdbook`](https://github.com/rust-lang/mdBook) (v0.5 or newer).
 
-Optionally, you can install the [`mdbook-linkcheck`](https://github.com/Michael-F-Bryan/mdbook-linkcheck) backend, to check for broken links in the documentation.
+Optionally, you can install the [`mdbook-linkcheck2`](https://github.com/marxin/mdbook-linkcheck2) backend, to check for broken links in the documentation.
 
 Then, from the root of the repository run:
 

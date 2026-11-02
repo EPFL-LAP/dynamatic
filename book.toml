@@ -2,15 +2,11 @@
 title = "Dynamatic"
 authors = ["Dynamatic Authors"]
 language = "en"
-multilingual = false
 src = "docs/"
 
 [build]
 build-dir = "build/mdbook"
 create-missing = false
-
-[preprocessor.alerts]
-renderers = ["html", "linkcheck"]
 
 [output.html]
 smart-punctuation = true
@@ -28,9 +24,13 @@ boost-paragraph = 1
 expand = true
 heading-split-level = 2
 
-[output.linkcheck]
+[output.linkcheck2]
 follow-web-links = false
 optional = true
+# mdbook's native alert syntax (`> [!NOTE]`) is reported as an incomplete
+# link, and there is currently no way to exclude those. Broken links are
+# still reported as errors.
+warning-policy = "ignore"
 exclude = [
     # Ignore links with anchors - not supported..
     '''[^:\s]+\.md:[^:\s]+''',
