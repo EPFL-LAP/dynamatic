@@ -1021,8 +1021,7 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
 /// return the channel carrying the allocation token
 /// into the LSQ group that the memory access belongs to.
 /// Otherwise, return nothing.
-static std::optional<OpResult>
-getLSQGroupLazyForkOutput(Operation *memAccess) {
+static std::optional<OpResult> getLSQGroupLazyForkOutput(Operation *memAccess) {
   std::optional<handshake::MemoryOpInterface> memOp =
       findMemInterface(memAccess);
   assert(memOp && "memory access is connected to no memory interface");
@@ -1090,8 +1089,7 @@ void BufferPlacementMILP::addLSQAllocationConstraints(CFDFC &cfdfc) {
 
     // get the retiming variable for when the address
     // enters the memory access
-    CPVar &retAddress =
-        cfVars.getUnitVarsFor(unit).getRetIn(addressOperandIdx);
+    CPVar &retAddress = cfVars.getUnitVarsFor(unit).getRetIn(addressOperandIdx);
 
     // the address enters the memory access at least one cycle
     // after the group allocator control enters the LSQ:
