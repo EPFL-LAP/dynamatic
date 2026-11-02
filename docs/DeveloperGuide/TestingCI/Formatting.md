@@ -16,6 +16,33 @@ The CI workflow uses clang-format 23, and it is recommended that you use the sam
 
 The style used by clang-format is determined by the `.clang-format` file in the project root directory.
 
+### Installing clang-format
+
+The easiest way to get the exact version used by the CI is to install it from [PyPI](https://pypi.org/project/clang-format/) with pip, which is also how the CI installs it. The package includes both `clang-format` and `git-clang-format`, and does not interfere with any clang-format installed by your system package manager.
+
+1. From the root of the repository, create and activate a local virtual environment in `.venv` (which is ignored by git):
+    ```
+    $ python3 -m venv .venv
+    $ source .venv/bin/activate
+    ```
+
+2. Install the version used in `.github/workflows/ci.yml` (see `CLANG_FORMAT_VERSION`), e.g.:
+    ```
+    $ pip install clang-format==23.1.3
+    ```
+
+3. Check that the right version is picked up:
+    ```
+    $ clang-format --version
+    clang-format version 23.1.3
+    ```
+
+While the virtual environment is active, `clang-format` and `git clang-format` use this version. To use it without activating the environment (e.g. from your editor), point your editor's clang-format path to `.venv/bin/clang-format` in the repository.
+
+You can also use tools like [pipx](https://pipx.pypa.io/) (`pipx install clang-format==23.1.3`) or [uv](https://docs.astral.sh/uv/) (`uv tool install clang-format==23.1.3`) to install the correct verison of clang-format if you wish.
+
+### Using clang-format
+
 Some ways you can use clang-format yourself are listed below.
 
 1. Just check formatting and list the style changes that would be applied without modifying the file:
@@ -53,6 +80,11 @@ Listing modified files by hand when running clang-format can be a tedious job. g
 ## autopep8
 
 The CI currently uses autopep8 2.3.2, but if you are unsure, again you should check the version in `.github/workflows/ci.yml`. As with clang-format, this is because version differences can be problematic.
+
+Like clang-format, autopep8 can be installed with pip (for example into the same virtual environment):
+```
+$ pip install autopep8==2.3.2
+```
 
 autopep8 is quite similar to clang-format. Below are some things to know about it.
 

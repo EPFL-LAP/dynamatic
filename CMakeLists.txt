@@ -241,6 +241,7 @@ if(DYNAMATIC_ENABLE_CBC)
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE
       SOURCE_DIR ${CMAKE_BINARY_DIR}/cbc
       URL https://github.com/coin-or/Cbc/releases/download/releases%2F2.10.12/Cbc-releases.2.10.12-x86_64-ubuntu22-gcc1140-static.tar.gz
+      URL_HASH SHA256=eeffce2fc061170a8d8741b228cbf2af4bcb3d09a7d1a86004b44087e433424f
       SYSTEM
     )
 
@@ -267,6 +268,7 @@ if(DYNAMATIC_ENABLE_ABC)
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE
       SOURCE_DIR ${CMAKE_BINARY_DIR}/abc
       URL https://github.com/ETHZ-DYNAMO/abc/archive/refs/tags/v1.0.0.tar.gz
+      URL_HASH SHA256=959e03b1760788c1d677469f064f5a6bfe64a0f1ee30e57dc1ece0eee27f24bf
       SYSTEM
     )
 
@@ -316,6 +318,7 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
   file(DOWNLOAD
       https://github.com/ETHZ-DYNAMO/NuSMV-2.7.0/releases/download/v1.0.1/NuSMV
       ${EXT_BIN_DIR}/NuSMV
+      EXPECTED_HASH SHA256=00440b7f19bd9a60d571ac26a18a6ba8622c4c683a84af9c6ad0261e71dee94a
   )
   file(CHMOD ${EXT_BIN_DIR}/NuSMV PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ)
 
@@ -324,7 +327,8 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
     dot2smv
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     SOURCE_DIR     ${EXT_BIN_DIR}/dot2smv
-    URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
+    URL https://github.com/Jiahui17/dot2smv/archive/28266797d69a4c079c98b7f60c56d814af0aae70.tar.gz
+    URL_HASH SHA256=049c50a854a1a9b3c8e055e2f6548920496d80920b68c396605ea429cc753264
   )
 
   FetchContent_Declare(
@@ -332,6 +336,7 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     SOURCE_DIR ${EXT_BIN_DIR}/nuXmv
     URL https://nuxmv.fbk.eu/theme/download.php?file=nuXmv-2.1.0-linux64.tar.xz
+    URL_HASH SHA256=c7dfec43749bcb230c857efe81099b95d868b94efd9f81bccebe542a306a7c83
   )
 
   FetchContent_MakeAvailable(dot2smv nuXmv)
@@ -345,6 +350,7 @@ FetchContent_Declare(
   googletest
   DOWNLOAD_EXTRACT_TIMESTAMP true
   URL https://github.com/google/googletest/archive/2ae29b52fdff88c52fef655fa0d245fc514ca35b.zip
+  URL_HASH SHA256=21a3a4021fd5e3127c90547234e2126d24f23571fedefa0d9370bf706a870fba
   SYSTEM
 )
 
@@ -356,6 +362,7 @@ FetchContent_MakeAvailable(googletest)
 FetchContent_Declare(
   json
   URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+  URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
   SYSTEM
 )
 FetchContent_MakeAvailable(json)
