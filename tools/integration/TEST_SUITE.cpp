@@ -591,16 +591,14 @@ protected:
     };
     EXPECT_EQ(config.run(), 0);
 
-    std::vector<IISummary> summaries =
-        parseIISummaries(config.simReportPath());
+    std::vector<IISummary> summaries = parseIISummaries(config.simReportPath());
 
     // one line per monitor
     for (const IISummary &summary : summaries)
       std::cout << "[II] " << summary.loop << " depth " << summary.depth
                 << " max_depth " << summary.maxDepth << " iterations "
-                << summary.iterations << " activations "
-                << summary.activations << " median_ii " << summary.medianII
-                << std::endl;
+                << summary.iterations << " activations " << summary.activations
+                << " median_ii " << summary.medianII << std::endl;
     return summaries;
   }
 };

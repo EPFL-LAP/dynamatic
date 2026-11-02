@@ -1029,9 +1029,9 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   }
 
   // run the control-network routing algorithm once per cfg
-  MapVector<MemrefValue, MemoryInterfaceInputs> memoryInputs = routeCfgs(
-      body, blockToCond, memStarts, nonMemoryCfgs, memoryCfgs,
-      speculationCfgs, builder);
+  MapVector<MemrefValue, MemoryInterfaceInputs> memoryInputs =
+      routeCfgs(body, blockToCond, memStarts, nonMemoryCfgs, memoryCfgs,
+                speculationCfgs, builder);
 
   // label each cond branch with the cfg successors of its basic block,
   // for buffering to match the branch sides to the cfg arcs

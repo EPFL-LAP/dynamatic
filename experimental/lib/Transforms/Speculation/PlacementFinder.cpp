@@ -271,8 +271,7 @@ static void markSpeculativeRegion(OpOperand &edge, bool isDownstream,
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
     if (isDownstream) {
       for (OpOperand &use : loadOp.getDataResult().getUses())
-        markSpeculativeRegion(use, true, placements, speculativeEdges,
-                              visited);
+        markSpeculativeRegion(use, true, placements, speculativeEdges, visited);
     } else {
       markSpeculativeRegion(loadOp->getOpOperand(0), false, placements,
                             speculativeEdges, visited);
@@ -374,8 +373,7 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   assert(funcOp && "op should have parent function");
 
   // mark every edge that a speculative token can travel along
-  llvm::DenseSet<CFGEdge *> speculativeEdges =
-      markSpeculativeEdges(placements);
+  llvm::DenseSet<CFGEdge *> speculativeEdges = markSpeculativeEdges(placements);
 
   for (Operation &op : funcOp.getOps()) {
     // the inputs a merge-like op chooses between:
@@ -449,8 +447,8 @@ LogicalResult PlacementFinder::findCommitsAtJoins() {
     for (Operation &op : funcOp.getOps()) {
       // merges, control merges and muxes
       // only combine tokens from one routing call
-      if (isa<handshake::MergeOp, handshake::ControlMergeOp,
-              handshake::MuxOp>(op))
+      if (isa<handshake::MergeOp, handshake::ControlMergeOp, handshake::MuxOp>(
+              op))
         continue;
 
       // a load's memory data input is the answer to its own address

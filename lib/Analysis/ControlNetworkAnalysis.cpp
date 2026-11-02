@@ -74,8 +74,8 @@ ControlGraph::ControlGraph(handshake::FuncOp funcOp) {
   // otherwise the network is unreachable from the entry and its loops are
   // not found
   for (ControlNode &node : nodes)
-    if (&node != entry &&
-        (node.preds.empty() || isa_and_present<handshake::InitOp>(node.getOp())))
+    if (&node != entry && (node.preds.empty() ||
+                           isa_and_present<handshake::InitOp>(node.getOp())))
       addEdge(entry, &node);
 }
 

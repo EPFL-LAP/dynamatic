@@ -730,9 +730,9 @@ public:
   }
 
   // keep the cfg successors of the branch on the rebuilt branch
-  handshake::ConditionalBranchOp
-  createOp(ArrayRef<Type> newResTypes, ArrayRef<Value> newOperands,
-           PatternRewriter &rewriter) override {
+  handshake::ConditionalBranchOp createOp(ArrayRef<Type> newResTypes,
+                                          ArrayRef<Value> newOperands,
+                                          PatternRewriter &rewriter) override {
     return rewriter.create<handshake::ConditionalBranchOp>(
         op.getLoc(), newResTypes[0], newResTypes[1], newOperands[0],
         newOperands[1], op.getCfgSuccsAttr());

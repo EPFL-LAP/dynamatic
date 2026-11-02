@@ -651,8 +651,7 @@ static RoutedTriggers buildTriggerRouting(TriggerCfg &triggerCfg,
           handshake::MergeOp::create(builder, loc, controlType, mergeInputs)
               .getResult();
     } else {
-      llvm_unreachable(
-          "every basic block in the network has a predecessor");
+      llvm_unreachable("every basic block in the network has a predecessor");
     }
 
     // outside trigger blocks, the token just passes through
@@ -873,7 +872,7 @@ void dynamatic::experimental::cf_to_handshake::labelCondBranchSuccessors(
     auto [trueSucc, falseSucc] = succsIt->second;
 
     // store the basic block successor outputs on the branch
-    condBrOp.setCfgSuccsAttr(
-        handshake::CfgSuccsAttr::get(builder.getContext(), trueSucc, falseSucc));
+    condBrOp.setCfgSuccsAttr(handshake::CfgSuccsAttr::get(builder.getContext(),
+                                                          trueSucc, falseSucc));
   }
 }
