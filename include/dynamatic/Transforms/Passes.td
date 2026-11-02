@@ -105,6 +105,16 @@ def FuncSetArgNames : Pass<"func-set-arg-names", "mlir::ModuleOp"> {
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
+def FuncMergeReturns : Pass<"func-merge-returns", "mlir::ModuleOp"> {
+  let summary = "Gives every function a single return";
+  let description = [{
+    When a function has more than one return, the pass adds a new last basic
+    block that takes the returned values as its block arguments and returns
+    them, and turns every original return into a branch to that block.
+  }];
+  let dependentDialects = ["mlir::cf::ControlFlowDialect"];
+}
+
 //===----------------------------------------------------------------------===//
 // Handshake passes
 //===----------------------------------------------------------------------===//
