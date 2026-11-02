@@ -9,6 +9,7 @@
 #include "dynamatic/Conversion/CfToHandshake/ControlNetworkRouting.h"
 #include "dynamatic/Conversion/CfToHandshake/TempOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
@@ -539,21 +540,30 @@ static void route(const Cfg &cfg, const BlockToCond &blockToCond,
   buildRouting(cfg, blockToCond, selects, builder);
 }
 
-/// Routes the single memory token of a memory interface on its optimized CFG,
-/// from memStart in the entry block to the exit block.
-/// In each interfacing basic block, a lazy fork gives the token
+/// What a trigger routing produces
+struct RoutedTriggers {
+  // the token given to each trigger block, keyed by block number
+  DenseMap<unsigned, Value> triggers;
+  // the token leaving the exit block, if the token reaches the exit
+  std::optional<Value> exitToken;
+};
+
+/// Routes the single token of a trigger CFG on its optimized CFG,
+/// from the token input in the entry block to the exit block,
+/// and returns the tokens it gave to the trigger blocks and the exit token.
+/// In a memory trigger block, a lazy fork gives the token
 /// to the interface's control input and passes it on,
 /// so the interface's control inputs arrive in program order.
-static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
-                               MemoryInterfaceInputs &inputs,
-                               const BlockToCond &blockToCond, Value memStart,
-                               OpBuilder &builder) {
-  // Pull the annotated CFG itself from the memory cfg struct
-  Cfg &cfg = memoryCfg.cfg;
+/// In a speculation trigger block, the control branch is marked
+/// for the speculation pass.
+static RoutedTriggers buildTriggerRouting(TriggerCfg &triggerCfg,
+                                          const BlockToCond &blockToCond,
+                                          Value tokenInput,
+                                          OpBuilder &builder) {
+  Cfg &cfg = triggerCfg.cfg;
 
-  // the controls of this interface, in the region's inputs
-  DenseMap<unsigned, Value> &controls =
-      mcOrLsq == McOrLsq::MC ? inputs.mcControls : inputs.lsqControls;
+  // what this routing produces
+  RoutedTriggers routed;
 
   // routing doesn't correspond
   // to any specific part of the IR
@@ -563,7 +573,7 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
   // we need this to build dataless control units later
   Type controlType = handshake::ControlType::get(builder.getContext());
 
-  // the memory token carries no values,
+  // the token carries no values,
   // so its live-out on an edge is just the edge
   using ControlLiveOut = CfgEdge *;
 
@@ -574,11 +584,11 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
   // and will use them to replace the temp
   ControlLiveOutToProd routedOuts;
 
-  // We need to reliably find the producer of the end token
-  // but when the end basic block is not an interfacing block,
-  // the producer of the end token can be a TempProd for most of routing
+  // We need to reliably find the producer of the exit token
+  // but when the exit basic block is not a trigger block,
+  // the producer of the exit token can be a TempProd for most of routing
   // Rather than trying to check when this happens or doesn't happen
-  // We unconditionally place a TempCons after the end token producer
+  // We unconditionally place a TempCons after the exit token producer
   // At the end, if there was a TempProd, it's been replaced
   // so the TempCons is guaranteed to point to the real producer
   TempCons endReader;
@@ -592,7 +602,7 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
 
   // for each basic block
   for (Block *block : cfg.blocks) {
-    // on the memory network, there is only one input into the basic block,
+    // on the network, there is only one input into the basic block,
     // and the incoming live-outs of that input are the edges
     // from each predecessor
     SmallVector<ControlLiveOut> incomingLiveOuts = cfg.getInEdges(block);
@@ -600,13 +610,12 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
     // handle insertion point
     builder.setInsertionPointToStart(block);
 
-    // on the memory network,
+    // on the network,
     // there is only one value into the basic block
     Value routedIn;
 
     if (block == cfg.entry) {
-      // the token enters the network from the "memStart" function arg
-      routedIn = memStart;
+      routedIn = tokenInput;
     } else if (incomingLiveOuts.size() == 1) {
       // if there is one predecessor
 
@@ -643,18 +652,19 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
               .getResult();
     } else {
       llvm_unreachable(
-          "every basic block in the memory network has a predecessor");
+          "every basic block in the network has a predecessor");
     }
 
-    // in non-interfacing blocks, the single memory token just passes through
+    // outside trigger blocks, the token just passes through
     Value sdpOut = routedIn;
 
     // for a non-take-end LSQ (an LSQ connected to an MC),
     // we optimize the CFG to allow multiple exit basic blocks.
     // If this is such an exit basic block,
     // the token goes directly into the LSQ and is not routed further
-    if (memoryCfg.interfacingBlocks.contains(block) &&
-        cfg.getOutEdges(block).empty() && !memoryCfg.takesEnd) {
+    if (triggerCfg.kind == TriggerKind::Memory &&
+        triggerCfg.triggerBlocks.contains(block) &&
+        cfg.getOutEdges(block).empty() && !triggerCfg.triggersEnd) {
       builder.setInsertionPoint(block->getTerminator());
       // Use a temp consumer to reliably find the producers of control tokens
       // that go directly into an LSQ
@@ -662,15 +672,16 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
       continue;
     }
 
-    // in an interfacing basic block, the straight data path is a lazy fork:
+    // in a memory trigger block, the straight data path is a lazy fork:
     // one output to the interface, one passing the token on
-    if (memoryCfg.interfacingBlocks.contains(block)) {
+    if (triggerCfg.kind == TriggerKind::Memory &&
+        triggerCfg.triggerBlocks.contains(block)) {
       auto forkOp = handshake::LazyForkOp::create(builder, loc, sdpOut, 2);
-      controls[getBlockNumber(block)] = forkOp->getResult(0);
+      routed.triggers[getBlockNumber(block)] = forkOp->getResult(0);
       sdpOut = forkOp->getResult(1);
     }
 
-    // live-outs in a memory interface CFG are represented by CFG edges
+    // live-outs in a trigger CFG are represented by CFG edges
     SmallVector<ControlLiveOut> outgoingLiveOuts = cfg.getOutEdges(block);
 
     if (outgoingLiveOuts.empty()) {
@@ -678,12 +689,14 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
       // can still route to an exit it does not need,
       // when the exit could not be pruned:
       // the token is then simply not used here
-      if (!memoryCfg.takesEnd) {
+      if (triggerCfg.kind == TriggerKind::Memory && !triggerCfg.triggersEnd) {
         continue;
       }
       builder.setInsertionPoint(block->getTerminator());
 
-      // the token leaves the network at the exit, as the end control
+      // the token leaves the network at the exit,
+      // as the end control of a memory interface,
+      // or back into the init of a speculation network.
       // use a TempCons to be able to reliably find the producer
       // no matter what it is or what happens to it later
       endReader = TempCons(builder, sdpOut);
@@ -704,6 +717,13 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
           builder, loc, TypeRange{controlType, controlType},
           ValueRange{blockToCond[block], sdpOut});
 
+      // in a speculation trigger block,
+      // mark the control branch for the speculation pass:
+      // its data input triggers the speculator
+      if (triggerCfg.kind == TriggerKind::Speculation &&
+          triggerCfg.triggerBlocks.contains(block))
+        condBrOp->setAttr(SPEC_TRIGGER_ATTR_NAME, builder.getUnitAttr());
+
       // then store the real value of the live-outs of this basic block
       // (the branch output for true or false)
       for (ControlLiveOut liveOut : outgoingLiveOuts) {
@@ -712,7 +732,7 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
                                            : condBrOp.getFalseResult());
       }
     } else {
-      llvm_unreachable("every basic block in the memory network has at most "
+      llvm_unreachable("every basic block in the network has at most "
                        "two successors");
     }
   }
@@ -731,12 +751,12 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
     }
   }
 
-  if (memoryCfg.takesEnd) {
-    // if this memory cfg routes the end token
+  if (triggerCfg.triggersEnd || triggerCfg.kind == TriggerKind::Speculation) {
+    // if the token reaches the exit
 
-    // the producer of the end control is now final
+    // the producer of the exit token is now final
     // so we get its output value from the end reader
-    inputs.ctrlEnd = endReader.getValue();
+    routed.exitToken = endReader.getValue();
     // and remove the end reader from the IR
     endReader.erase();
   } else {
@@ -745,10 +765,12 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
     // rather than through a lazy fork
     // can now be reliably found from the readers
     for (auto &[blockNumber, directToLSQReader] : directToLSQReaders) {
-      controls[blockNumber] = directToLSQReader.getValue();
+      routed.triggers[blockNumber] = directToLSQReader.getValue();
       directToLSQReader.erase();
     }
   }
+
+  return routed;
 }
 
 MapVector<MemrefValue, MemoryInterfaceInputs>
@@ -756,8 +778,12 @@ dynamatic::experimental::cf_to_handshake::routeCfgs(
     Region &body, const BlockToCond &blockToCond,
     const MapVector<MemrefValue, ControlValue> &memStarts,
     ArrayRef<Cfg> nonMemoryCfgs,
-    MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> &memoryCfgs,
-    OpBuilder &builder) {
+    MapVector<std::pair<MemrefValue, McOrLsq>, TriggerCfg> &memoryCfgs,
+    SmallVectorImpl<TriggerCfg> &speculationCfgs, OpBuilder &builder) {
+  // MLIR type stuff handled here-
+  // we need this to build the dataless init of a speculation network
+  Type controlType = handshake::ControlType::get(builder.getContext());
+
   // route the non-memory cfgs
   for (const Cfg &cfg : nonMemoryCfgs) {
     route(cfg, blockToCond, builder);
@@ -771,9 +797,41 @@ dynamatic::experimental::cf_to_handshake::routeCfgs(
     // unpack for which memref, and whether the cfg is for its MC or its LSQ
     auto [memref, mcOrLsq] = key;
 
-    // route the inputs to the memory interface and store them in memoryInputs
-    buildMemoryRouting(memoryCfg, mcOrLsq, memoryInputs[memref], blockToCond,
-                       memStarts.lookup(memref), builder);
+    // route the token from the memory start
+    RoutedTriggers routed = buildTriggerRouting(
+        memoryCfg, blockToCond, memStarts.lookup(memref), builder);
+
+    // the triggers are the control inputs of the interface
+    MemoryInterfaceInputs &inputs = memoryInputs[memref];
+    if (mcOrLsq == McOrLsq::MC)
+      inputs.mcControls = routed.triggers;
+    else
+      inputs.lsqControls = routed.triggers;
+
+    // the exit token is the end control, if this interface takes it
+    if (memoryCfg.triggersEnd) {
+      assert(routed.exitToken && "an end trigger cfg reaches the exit");
+      inputs.ctrlEnd = routed.exitToken.value();
+    }
+  }
+
+  // for each speculation cfg
+  for (TriggerCfg &speculationCfg : speculationCfgs) {
+    // the token starts at an init in the entry block,
+    // whose input comes back from the exit once routed
+    builder.setInsertionPointToStart(speculationCfg.cfg.entry);
+    TempProd initInput(builder, controlType);
+    Value init = handshake::InitOp::create(builder, builder.getUnknownLoc(),
+                                           controlType, initInput.getValue())
+                     .getResult();
+
+    // route the token from the init
+    RoutedTriggers routed =
+        buildTriggerRouting(speculationCfg, blockToCond, init, builder);
+
+    // close the cycle
+    assert(routed.exitToken && "a speculation cfg reaches the exit");
+    initInput.replace(routed.exitToken.value());
   }
 
   // return the memory interface inputs, keyed by memref

@@ -469,21 +469,31 @@ static LogicalResult replaceArithOp(Operation &op, TypeRange resultTypes,
           // handshake's predicates have the same values as arith's
           auto predicate =
               static_cast<handshake::CmpFPredicate>(cmpFOp.getPredicate());
-          return handshake::CmpFOp::create(
-                     builder, loc,
-                     handshake::ChannelType::get(builder.getI1Type()),
-                     predicate, cmpFOp.getLhs(), cmpFOp.getRhs())
-              .getResult();
+          auto handshakeCmpF = handshake::CmpFOp::create(
+              builder, loc, handshake::ChannelType::get(builder.getI1Type()),
+              predicate, cmpFOp.getLhs(), cmpFOp.getRhs());
+
+          // keep the attributes other than the predicate
+          // (the other ops get them through attrs),
+          // for example the speculate pragma
+          handshakeCmpF->setDiscardableAttrs(
+              cmpFOp->getDiscardableAttrDictionary());
+          return handshakeCmpF.getResult();
         })
         .Case<arith::CmpIOp>([&](arith::CmpIOp cmpIOp) {
           // handshake's predicates have the same values as arith's
           auto predicate =
               static_cast<handshake::CmpIPredicate>(cmpIOp.getPredicate());
-          return handshake::CmpIOp::create(
-                     builder, loc,
-                     handshake::ChannelType::get(builder.getI1Type()),
-                     predicate, cmpIOp.getLhs(), cmpIOp.getRhs())
-              .getResult();
+          auto handshakeCmpI = handshake::CmpIOp::create(
+              builder, loc, handshake::ChannelType::get(builder.getI1Type()),
+              predicate, cmpIOp.getLhs(), cmpIOp.getRhs());
+
+          // keep the attributes other than the predicate
+          // (the other ops get them through attrs),
+          // for example the speculate pragma
+          handshakeCmpI->setDiscardableAttrs(
+              cmpIOp->getDiscardableAttrDictionary());
+          return handshakeCmpI.getResult();
         })
         .Case<arith::DivFOp>([&](auto) {
           return handshake::DivFOp::create(builder, loc, resultTypes, operands,
@@ -949,8 +959,11 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // from memref loads and stores to handshake loads and stores
   // because we find the loads and stores of each memory region
   // by walking the memref
-  MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> memoryCfgs =
+  MapVector<std::pair<MemrefValue, McOrLsq>, TriggerCfg> memoryCfgs =
       collectMemoryInterfaceCfgs(base, memStarts);
+
+  // collect the routing CFGs for the speculator triggers
+  SmallVector<TriggerCfg, 0> speculationCfgs = collectSpeculationCfgs(base);
 
   // convert constants
   if (failed(convertConstants(body, start, builder))) {
@@ -1010,10 +1023,15 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   for (auto &[key, memoryCfg] : memoryCfgs) {
     optimizeMemoryCfg(memoryCfg);
   }
+  // for each speculation cfg, optimize
+  for (TriggerCfg &speculationCfg : speculationCfgs) {
+    optimizeCfg(speculationCfg.cfg);
+  }
 
   // run the control-network routing algorithm once per cfg
   MapVector<MemrefValue, MemoryInterfaceInputs> memoryInputs = routeCfgs(
-      body, blockToCond, memStarts, nonMemoryCfgs, memoryCfgs, builder);
+      body, blockToCond, memStarts, nonMemoryCfgs, memoryCfgs,
+      speculationCfgs, builder);
 
   // label every op with the number of its basic block (its bb attribute).
   // the memory interface builder reads it off each memory access

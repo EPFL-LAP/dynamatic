@@ -296,6 +296,9 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, extr
         data_bitwidth, concat_layout)
     forwarding_assignments = _generate_forwarding(extra_signals)
 
+    # a dataless mux has no data output, only its extra signals
+    data_assignment = "outs <= outs_inner;" if data_bitwidth > 0 else ""
+
     architecture = f"""
 -- Architecture of signal manager (mux)
 architecture arch of {name} is
@@ -309,7 +312,7 @@ begin
   -- Forwarding logic
   {forwarding_assignments}
 
-  outs <= outs_inner;
+  {data_assignment}
   outs_valid <= outs_inner_valid;
   outs_inner_ready <= outs_ready;
 

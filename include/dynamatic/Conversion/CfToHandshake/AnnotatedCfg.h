@@ -51,14 +51,18 @@ using MemrefValue = TypedValue<MemRefType>;
 /// A value known to be a dataless control channel
 using ControlValue = TypedValue<handshake::ControlType>;
 
-/// The CFG for routing the control inputs of one memory interface,
-/// sequentialized by a single memory token.
-struct MemoryInterfaceCfg {
+enum class TriggerKind : unsigned { Memory, Speculation };
+
+/// The CFG for routing a single control token,
+/// which triggers something in each of its trigger blocks:
+/// the control inputs of a memory interface,
+/// or the speculator of a speculated block.
+struct TriggerCfg {
   Cfg cfg;
-  // the basic blocks the memory interface takes control inputs from
-  SetVector<Block *> interfacingBlocks;
-  // whether the interface takes the region's end control
-  bool takesEnd;
+  TriggerKind kind;
+  SetVector<Block *> triggerBlocks;
+  // whether the cfg has an additional "end" trigger in the last exit block
+  bool triggersEnd;
 };
 
 /// Builds the CFGs for routing the control inputs
@@ -66,9 +70,14 @@ struct MemoryInterfaceCfg {
 /// per memory region (each memref with a memStart),
 /// one for its memory controller if it has one,
 /// and one for its LSQ if it has one.
-MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg>
+MapVector<std::pair<MemrefValue, McOrLsq>, TriggerCfg>
 collectMemoryInterfaceCfgs(
     const Cfg &base, const MapVector<MemrefValue, ControlValue> &memStarts);
+
+/// Builds the CFGs for routing the speculator triggers of the function:
+/// one per basic block holding an op with the `dynamatic.speculate`
+/// attribute, with that block as its only trigger block.
+SmallVector<TriggerCfg, 0> collectSpeculationCfgs(const Cfg &base);
 
 /// Optimizes the CFG for routing:
 /// removes the control flow
@@ -77,7 +86,7 @@ collectMemoryInterfaceCfgs(
 void optimizeCfg(Cfg &cfg);
 
 /// Optimizes a memory interface CFG for routing
-void optimizeMemoryCfg(MemoryInterfaceCfg &memoryCfg);
+void optimizeMemoryCfg(TriggerCfg &memoryCfg);
 
 } // namespace cf_to_handshake
 } // namespace experimental

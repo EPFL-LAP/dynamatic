@@ -99,14 +99,15 @@ struct MemoryInterfaceInputs {
 };
 
 /// Routes the non-memory cfgs,
-/// and routes the inputs to each memory interface on its MC cfg or LSQ cfg.
+/// routes the inputs to each memory interface on its MC cfg or LSQ cfg,
+/// and routes the speculator trigger of each speculation cfg.
 /// Returns the memory interface inputs, keyed by memref.
 MapVector<MemrefValue, MemoryInterfaceInputs> routeCfgs(
     Region &body, const BlockToCond &blockToCond,
     const MapVector<MemrefValue, ControlValue> &memStarts,
     ArrayRef<Cfg> nonMemoryCfgs,
-    MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> &memoryCfgs,
-    OpBuilder &builder);
+    MapVector<std::pair<MemrefValue, McOrLsq>, TriggerCfg> &memoryCfgs,
+    SmallVectorImpl<TriggerCfg> &speculationCfgs, OpBuilder &builder);
 
 } // namespace cf_to_handshake
 } // namespace experimental

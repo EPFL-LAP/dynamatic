@@ -218,12 +218,10 @@ Cfg dynamatic::experimental::cf_to_handshake::buildCfg(
 // Annotating a CFG for memory interfaces
 //===----------------------------------------------------------------------===//
 
-/// Builds the CFG for routing the control inputs
-/// of one memory interface,
-/// sequentialized by a single memory token:
+/// Builds the CFG for routing a single control token:
 /// a copy of the base CFG,
-/// with every block that produces the token needed.
-static Cfg buildMemoryInterfaceCfg(const Cfg &base, ArrayRef<Block *> blocks) {
+/// with the entry, the exit and every given block needed.
+static Cfg buildTriggerCfg(const Cfg &base, ArrayRef<Block *> blocks) {
   Cfg cfg = base;
 
   // we always mark the entry and exit blocks as needed,
@@ -240,7 +238,7 @@ static Cfg buildMemoryInterfaceCfg(const Cfg &base, ArrayRef<Block *> blocks) {
   return cfg;
 }
 
-MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg>
+MapVector<std::pair<MemrefValue, McOrLsq>, TriggerCfg>
 dynamatic::experimental::cf_to_handshake::collectMemoryInterfaceCfgs(
     const Cfg &base, const MapVector<MemrefValue, ControlValue> &memStarts) {
   // the memory's start produces the token in the entry block
@@ -249,7 +247,7 @@ dynamatic::experimental::cf_to_handshake::collectMemoryInterfaceCfgs(
   // the end control of a region comes from the return block
   Block *returnBlock = base.exit;
 
-  MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> cfgs;
+  MapVector<std::pair<MemrefValue, McOrLsq>, TriggerCfg> cfgs;
 
   // each memory region is a memref with a memStart
   // (a memref argument of the function or a RAM op)
@@ -299,10 +297,11 @@ dynamatic::experimental::cf_to_handshake::collectMemoryInterfaceCfgs(
       // and add the final block as well, for the end input
       mcBlocks.insert(returnBlock);
       // and build a CFG for it
-      MemoryInterfaceCfg mcCfg;
-      mcCfg.cfg = buildMemoryInterfaceCfg(base, mcBlocks.getArrayRef());
-      mcCfg.interfacingBlocks = storeBlocks;
-      mcCfg.takesEnd = true;
+      TriggerCfg mcCfg;
+      mcCfg.cfg = buildTriggerCfg(base, mcBlocks.getArrayRef());
+      mcCfg.kind = TriggerKind::Memory;
+      mcCfg.triggerBlocks = storeBlocks;
+      mcCfg.triggersEnd = true;
       cfgs[{memref, McOrLsq::MC}] = mcCfg;
     }
 
@@ -331,12 +330,44 @@ dynamatic::experimental::cf_to_handshake::collectMemoryInterfaceCfgs(
         lsqBlocks.insert(returnBlock);
       }
 
-      MemoryInterfaceCfg lsqCfg;
-      lsqCfg.cfg = buildMemoryInterfaceCfg(base, lsqBlocks.getArrayRef());
-      lsqCfg.interfacingBlocks = groupBlocks;
-      lsqCfg.takesEnd = !buildRoutingForMemoryController;
+      TriggerCfg lsqCfg;
+      lsqCfg.cfg = buildTriggerCfg(base, lsqBlocks.getArrayRef());
+      lsqCfg.kind = TriggerKind::Memory;
+      lsqCfg.triggerBlocks = groupBlocks;
+      lsqCfg.triggersEnd = !buildRoutingForMemoryController;
       cfgs[{memref, McOrLsq::LSQ}] = lsqCfg;
     }
+  }
+
+  return cfgs;
+}
+
+/// Builds the CFGs for routing the speculator triggers of the function:
+/// one per basic block holding an op with the `dynamatic.speculate`
+/// attribute, with that block as its only trigger block.
+SmallVector<TriggerCfg, 0>
+dynamatic::experimental::cf_to_handshake::collectSpeculationCfgs(
+    const Cfg &base) {
+  SmallVector<TriggerCfg, 0> cfgs;
+
+  // for each basic block
+  for (Block *block : base.blocks) {
+    // a block is speculated if one of its ops carries the speculate pragma
+    bool hasSpeculatedOp = llvm::any_of(*block, [](Operation &op) {
+      return op.hasAttr("dynamatic.speculate");
+    });
+    if (!hasSpeculatedOp)
+      continue;
+
+    // build a speculation CFG:
+    // the speculated block is its only trigger block,
+    // and it has no end trigger
+    TriggerCfg speculationCfg;
+    speculationCfg.cfg = buildTriggerCfg(base, {block});
+    speculationCfg.kind = TriggerKind::Speculation;
+    speculationCfg.triggerBlocks.insert(block);
+    speculationCfg.triggersEnd = false;
+    cfgs.push_back(speculationCfg);
   }
 
   return cfgs;
@@ -550,16 +581,16 @@ void dynamatic::experimental::cf_to_handshake::optimizeCfg(Cfg &cfg) {
 }
 
 void dynamatic::experimental::cf_to_handshake::optimizeMemoryCfg(
-    MemoryInterfaceCfg &memoryCfg) {
+    TriggerCfg &memoryCfg) {
   // pull the actual cfg out of the memory cfg struct
   Cfg &cfg = memoryCfg.cfg;
 
   // whether this memory interface does not take the mem end
   // (an LSQ which connects to an MC)
-  bool noEnd = !memoryCfg.takesEnd;
+  bool noEnd = !memoryCfg.triggersEnd;
 
   // whether this memory interface has no memory accesses in the exit block
-  bool noAccessesInExit = !memoryCfg.interfacingBlocks.contains(cfg.exit);
+  bool noAccessesInExit = !memoryCfg.triggerBlocks.contains(cfg.exit);
 
   // if both, we shouldn't route to the exit
   // because of the init op, this only applies to memory cfgs
