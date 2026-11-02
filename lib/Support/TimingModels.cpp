@@ -167,8 +167,8 @@ FailureOr<double> TimingDatabase::getLatency(Operation *op,
   // special-case this here so we should find a way to properly express this
   // information in our models.
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
-    auto memOp = findMemInterface(loadOp.getAddressResult());
-    if (isa_and_present<handshake::LSQOp>(memOp))
+    auto memOp = findMemInterface(loadOp);
+    if (memOp && isa<handshake::LSQOp>(*memOp))
       latency += 2;
   }
   return latency;
