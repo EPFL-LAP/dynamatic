@@ -4,6 +4,7 @@ add_dynamatic_library(DynamaticTransforms
   FlattenMemRefRowMajor.cpp
   ForceMemoryInterface.cpp
   FuncMaximizeSSA.cpp
+  FuncMergeReturns.cpp
   FuncSetArgNames.cpp
   ConsumeProducerOutputAttrMarker.cpp
   HandshakeCanonicalize.cpp
@@ -36,6 +37,7 @@ add_dynamatic_library(DynamaticTransforms
   MLIRControlFlowTransforms
   MLIRMemRefDialect
   MLIRFuncDialect
+  MLIRControlFlowDialect
   MLIRSupport
   MLIRTransformUtils
   DynamaticSupport
