@@ -3,8 +3,10 @@ add_dynamatic_library(DynamaticBufferPlacement
   Utils/BufferPlacementMILP.cpp
   Utils/CFDFC.cpp
   Utils/UnitMILPVars.cpp
+  # TODO [amos]: Remove these two once the mix works
   FPGA20Buffers.cpp
   FPL22Buffers.cpp
+  MixedBuffers.cpp
   FPGA24Buffers.cpp
   LatencyAndOccupancyBalancingSupport.cpp
   CostAwareBuffers.cpp

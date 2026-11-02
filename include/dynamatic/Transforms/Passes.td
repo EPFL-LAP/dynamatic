@@ -313,6 +313,12 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     "If true, use FTD-specific CFDFC extraction and backedge "
     "identification.">,
 
+    Option<"cfdfcUnions", "cfdfc-unions", "std::string", "\"auto\"",
+    "Only for 'fpga20' and 'fpl22'. If 'on', solve one MILP per disjoint "
+    "CFDFC union plus one MILP for channels outside of all CFDFCs; if 'off', "
+    "solve a single MILP for the whole function. 'auto' (default) is 'on' for "
+    "'fpl22' and 'off' for 'fpga20'.">,
+
     Option<"onlyInnermostCFDFCs", "only-innermost-cfdfcs", "bool", "false",
     "If true, CFDFCs that strictly contains another CFDFC in the original CFG "
     "do not contribute to the throughput objective.">,

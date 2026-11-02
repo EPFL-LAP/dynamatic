@@ -28,6 +28,7 @@ CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
 USE_LSQ_SIZING=${20:-0}
 ONLY_INNERMOST_CFDFCS=${21:-0}
+CFDFC_UNIONS=${22:-auto}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -458,11 +459,11 @@ else
       spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json \
       target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG ftd=$FAST_TOKEN_DELIVERY \
       only-innermost-cfdfcs=$ONLY_INNERMOST_CFDFCS \
+      cfdfc-unions=$CFDFC_UNIONS \
       blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     ${LSQ_SIZING_PASS:+"$LSQ_SIZING_PASS"} \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     --handshake-size-select-depth \
-    --debug-only=handshake-place-buffers \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

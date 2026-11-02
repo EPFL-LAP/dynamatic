@@ -21,9 +21,10 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
-#include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
+// #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
-#include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+// #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/MixedBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
@@ -682,16 +683,41 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     std::filesystem::create_directories(dumpDir);
   }
 
-  if (algorithm == FPGA20) {
-    // Create and solve the MILP
-    if (dumpMILPModels) {
-      writeTo = dumpDir + sep + funcName + "-fpga20-buffers";
+   if (algorithm == FPGA20 || algorithm == FPL22) {
+    using namespace mixedbuffers;
+    SignalModel signalModel = algorithm == FPGA20
+                                  ? SignalModel::DATA_ONLY
+                                  : SignalModel::DATA_VALID_READY;
+
+    // By default, FPGA'20 solves a single MILP for the whole function while
+    // FPL'22 decomposes the problem along CFDFC unions
+    bool useCFDFCUnions;
+    if (cfdfcUnions == "auto") {
+      useCFDFCUnions = algorithm == FPL22;
+    } else if (cfdfcUnions == "on" || cfdfcUnions == "off") {
+      useCFDFCUnions = cfdfcUnions == "on";
+    } else {
+      // Wrong combination of union CFDFC and algorithm :(
+      return failure();
     }
-    fpga20::FPGA20Buffers milp(solverKind, timeout, info, timingDB, targetCP,
-                               writeTo, ftd);
-    return milp.solve(placement, calculatePathDelays);
-  }
-  if (algorithm == FPL22) {
+    // FIXME: FPL'22 historically ignores the `ftd` option. Kept as-is so that
+    // this refactoring does not change placement results.
+    bool milpFTD = algorithm == FPGA20 && ftd;
+
+    std::string algoName = algorithm.getValue();
+    if (!useCFDFCUnions) {
+      // Create and solve a single MILP for the whole function
+      if (dumpMILPModels)
+        writeTo = dumpDir + sep + funcName + "-" + algoName + "-buffers";
+      MixedBuffers milp(solverKind, timeout, info, timingDB, targetCP,
+                    signalModel, MILPMode::ONE_MILP,
+                    /*cfUnion=*/nullptr, writeTo, milpFTD);
+      if (failed(milp.solve(placement, calculatePathDelays)))
+        return failure();
+      setCFDFCThroughputAttr(info);
+      return success();
+    }
+
     // Create disjoint block unions of all CFDFCs
     SmallVector<CFDFC *, 8> cfdfcs;
     std::vector<CFDFCUnion> disjointUnions;
@@ -705,23 +731,29 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     // accumulated over all MILPs. It's not possible to override a previous
     // placement decision because each CFDFC union is disjoint from the others
     for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
-      if (dumpMILPModels) {
+      if (dumpMILPModels)
         writeTo = dumpDir + sep + funcName + "-cfunion" + std::to_string(idx);
-      }
-      fpl22::CFDFCUnionBuffers milp(solverKind, timeout, info, timingDB,
-                                    targetCP, cfUnion, writeTo);
+
+      MixedBuffers milp(solverKind, timeout, info, timingDB, targetCP,
+                    signalModel, MILPMode::CFDFC_UNION, &cfUnion,
+                    writeTo, milpFTD);
+
       if (failed(milp.solve(placement, calculatePathDelays)))
         return failure();
     }
 
-    if (dumpMILPModels) {
-      writeTo = dumpDir + sep + funcName + "-out-of-cycle";
-    }
-
     // Solve last MILP on channels/units that are not part of any CFDFC
-    fpl22::OutOfCycleBuffers milp(solverKind, timeout, info, timingDB, targetCP,
-                                  writeTo);
-    return milp.solve(placement, calculatePathDelays);
+    if (dumpMILPModels)
+      writeTo = dumpDir + sep + funcName + "-out-of-cycle";
+    MixedBuffers milp(solverKind, timeout, info, timingDB, targetCP,
+                  signalModel, MILPMode::OUT_OF_CYCLE,
+                  /*cfUnion=*/nullptr, writeTo, milpFTD);
+    if (failed(milp.solve(placement, calculatePathDelays)))
+      return failure();
+    setCFDFCThroughputAttr(info);
+    return success();
+
+
   }
 
   if (algorithm == FPGA24) {

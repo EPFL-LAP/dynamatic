@@ -311,6 +311,7 @@ public:
       "calculate-path-delays";
   static constexpr llvm::StringLiteral INSTRUMENT_II = "instrument-ii";
   static constexpr llvm::StringLiteral LSQ_SIZING = "lsq-sizing";
+  static constexpr llvm::StringLiteral CFDFC_UNIONS = "cfdfc-unions";
   static constexpr llvm::StringLiteral ONLY_INNERMOST_CFDFCS = 
       "only-innermost-cfdfcs";
 
@@ -368,6 +369,12 @@ public:
             "Leave CFDFCs whose block cycle strictly contains another "
             "CFDFC's (e.g., outer loops) out of the buffer placement MILP's "
             "throughput objective (FPGA20 and FPL22 only)"});
+    addOption({CFDFC_UNIONS,
+               "Only for 'fpga20' and 'fpl22' buffer placement. 'on' solves "
+               "one MILP per disjoint CFDFC union plus one for the rest of "
+               "the circuit, 'off' solves a single MILP for the whole "
+               "function, 'auto' (default) is 'on' for 'fpl22' and 'off' for "
+               "'fpga20'"});
 
   }
 
@@ -801,6 +808,18 @@ CommandResult Compile::execute(CommandArguments &args) {
     milpSolver = it->second;
   }
 
+  std::string cfdfcUnions = "auto";
+  if (auto it = args.options.find(CFDFC_UNIONS); it != args.options.end()) {
+    if (it->second != "auto" && it->second != "on" && it->second != "off") {
+      llvm::errs() << "Unknown value " << it->second << " for --"
+                   << CFDFC_UNIONS << "! Possible values are 'auto', 'on', "
+                   << "and 'off'.\n";
+      return CommandResult::FAIL;
+    }
+    cfdfcUnions = it->second;
+  }
+
+
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string kInduction = "0";
@@ -827,7 +846,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
                  fastTokenDelivery, milpSolver, straightToQueue, speculation,
                  enableShortCircuit, enableDuplication, calculatePathDelays,
-                 instrumentII, lsqSizing, onlyInnermostCFDFCs);
+                 instrumentII, lsqSizing, onlyInnermostCFDFCs, cfdfcUnions);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

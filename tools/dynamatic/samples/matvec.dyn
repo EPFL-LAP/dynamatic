@@ -1,0 +1,7 @@
+set-dynamatic-path  .
+set-src             integration-test/matvec/matvec.c
+set-clock-period    4
+compile             --buffer-algorithm fpga20 --cfdfc-unions on
+write-hdl
+simulate
+exit

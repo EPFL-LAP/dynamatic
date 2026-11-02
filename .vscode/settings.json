@@ -22,5 +22,6 @@
   "[python]": {
     "editor.tabSize": 4,
     "editor.defaultFormatter": "ms-python.autopep8"
-  }
+  },
+  "C_Cpp.errorSquiggles": "enabled"
 }
