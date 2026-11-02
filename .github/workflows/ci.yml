@@ -88,15 +88,12 @@ jobs:
         run: ./build.sh --release --enable-llvm-assertions --enable-cbc --enable-leq-binaries --force
 
       - name: check-dynamatic
-        if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic
 
       - name: check-constraint-programming-library
-        if: steps.build.outputs.exit_code == 0
         run: ninja -C build run-constraint-programming-test
 
       - name: integration-test
-        if: steps.build.outputs.exit_code == 0
         run: ninja -C build run-ci-integration-tests
 
       - name: performance-report

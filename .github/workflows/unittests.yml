@@ -52,7 +52,6 @@ jobs:
         run: ./build.sh --release --use-prebuilt-llvm --enable-abc --enable-cbc --force
 
       - name: check-dynamatic
-        if: steps.build.outputs.exit_code == 0
         run: ninja check-dynamatic
         working-directory: build
 
