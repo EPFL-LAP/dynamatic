@@ -159,13 +159,13 @@ static std::string getPrettyNodeLabel(Operation *op) {
         return getMemLabel("LSQ", getMemName(lsqOp.getMemRef()));
       })
       .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
-        auto memOp = findMemInterface(loadOp.getAddressResult());
-        StringRef memName = memOp ? getMemName(memOp.getMemRef()) : "";
+        auto memOp = findMemInterface(loadOp);
+        StringRef memName = memOp ? getMemName(memOp->getMemRef()) : "";
         return getMemLabel("LD", memName);
       })
       .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
-        auto memOp = findMemInterface(storeOp.getAddressResult());
-        StringRef memName = memOp ? getMemName(memOp.getMemRef()) : "";
+        auto memOp = findMemInterface(storeOp);
+        StringRef memName = memOp ? getMemName(memOp->getMemRef()) : "";
         return getMemLabel("ST", memName);
       })
       .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
