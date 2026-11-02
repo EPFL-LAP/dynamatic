@@ -154,6 +154,17 @@ LLVM_DIR="$PWD/build/llvm-project"
 # ETHZ-DYNAMO/llvm-project), which must match the llvm-project submodule
 PREBUILT_LLVM_VERSION="e974cfe"
 PREBUILT_LLVM_URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-$PREBUILT_LLVM_VERSION"
+PREBUILT_LLVM_RELEASE_SHA256="d95ac2dd47df4bd50b0bf7711f40a42aeb7ed516eec7c88d23be219e9b7bb6b5"
+declare -A PREBUILT_LLVM_DEBUG_SHA256=(
+  [aa]="329b6a399532ab2b57f682ee2980695378a449aa920a1d16d4837d284b143459"
+  [ab]="ec926a423f2fe995b09cc71d8c9ff039a6785c7def72a962603f8f9140f7ec93"
+  [ac]="d4857f2a50a3660ac8e5c54781a7951af55bf9a476c40b671e267c1f7d4f6aec"
+  [ad]="356357404d928b4764f1e0b3dfb8822a0d2fcc2c1822bb855980d889e78599bd"
+  [ae]="b54a97ef30d95b0b3e85dc4e13e1998f8c6d50b88f282da0e04afe379e020565"
+  [af]="70f78d5cbc77955247870b0cd80f7c261fb72b28bba27d3eba8f0d03fa96ff76"
+  [ag]="765fece5f2aa806c7bb67c6091a007d24fe0a38e2e594ca076f3b7d4fd4af296"
+  [ah]="9ebe3793373b3a14ecee28e500db0ec631064a61e9a6ac768f782808504f7081"
+)
 
 
 # Loop over command line arguments and update script variables
@@ -267,6 +278,8 @@ if [[ $PREBUILT_LLVM -eq 1 ]]; then
         wget --no-verbose --show-progress -O "$PREBUILT_LLVM_TARBALL" \
           "$PREBUILT_LLVM_URL/$PREBUILT_LLVM_NAME.tar.gz"
         exit_on_fail "Failed to download the prebuilt llvm-project (release)!"
+        echo "$PREBUILT_LLVM_RELEASE_SHA256  $PREBUILT_LLVM_TARBALL" | sha256sum --check --status || { rm -f "$PREBUILT_LLVM_TARBALL"; false; }
+        exit_on_fail "Hash mismatch for the prebuilt llvm-project (release)!"
     fi
   else
     PREBUILT_LLVM_NAME="llvm-$PREBUILT_LLVM_VERSION-x86_64-linux-Debug"
@@ -279,6 +292,8 @@ if [[ $PREBUILT_LLVM -eq 1 ]]; then
         wget --no-verbose --show-progress -O "$PREBUILT_LLVM_NAME.part-$PART" \
           "$PREBUILT_LLVM_URL/$PREBUILT_LLVM_NAME.part-$PART"
         exit_on_fail "Failed to download the prebuilt llvm-project (debug)!"
+        echo "${PREBUILT_LLVM_DEBUG_SHA256[$PART]}  $PREBUILT_LLVM_NAME.part-$PART" | sha256sum --check --status || { rm -f "$PREBUILT_LLVM_NAME.part-$PART"; false; }
+        exit_on_fail "Hash mismatch for the prebuilt llvm-project (debug, part $PART)!"
         PARTS+=("$PREBUILT_LLVM_NAME.part-$PART")
       done
       cat "${PARTS[@]}" > "$PREBUILT_LLVM_TARBALL"

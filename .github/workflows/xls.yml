@@ -24,15 +24,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: cleanup
-        run: |
-          echo "Emptying folder"
-          rm -rf -- * .*
-          echo "Folder contents"
-          ls -la
-
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -52,8 +45,7 @@ jobs:
             libboost-all-dev pkg-config python3.12 \
             python3.12-venv python3.12-dev
 
-      - name: Verify Python 3.12
-        run: python3.12 --version
+          python3.12 --version
 
       # Clones XLS at the commit pinned in build.sh into 'xls/' and builds
       # Dynamatic with the XLS dialect and conversion passes
