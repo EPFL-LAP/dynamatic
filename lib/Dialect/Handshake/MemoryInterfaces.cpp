@@ -195,10 +195,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     std::optional<unsigned> block = getLogicBB(firstOpInGroup);
     if (!block)
       return firstOpInGroup->emitError() << "LSQ port must belong to a BB.";
-    Value groupCtrl = getCtrl(*block);
-    if (!groupCtrl)
-      return failure();
-    inputs.lsqCtrl.push_back(groupCtrl);
+    inputs.lsqCtrl.push_back(getLSQCtrl(*block));
 
     // Then, add all memory port results that go the interface to the LSQ
     // inputs of their kind
@@ -251,9 +248,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     // Blocks with at least one store need to provide a control signal fed
     // through a constant indicating the number of stores in the block
     if (numStoresInBlock > 0) {
-      Value blockCtrl = getCtrl(block);
-      if (!blockCtrl)
-        return failure();
+      Value blockCtrl = getMCCtrl(block);
       inputs.mcCtrl.push_back(
           getMCControl(blockCtrl, numStoresInBlock, builder));
     }
@@ -286,9 +281,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
       continue;
 
     // Identically to before, blocks with stores need a cntrol signal
-    Value blockCtrl = getCtrl(lsqBlock);
-    if (!blockCtrl)
-      return failure();
+    Value blockCtrl = getMCCtrl(lsqBlock);
     inputs.mcCtrl.push_back(getMCControl(blockCtrl, numStores, builder));
 
     // The block has no access of its own to the MC
@@ -300,12 +293,17 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
   return success();
 }
 
-Value MemoryInterfaceBuilder::getCtrl(unsigned block) {
-  auto groupCtrl = ctrlVals.find(block);
-  if (groupCtrl == ctrlVals.end()) {
-    llvm::errs() << "Cannot determine control signal for BB " << block << "\n";
-    return nullptr;
-  }
+Value MemoryInterfaceBuilder::getMCCtrl(unsigned block) {
+  auto groupCtrl = mcCtrlVals.find(block);
+  assert(groupCtrl != mcCtrlVals.end() &&
+         "no MC control signal for the basic block");
+  return groupCtrl->second;
+}
+
+Value MemoryInterfaceBuilder::getLSQCtrl(unsigned block) {
+  auto groupCtrl = lsqCtrlVals.find(block);
+  assert(groupCtrl != lsqCtrlVals.end() &&
+         "no LSQ control signal for the basic block");
   return groupCtrl->second;
 }
 

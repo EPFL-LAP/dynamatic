@@ -69,8 +69,13 @@ ControlGraph::ControlGraph(handshake::FuncOp funcOp) {
   }
 
   // Connect all nodes without predecessors to the virtual entry node.
+  // An init op starts a control network which is a closed cycle (its input
+  // comes back from the network's control merge), so it is connected too:
+  // otherwise the network is unreachable from the entry and its loops are
+  // not found
   for (ControlNode &node : nodes)
-    if (&node != entry && node.preds.empty())
+    if (&node != entry &&
+        (node.preds.empty() || isa_and_present<handshake::InitOp>(node.getOp())))
       addEdge(entry, &node);
 }
 

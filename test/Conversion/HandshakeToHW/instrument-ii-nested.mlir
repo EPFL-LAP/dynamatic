@@ -33,12 +33,14 @@
 module {
   handshake.func @nestedLoops(%in0: <i32>, %in1: <i32>, %start: <>) -> (end: <>) {
     %startFork:2 = fork [2] %start {handshake.bb = 0 : ui32, handshake.name = "fork0"} : <>
+    sink %startFork#1 {handshake.name = "sink3"} : <>
+    %init = init %outerExitCtrl {handshake.bb = 0 : ui32, handshake.name = "init0"} : <>
     %bound:2 = fork [2] %in1 {handshake.bb = 0 : ui32, handshake.name = "fork1"} : <i32>
 
     // Outer loop header.
     %outerVal = mux %outerIndex [%in0, %outerBackVal] {handshake.bb = 1 : ui32, handshake.name = "muxOuter"} : <i1>, [<i32>, <i32>] to <i32>
     %outerVals:2 = fork [2] %outerVal {handshake.bb = 1 : ui32, handshake.name = "fork2"} : <i32>
-    %outerCtrl, %outerIndex = control_merge [%startFork#1, %outerBackCtrl]  {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : [<>, <>] to <>, <i1>
+    %outerCtrl, %outerIndex = control_merge [%init, %outerBackCtrl]  {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : [<>, <>] to <>, <i1>
 
     // Inner loop header.
     %innerVal = mux %innerIndex [%outerVals#0, %innerBackVal] {handshake.bb = 2 : ui32, handshake.name = "muxInner"} : <i1>, [<i32>, <i32>] to <i32>
@@ -56,7 +58,6 @@ module {
     %outerBackVal, %outerExitVal = cond_br %outerConds#0, %outerVals#1 {handshake.bb = 3 : ui32, handshake.name = "cond_brOuterVal"} : <i1>, <i32>
     %outerBackCtrl, %outerExitCtrl = cond_br %outerConds#1, %innerExitCtrl {handshake.bb = 3 : ui32, handshake.name = "cond_brOuterCtrl"} : <i1>, <>
     sink %outerExitVal {handshake.name = "sink1"} : <i32>
-    sink %outerExitCtrl {handshake.name = "sink2"} : <>
 
     end {handshake.bb = 4 : ui32, handshake.name = "end0"} %startFork#0 : <>
   }

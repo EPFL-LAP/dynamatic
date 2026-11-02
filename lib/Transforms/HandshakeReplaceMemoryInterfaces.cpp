@@ -186,7 +186,8 @@ LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceForMemRef(
 
   // Context and builder for creating new operation
   MemoryInterfaceBuilder memBuilder(funcOp, memref, masterIface.getMemStart(),
-                                    masterIface.getCtrlEnd(), ctrlVals);
+                                    masterIface.getCtrlEnd(), ctrlVals,
+                                    ctrlVals);
 
   // Collect all access ports related to the memory region under consideration
   DenseSet<MemPortOpInterface> regionPorts;

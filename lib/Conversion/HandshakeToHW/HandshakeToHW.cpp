@@ -2220,9 +2220,12 @@ detectIIMonitors(ControlNetworkAnalysis &controlNetwork) {
     if (selChannels.empty())
       continue;
 
+    // Every control network is a closed cycle through its init, which is found
+    // as an outer loop around the loops of the network. It is not a loop of the
+    // program, so it is not counted in the depths
     specs.push_back({getUniqueName(cmergeOp).str(), std::move(selChannels),
-                     std::move(initSelects), loop->getLoopDepth(),
-                     loop->getMaxLoopDepth()});
+                     std::move(initSelects), loop->getLoopDepth() - 1,
+                     loop->getMaxLoopDepth() - 1});
   }
   return specs;
 }
