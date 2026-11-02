@@ -343,6 +343,14 @@ protected:
   /// CFDFC to the model.
   void addUnitThroughputConstraints(CFDFC &cfdfc);
 
+  /// Adds a constraint for each load or store connected to an LSQ in the
+  /// CFDFC: its address cannot enter the load or store until one cycle
+  /// after the allocation token of its LSQ group enters the LSQ.
+  ///
+  /// It is only valid to call this method after having added variables for the
+  /// CFDFC to the model.
+  void addLSQAllocationConstraints(CFDFC &cfdfc);
+
   // Adds Blackbox Constraints for the Data Signals of blackbox ADDI, SUBI and
   // CMPI modules or any other component that is not directly implemented as an
   // LUT. These delays are retrieved from Vivado Timing Reports. Ready and Valid
