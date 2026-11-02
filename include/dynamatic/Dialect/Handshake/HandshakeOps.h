@@ -585,13 +585,11 @@ public:
 /// backtracking their def-use chain till reaching specific operation types.
 FuncMemoryPorts getMemoryPorts(dynamatic::handshake::MemoryOpInterface memOp);
 
-/// Attempts to find the memory interface of a load or store (memory access) by
-/// following the uses of its address output in a BFS fashion. This works even
-/// on dematerialized IR but will only follow through simple "forwarding
-/// operations" like extensions/truncations and forks before giving up. Returns
-/// nothing if no memory interface could be found.
-std::optional<handshake::MemoryOpInterface>
-findMemInterface(Operation *memAccess);
+/// Attempts to find a memory interface by following the value's uses in a BFS
+/// fashion. This works even on dematerialized IR but will only follow through
+/// simple "forwarding operations" like extensions/truncations and forks before
+/// giving up. Returns `nullptr` if no memory interface could be found.
+handshake::MemoryOpInterface findMemInterface(Value val);
 
 } // namespace dynamatic
 

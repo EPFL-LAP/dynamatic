@@ -1597,17 +1597,7 @@ dynamatic::getMemoryPorts(handshake::MemoryOpInterface memOp) {
   llvm_unreachable("unknown memory interface type");
 }
 
-std::optional<handshake::MemoryOpInterface>
-dynamatic::findMemInterface(Operation *memAccess) {
-  // the address output of the load or store goes to its memory interface
-  Value val;
-  if (auto loadOp = dyn_cast<handshake::LoadOp>(memAccess))
-    val = loadOp.getAddressResult();
-  else if (auto storeOp = dyn_cast<handshake::StoreOp>(memAccess))
-    val = storeOp.getAddressResult();
-  else
-    llvm_unreachable("findMemInterface takes a load or store");
-
+handshake::MemoryOpInterface dynamatic::findMemInterface(Value val) {
   llvm::SmallDenseSet<Operation *, 2> explore(val.getUsers().begin(),
                                               val.getUsers().end());
   llvm::SmallDenseSet<Operation *, 2> visited;
@@ -1620,7 +1610,7 @@ dynamatic::findMemInterface(Operation *memAccess) {
             handshake::ForkOp, handshake::LazyForkOp>(op))
       explore.insert(op->getUsers().begin(), op->getUsers().end());
   }
-  return std::nullopt;
+  return nullptr;
 }
 
 MemoryPort::MemoryPort(Operation *portOp, ArrayRef<unsigned> oprdIndices,

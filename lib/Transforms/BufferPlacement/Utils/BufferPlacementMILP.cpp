@@ -252,14 +252,14 @@ static bool hasVariableLatencyUnit(const DataflowGraphNode &node) {
     return false;
   Operation *unit = node.op;
   if (auto loadOp = dyn_cast<handshake::LoadOp>(unit)) {
-    auto memOp = findMemInterface(loadOp);
-    if (memOp && isa<handshake::LSQOp>(*memOp))
+    auto memOp = findMemInterface(loadOp.getAddress());
+    if (isa_and_present<handshake::LSQOp>(memOp))
       return true;
   }
 
   if (auto storeOp = dyn_cast<handshake::StoreOp>(unit)) {
-    auto memOp = findMemInterface(storeOp);
-    if (memOp && isa<handshake::LSQOp>(*memOp))
+    auto memOp = findMemInterface(storeOp.getAddress());
+    if (isa_and_present<handshake::LSQOp>(memOp))
       return true;
   }
 
@@ -784,8 +784,8 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     /// In the new implementation, we use the MemInterfaceAttr to determine
     /// whether the StoreOp is connected to the LSQ or not.
     if (auto storeOp = dyn_cast<handshake::StoreOp>(dstOp)) {
-      auto memOp = findMemInterface(storeOp);
-      if (memOp && isa<handshake::LSQOp>(*memOp))
+      auto memOp = findMemInterface(storeOp.getAddressResult());
+      if (isa<handshake::LSQOp>(memOp))
         continue;
     }
 
@@ -1014,89 +1014,6 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
                            *retPath.retOut - *retPath.retIn,
                        "through_unitRetiming");
     }
-  }
-}
-
-/// If a load or store (memory access) goes through an LSQ,
-/// return the channel carrying the allocation token
-/// into the LSQ group that the memory access belongs to.
-/// Otherwise, return nothing.
-static std::optional<OpResult> getLSQGroupLazyForkOutput(Operation *memAccess) {
-  std::optional<handshake::MemoryOpInterface> memOp =
-      findMemInterface(memAccess);
-  assert(memOp && "memory access is connected to no memory interface");
-
-  // An address cannot enter an LSQ until one cycle
-  // after the allocation token of its group enters the LSQ.
-  // This does not apply to an MC, so we return nothing.
-  if (!isa<handshake::LSQOp>(*memOp))
-    return std::nullopt;
-
-  auto lsqOp = cast<handshake::LSQOp>(*memOp);
-
-  // the ports of the LSQ, sorted into its groups
-  LSQPorts ports = lsqOp.getPorts();
-
-  // find the LSQ group that the memory access belongs to
-  LSQGroup memAccessGroup = [&]() -> LSQGroup {
-    // each group lists its loads and stores as access ports
-    for (LSQGroup &group : ports.getGroups()) {
-      for (MemoryPort &port : group->accessPorts) {
-        // if the memory access is one of the loads and stores of this group
-        if (port.portOp == memAccess)
-          return group;
-      }
-    }
-    llvm_unreachable("memory access connected to an LSQ is in no LSQ group");
-  }();
-
-  // get which operand is the group allocation input, by index
-  assert(memAccessGroup->ctrlPort && "LSQ group has no control port");
-  unsigned opIndex = memAccessGroup->ctrlPort->getCtrlInputIndex();
-
-  // get the OpResult
-  return cast<OpResult>(lsqOp->getOperand(opIndex));
-}
-
-void BufferPlacementMILP::addLSQAllocationConstraints(CFDFC &cfdfc) {
-  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
-  for (Operation *unit : cfdfc.units) {
-    // iterate loads and stores in the cfdfc
-    auto memPort = dyn_cast<handshake::MemPortOpInterface>(unit);
-    if (!memPort)
-      continue;
-
-    // get the LSQ group allocator control input for this memory access,
-    // which returns nothing if the memory access does not go through an LSQ
-    std::optional<OpResult> gaControl = getLSQGroupLazyForkOutput(unit);
-    if (!gaControl)
-      continue;
-
-    Operation *gaControlProducer = gaControl->getOwner();
-    assert(cfdfc.units.contains(gaControlProducer) &&
-           "producer of an LSQ group allocator control input is not in the "
-           "CFDFC of its loads and stores");
-
-    // the address is the first operand of every load and store
-    unsigned addressOperandIdx = 0;
-    assert(unit->getOperand(addressOperandIdx) == memPort.getAddressInput() &&
-           "address is not the first operand of the load or store");
-
-    // get the retiming variable for when the group allocator control
-    // enters the LSQ
-    CPVar &retLSQGaAlloc = cfVars.getUnitVarsFor(gaControlProducer)
-                               .getRetOut(gaControl->getResultNumber());
-
-    // get the retiming variable for when the address
-    // enters the memory access
-    CPVar &retAddress = cfVars.getUnitVarsFor(unit).getRetIn(addressOperandIdx);
-
-    // the address enters the memory access at least one cycle
-    // after the group allocator control enters the LSQ:
-    // at steady state, the occupancy of this edge is an upper bound
-    // on the throughput
-    model->addConstr(retAddress - retLSQGaAlloc >= cfVars.throughput,
-                     "throughput_lsqAllocation_" + getUniqueName(unit).str());
   }
 }
 
