@@ -307,7 +307,6 @@ void MAPBUFBuffers::setup() {
     addSteadyStateReachabilityConstraints(*cfdfc);
     addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
-    addLSQAllocationConstraints(*cfdfc);
   }
 
   addMaxThroughputObjective(allChannels, cfdfcs);

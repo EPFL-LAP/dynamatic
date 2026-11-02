@@ -200,8 +200,8 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
   // slots at Store/Load's input.
   // This is a temporary workaround and a better solution is needed.
   for (handshake::StoreOp storeOp : funcOp.getOps<handshake::StoreOp>()) {
-    auto memOp = findMemInterface(storeOp);
-    if (!memOp || !mlir::isa<handshake::LSQOp>(*memOp))
+    auto memOp = findMemInterface(storeOp.getAddressResult());
+    if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
       continue;
 
     for (Value operand : storeOp->getOperands()) {
@@ -215,8 +215,8 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
   }
 
   for (handshake::LoadOp loadOp : funcOp.getOps<handshake::LoadOp>()) {
-    auto memOp = findMemInterface(loadOp);
-    if (!memOp || !mlir::isa<handshake::LSQOp>(*memOp))
+    auto memOp = findMemInterface(loadOp.getAddressResult());
+    if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
       continue;
 
     for (Value operand : loadOp->getOperands()) {
