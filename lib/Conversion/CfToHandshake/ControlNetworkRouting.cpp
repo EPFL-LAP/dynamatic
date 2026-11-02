@@ -837,3 +837,43 @@ dynamatic::experimental::cf_to_handshake::routeCfgs(
   // return the memory interface inputs, keyed by memref
   return memoryInputs;
 }
+
+void dynamatic::experimental::cf_to_handshake::labelCondBranchSuccessors(
+    Region &body, const BlockToCond &blockToCond, const Cfg &base,
+    OpBuilder &builder) {
+  // map each branch condition to its successors in the original cfg
+  DenseMap<Value, std::pair<unsigned, unsigned>> condToSuccs;
+
+  // for each basic block
+  for (Block *block : blockToCond.getBlocks()) {
+    // default construct the successor labels for this block
+    std::pair<unsigned, unsigned> &succs = condToSuccs[blockToCond[block]];
+
+    SmallVector<const CfgEdge *> outEdges = base.getOutEdges(block);
+    assert(outEdges.size() == 2 &&
+           "a basic block with a branch condition must have two out edges");
+
+    // get the two successor labels
+    for (const CfgEdge *edge : outEdges) {
+      assert(edge && "getOutEdges gave null ptr");
+      assert(edge->condition && "edge has no condition");
+      if (edge->condition.value())
+        succs.first = getBlockNumber(edge->to);
+      else
+        succs.second = getBlockNumber(edge->to);
+    }
+  }
+
+  // for every handshake.cond_br
+  for (auto condBrOp : body.getOps<handshake::ConditionalBranchOp>()) {
+    // get the successor labels from the condition
+    auto succsIt = condToSuccs.find(condBrOp.getConditionOperand());
+    assert(succsIt != condToSuccs.end() &&
+           "cond_br condition wasn't in BlockToCond");
+    auto [trueSucc, falseSucc] = succsIt->second;
+
+    // store the basic block successor outputs on the branch
+    condBrOp.setCfgSuccsAttr(
+        handshake::CfgSuccsAttr::get(builder.getContext(), trueSucc, falseSucc));
+  }
+}

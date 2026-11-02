@@ -1033,6 +1033,10 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
       body, blockToCond, memStarts, nonMemoryCfgs, memoryCfgs,
       speculationCfgs, builder);
 
+  // label each cond branch with the cfg successors of its basic block,
+  // for buffering to match the branch sides to the cfg arcs
+  labelCondBranchSuccessors(body, blockToCond, base, builder);
+
   // label every op with the number of its basic block (its bb attribute).
   // the memory interface builder reads it off each memory access
   // to group them, so it has to be set before the interfaces are built

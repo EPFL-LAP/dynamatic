@@ -69,6 +69,15 @@ public:
     return blockToCondReader.lookup(block).getValue();
   }
 
+  /// the basic blocks that have a branch condition
+  SmallVector<Block *> getBlocks() const {
+    SmallVector<Block *> blocks;
+    for (auto &[block, condReader] : blockToCondReader) {
+      blocks.push_back(block);
+    }
+    return blocks;
+  }
+
   /// erase the cond readers, and the temporary producers
   /// of the CondBranchOp conditions,
   /// once the branches are erased
@@ -108,6 +117,11 @@ MapVector<MemrefValue, MemoryInterfaceInputs> routeCfgs(
     ArrayRef<Cfg> nonMemoryCfgs,
     MapVector<std::pair<MemrefValue, McOrLsq>, TriggerCfg> &memoryCfgs,
     SmallVectorImpl<TriggerCfg> &speculationCfgs, OpBuilder &builder);
+
+/// Labels each cond branch with the bb ids of the successors
+/// of its basic block in the base CFG, on the true and the false side.
+void labelCondBranchSuccessors(Region &body, const BlockToCond &blockToCond,
+                               const Cfg &base, OpBuilder &builder);
 
 } // namespace cf_to_handshake
 } // namespace experimental

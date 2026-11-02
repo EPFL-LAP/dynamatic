@@ -359,11 +359,17 @@ dynamatic::experimental::cf_to_handshake::collectSpeculationCfgs(
     if (!hasSpeculatedOp)
       continue;
 
+    // the speculated block's successors are needed too,
+    // so the block keeps its branch, which triggers the speculator
+    SmallVector<Block *> neededBlocks = {block};
+    for (Block *succ : block->getSuccessors())
+      neededBlocks.push_back(succ);
+
     // build a speculation CFG:
     // the speculated block is its only trigger block,
     // and it has no end trigger
     TriggerCfg speculationCfg;
-    speculationCfg.cfg = buildTriggerCfg(base, {block});
+    speculationCfg.cfg = buildTriggerCfg(base, neededBlocks);
     speculationCfg.kind = TriggerKind::Speculation;
     speculationCfg.triggerBlocks.insert(block);
     speculationCfg.triggersEnd = false;

@@ -533,9 +533,14 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     if (numExecs == 0)
       break;
 
-    // Create the CFDFC from the set of selected archs and BBs
-    cfdfcs.push_back(CFDFC::createFTD(info.funcOp, selectedArchs, numExecs,
-                                      backwardChannels));
+    // Create the CFDFC from the set of selected archs and BBs.
+    // FTD collects its channels from the backward channels,
+    // and otherwise from the cfg successors of the cond branches
+    if (ftd)
+      cfdfcs.push_back(CFDFC::createFTD(info.funcOp, selectedArchs, numExecs,
+                                        backwardChannels));
+    else
+      cfdfcs.push_back(CFDFC::create(info.funcOp, selectedArchs, numExecs));
   } while (!firstCFDFC);
 
   return success();

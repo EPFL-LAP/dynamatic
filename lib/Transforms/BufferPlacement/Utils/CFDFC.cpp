@@ -220,56 +220,93 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
   }
 }
 
-void CFDFC::collectChannels() {
-  // Iterate over the pre-collected units which have been filtered to just
-  // this CFDFC
-  for (Operation *op : units) {
-    unsigned srcBB = *getLogicBB(op);
+/// Whether the cycle contains the arc from one block to another
+static bool isArcInCycle(unsigned srcBB, unsigned dstBB,
+                         const SetVector<unsigned> &cycle) {
+  for (size_t i = 0; i < cycle.size(); ++i) {
+    unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
+    if (srcBB == cycle[i] && dstBB == cycle[nextBB])
+      return true;
+  }
+  return false;
+}
 
-    // Add each handshake channel to the CFDFC, and additionally to backedges
-    // if the handshake channel is part of a backedge
+/// Whether an op is a cond branch of the original cfg:
+/// one the lowering labelled with the successors of its block
+static bool isCfgBranch(Operation *op) {
+  auto condBrOp = dyn_cast<handshake::ConditionalBranchOp>(op);
+  return condBrOp && condBrOp.getCfgSuccsAttr();
+}
+
+void CFDFC::collectChannels() {
+  // add every channel between two units,
+  // unless one of its ends is a cfg branch
+  for (Operation *op : units) {
+    if (isCfgBranch(op))
+      continue;
+
     for (OpResult res : op->getResults()) {
       assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
              "value must have unique user");
 
-      // Get the value's unique user and its basic block
+      // skip channels leaving the CFDFC,
+      // and channels into a cfg branch, which are added below
       Operation *user = *res.getUsers().begin();
-      std::optional<unsigned> optDstBB = getLogicBB(user);
+      if (!units.contains(user) || isCfgBranch(user))
+        continue;
 
-      // Channels to users without a basic block are not added to the CFDFC
-      if (optDstBB.has_value()) {
-        unsigned dstBB = *optDstBB;
+      channels.insert(res);
+      if (isCFDFCBackedge(res))
+        backedges.insert(res);
+    }
+  }
 
-        if (srcBB != dstBB) {
-          // The channel is in the CFDFC if it belongs belong to a selected arch
-          // between two basic blocks
+  // for each cfg branch in the CFDFC
+  for (Operation *op : units) {
+    if (!isCfgBranch(op))
+      continue;
+    auto condBrOp = cast<handshake::ConditionalBranchOp>(op);
 
-          // check each arch in the CFDFC
-          for (size_t i = 0; i < cycle.size(); ++i) {
-            unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
+    // add its input channels
+    for (Value operand : condBrOp->getOperands()) {
+      // a function argument is not a channel between units
+      Operation *defOp = operand.getDefiningOp();
+      if (!defOp)
+        continue;
 
-            // check if a matching arch is found
-            if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
-              channels.insert(res);
-              if (isCFDFCBackedge(res))
-                backedges.insert(res);
+      assert(units.contains(defOp) &&
+             "cond_br input is not produced in the CFDFC");
+      channels.insert(operand);
+    }
 
-              // stop if a matching arch is found
-              break;
-            }
-          }
-        } else if (cycle.size() == 1) {
-          // The channel is in the CFDFC if its producer/consumer belong to the
-          // same basic block and the CFDFC is just a block looping to itself
-          channels.insert(res);
-          if (isCFDFCBackedge(res))
-            backedges.insert(res);
-        } else if (!isBackedge(res)) {
-          // The channel is in the CFDFC if its producer/consumer belong to the
-          // same basic block and the channel is not a backedge
-          channels.insert(res);
-        }
-      }
+    // the successors of the branch's block in the original cfg
+    handshake::CfgSuccsAttr succs = condBrOp.getCfgSuccsAttr();
+    unsigned bb = getLogicBB(condBrOp).value();
+
+    // the true output
+    Value trueResult = condBrOp.getTrueResult();
+    assert(trueResult.hasOneUse() && "value must have unique user");
+    bool trueUserInCfdfc = units.contains(*trueResult.getUsers().begin());
+    bool trueArcInCycle = isArcInCycle(bb, succs.getTrueSucc(), cycle);
+
+    // add it if its user is in the CFDFC and its arc is in the cycle
+    if (trueUserInCfdfc && trueArcInCycle) {
+      channels.insert(trueResult);
+      if (isCFDFCBackedge(trueResult))
+        backedges.insert(trueResult);
+    }
+
+    // the false output
+    Value falseResult = condBrOp.getFalseResult();
+    assert(falseResult.hasOneUse() && "value must have unique user");
+    bool falseUserInCfdfc = units.contains(*falseResult.getUsers().begin());
+    bool falseArcInCycle = isArcInCycle(bb, succs.getFalseSucc(), cycle);
+
+    // add it if its user is in the CFDFC and its arc is in the cycle
+    if (falseUserInCfdfc && falseArcInCycle) {
+      channels.insert(falseResult);
+      if (isCFDFCBackedge(falseResult))
+        backedges.insert(falseResult);
     }
   }
 }
