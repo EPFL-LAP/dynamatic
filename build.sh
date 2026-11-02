@@ -66,6 +66,18 @@ exit_on_fail() {
     fi
 }
 
+# Downloads a file. The progress bar is only shown on a terminal: elsewhere
+# (e.g., in CI), every update of the bar would be a new line of the log
+# $1: Path of the downloaded file
+# $2: URL of the file
+download() {
+    local progress=()
+    if [[ -t 2 ]]; then
+        progress=(--show-progress)
+    fi
+    wget --no-verbose "${progress[@]}" -O "$1" "$2"
+}
+
 # Prepares to build a particular part of the project by creating a "build"
 # folder for it, cd-ing to it, and displaying a message to stdout.
 # $1: Name of the project part
@@ -275,7 +287,7 @@ if [[ $PREBUILT_LLVM -eq 1 ]]; then
     # Download only if the file doesn't exist
     if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
         echo "Downloading $PREBUILT_LLVM_TARBALL..."
-        wget --no-verbose --show-progress -O "$PREBUILT_LLVM_TARBALL" \
+        download "$PREBUILT_LLVM_TARBALL" \
           "$PREBUILT_LLVM_URL/$PREBUILT_LLVM_NAME.tar.gz"
         exit_on_fail "Failed to download the prebuilt llvm-project (release)!"
         echo "$PREBUILT_LLVM_RELEASE_SHA256  $PREBUILT_LLVM_TARBALL" | sha256sum --check --status || { rm -f "$PREBUILT_LLVM_TARBALL"; false; }
@@ -289,7 +301,7 @@ if [[ $PREBUILT_LLVM -eq 1 ]]; then
       # assets)
       PARTS=()
       for PART in aa ab ac ad ae af ag ah; do
-        wget --no-verbose --show-progress -O "$PREBUILT_LLVM_NAME.part-$PART" \
+        download "$PREBUILT_LLVM_NAME.part-$PART" \
           "$PREBUILT_LLVM_URL/$PREBUILT_LLVM_NAME.part-$PART"
         exit_on_fail "Failed to download the prebuilt llvm-project (debug)!"
         echo "${PREBUILT_LLVM_DEBUG_SHA256[$PART]}  $PREBUILT_LLVM_NAME.part-$PART" | sha256sum --check --status || { rm -f "$PREBUILT_LLVM_NAME.part-$PART"; false; }
