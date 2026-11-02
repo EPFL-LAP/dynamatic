@@ -24,13 +24,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: cleanup
-        run: |
-          echo "Emptying folder"
-          rm -rf -- * .*
-          echo "Folder contents"
-          ls -la
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -53,8 +46,7 @@ jobs:
             python3.12-venv python3.12-dev \
             ghdl verilator
 
-      - name: Verify Python 3.12
-        run: python3.12 --version
+          python3.12 --version
 
       - name: build
         run: ./build.sh --release --use-prebuilt-llvm --enable-abc --enable-cbc --force
