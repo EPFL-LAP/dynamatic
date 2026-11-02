@@ -2,6 +2,10 @@
 // RUN:   --handshake-annotate-properties="json-path=%t.json annotate-list=IOGSingleToken,EntryTokenOrder,SingleEntryToken,ExitTokenOrder" \
 // RUN:   --exp-test-print-formal-properties="json-path=%t.json" -o /dev/null \
 // RUN:   | FileCheck %s
+// RUN: dynamatic-opt %s \
+// RUN:   --handshake-annotate-properties="json-path=%t.consec.json annotate-list=IOGConsecutiveTokens" \
+// RUN:   --exp-test-print-formal-properties="json-path=%t.consec.json" -o /dev/null \
+// RUN:   | FileCheck %s --check-prefix=CONSEC
 
 // A loop that counts down from n, with a buffer on the index of its control
 // merge and two buffers on its condition
@@ -17,6 +21,11 @@
 // CHECK-DAG: IOGSingleToken: (count(start_valid, control_merge0.slot_full, buffer1.outs_valid_i, formal.dead_buffer0.full) = (1 + count(fork0.outs_1_sent, control_merge0.outs_sent)))
 // CHECK-DAG: IOGSingleToken: (count(start_valid, testbench.end_full) = (1 + count(fork0.outs_0_sent)))
 handshake.func @countLoop(%n: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
+  // The pending entry token and a token in another slot of its IOG were copied
+  // by the forks between the entry and the next slot. The IOGs are listed in
+  // the order in which the search finds them, hence CONSEC-DAG
+  // CONSEC-DAG: IOGConsecutiveTokens: ((start_valid & (count(testbench.end_full) > 0)) -> fork0.outs_0_sent)
+  // CONSEC-DAG: IOGConsecutiveTokens: ((n_valid & (count(buffer0.outs_valid_i) > 0)) -> fork1.outs_1_sent)
   %startFork:2 = fork [2] %start {handshake.bb = 0 : ui32, handshake.name = "fork0"} : <>
   // The control merge holds the entry token (index 0) only if the buffer after
   // it is empty

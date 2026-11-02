@@ -437,49 +437,58 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 }
 
 namespace {
+// A unit of an IOG that holds slots, or the entry of the IOG, which is modeled
+// as a slot that initially holds the token of the IOG.
+struct IOGSlotHolder {
+  // The unit, or null for the entry
+  Operation *unit;
+  // The channels that the tokens enter through: the operands of the unit, or
+  // none for the entry, which nothing in the circuit refills
+  SmallVector<Value> inputs;
+  // The channels that the tokens leave through: the results of the unit, or
+  // the entry itself
+  SmallVector<Value> outputs;
+  // Whether a token is in the slots
+  PropertyExpr occupied;
+  // The number of slots
+  size_t numSlots;
+};
+
 // This function finds appropriate fork sent state namers for the consecutive
-// tokens invariant: Given the IOG, a starting slot, and an ending slot, it
-// determines all forks for which:
-// 1. The start buffer is the copied slot of the fork
+// tokens invariant: Given the IOG, a starting slot holder, and an ending slot
+// holder, it determines all forks for which:
+// 1. The start holder holds the copied slot of the fork
 // 2. The fork is part of a path from start to end along the IOG
-std::vector<EagerForkSentNamer>
-findCopiedSents(const IOG &iog, Operation *startSlot, Operation *endSlot) {
-  auto pathSet = iog.findUnitsOnPaths(startSlot, endSlot);
+// There is no path into the entry, as nothing produces it.
+std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
+                                                const IOGSlotHolder &start,
+                                                const IOGSlotHolder &end) {
+  // The units that reach the end without going through the start. If the start
+  // unit is null, the start is the entry channel: no unit is a boundary, and
+  // the walk stops at the entry, which no unit produces
+  llvm::SetVector<Operation *> reachingEnd = reachBackward(
+      /*starts=*/end.inputs,
+      /*isBoundary=*/[&](Operation *op) { return op == start.unit; },
+      /*isFollowed=*/[&](Value channel) { return iog.contains(channel); });
   std::vector<EagerForkSentNamer> sents;
-  std::vector<Operation *> stack;
-  stack.push_back(pathSet.start);
-  bool first = true;
+  SmallVector<Value> stack(start.outputs);
   while (!stack.empty()) {
-    Operation *cur = stack.back();
-    stack.pop_back();
-    // Skip the check for slots for the first operation, as the first operation
-    // contains the starting slot but should not terminate the search
-    if (!first) {
-      auto slots = getAllSlotsOfOperation(cur);
-      if (!slots.empty()) {
-        // Stop following this path if it contains a buffer, as following forks
-        // will not have the start buffer as copied slot
-        continue;
-      }
-    }
-    first = false;
-    for (OpResult forward : cur->getResults()) {
-      if (!iog.contains(forward)) {
-        continue;
-      }
-      Operation *next = *forward.getUsers().begin();
-      assert(iog.contains(next));
-      if (pathSet.units.find(next) == pathSet.units.end()) {
-        continue;
-      }
-
-      if (auto forkOp = dyn_cast<EagerForkLikeOpInterface>(cur)) {
-        sents.push_back(
-            forkOp.getInternalSentStateNamers()[forward.getResultNumber()]);
-      }
-
-      stack.push_back(next);
-    }
+    Value channel = stack.pop_back_val();
+    if (!iog.contains(channel))
+      continue;
+    Operation *next = *channel.getUsers().begin();
+    assert(iog.contains(next));
+    if (next != end.unit && !reachingEnd.contains(next))
+      continue;
+    if (auto forkOp =
+            dyn_cast_or_null<EagerForkLikeOpInterface>(channel.getDefiningOp()))
+      sents.push_back(
+          forkOp.getInternalSentStateNamers()[cast<OpResult>(channel)
+                                                  .getResultNumber()]);
+    // Stop following this path if it contains a buffer, as following forks
+    // will not have the start buffer as copied slot
+    if (getAllSlotsOfOperation(next).empty())
+      llvm::append_range(stack, next->getResults());
   }
   return sents;
 }
@@ -537,29 +546,42 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(ModuleOp modOp) {
 
 void HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokensOf(
     const IOG &iog) {
-  std::vector<std::pair<Operation *, TokenCountNamer>> slotOps;
+  // The entry forms a pair with every other slot, e.g.:
+  //   ((start_valid & (count(buffer3.full) > 0)) -> fork0.outs_0_sent)
+  std::vector<IOGSlotHolder> holders;
+  holders.push_back(
+      {/*unit=*/nullptr, /*inputs=*/{}, /*outputs=*/{iog.entry},
+       /*occupied=*/State(std::make_shared<EntrySlotNamer>(iog.entry)),
+       /*numSlots=*/1});
   for (auto &op : iog.units) {
     auto slotCountNamer = getTokenCountNamerOfOperation(op);
     if (slotCountNamer.has_value()) {
-      slotOps.push_back({op, std::move(*slotCountNamer)});
+      size_t numSlots = slotCountNamer->slots->size();
+      holders.push_back({/*unit=*/op,
+                         /*inputs=*/SmallVector<Value>(op->getOperands()),
+                         /*outputs=*/SmallVector<Value>(op->getResults()),
+                         /*occupied=*/
+                         BinaryExpr(State(*slotCountNamer), BinaryExpr::Gt,
+                                    Constant::integer(0)),
+                         /*numSlots=*/numSlots});
     }
   }
-  for (auto slot1 = slotOps.begin(); slot1 != slotOps.end(); ++slot1) {
-    for (auto slot2 = slot1 + 1; slot2 != slotOps.end(); ++slot2) {
-      if (slot1->first == slot2->first) {
+  for (auto slot1 = holders.begin(); slot1 != holders.end(); ++slot1) {
+    for (auto slot2 = slot1 + 1; slot2 != holders.end(); ++slot2) {
+      if (slot1->unit == slot2->unit) {
         // TODO: Handle loops, i.e. if the slot contains >=2 tokens, there
         // should be a copied fork within a loop
-        if (slot1->second.slots->size() >= 2) {
-          slot1->first->emitWarning("Should annotate self-loop");
+        if (slot1->numSlots >= 2) {
+          slot1->unit->emitWarning("Should annotate self-loop");
         }
         continue;
       }
 
       std::vector<EagerForkSentNamer> copiedSents =
-          findCopiedSents(iog, slot1->first, slot2->first);
+          findCopiedSents(iog, *slot1, *slot2);
 
       std::vector<EagerForkSentNamer> extra =
-          findCopiedSents(iog, slot2->first, slot1->first);
+          findCopiedSents(iog, *slot2, *slot1);
 
       copiedSents.insert(copiedSents.end(), extra.begin(), extra.end());
 
@@ -574,11 +596,8 @@ void HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokensOf(
       // or, if no fork can copy the token between the two slots:
       //   (((count(buffer14.full) > 0) & (count(testbench.end_full) > 0))
       //    -> FALSE)
-      auto isOccupied = [](const TokenCountNamer &slot) {
-        return BinaryExpr(State(slot), BinaryExpr::Gt, Constant::integer(0));
-      };
       PropertyExpr bothOccupied =
-          conjunction({isOccupied(slot1->second), isOccupied(slot2->second)});
+          conjunction({slot1->occupied, slot2->occupied});
       addProperty(FormalProperty::IOG_CONSECUTIVE_TOKENS,
                   FormalProperty::TAG::INVAR,
                   implies(bothOccupied, disjunction(getStates(copiedSents))));
