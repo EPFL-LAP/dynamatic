@@ -713,6 +713,32 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.init",
+    "parameters": [
+      { "name": "INITIAL_VALUE", "type": "unsigned", "generic": false },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/init.v",
+    "module-name": "init_dataless",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.init",
+    "parameters": [
+      { "name": "INITIAL_VALUE", "type": "unsigned" },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/init.v",
+    "dependencies": ["init_dataless"],
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.lazy_fork",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },

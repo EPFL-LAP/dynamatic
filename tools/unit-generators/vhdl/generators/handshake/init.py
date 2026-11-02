@@ -69,8 +69,6 @@ def _generate_init(name, bitwidth, initial_value):
   dependencies = _generate_init_dataless(
       init_dataless_name)
 
-  dataReg_init = f"'{initial_value}'"
-
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -114,7 +112,7 @@ begin
   begin
     if (rising_edge(clk)) then
       if (rst = '1') then
-        dataReg <= (others => {dataReg_init});
+        dataReg <= std_logic_vector(to_unsigned({initial_value}, {bitwidth}));
       elsif (regEnable) then
         dataReg <= ins;
       end if;
