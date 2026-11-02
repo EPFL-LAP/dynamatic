@@ -508,13 +508,13 @@ int CFDFCGraph::getEarliestStartTime(mlir::Operation *op) {
 
 bool CFDFCGraph::isConnectedToLSQ(mlir::Operation *op) {
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
-    auto memOp = findMemInterface(loadOp.getAddressResult());
-    if (isa_and_present<handshake::LSQOp>(memOp))
+    auto memOp = findMemInterface(loadOp);
+    if (memOp && isa<handshake::LSQOp>(*memOp))
       return true;
   }
   if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
-    auto memOp = findMemInterface(storeOp.getAddressResult());
-    if (isa_and_present<handshake::LSQOp>(memOp))
+    auto memOp = findMemInterface(storeOp);
+    if (memOp && isa<handshake::LSQOp>(*memOp))
       return true;
   }
   return false;

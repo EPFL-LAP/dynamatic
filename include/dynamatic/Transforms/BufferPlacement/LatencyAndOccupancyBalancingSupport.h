@@ -224,8 +224,8 @@ public:
     if (!op || nodes[nodeId].type != DataflowGraphNode::REGULAR)
       return false;
     if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
-      auto memOp = findMemInterface(storeOp.getAddressResult());
-      if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+      auto memOp = findMemInterface(storeOp);
+      if (!memOp || !mlir::isa<handshake::LSQOp>(*memOp))
         return true;
     }
 
@@ -375,8 +375,8 @@ public:
       return false;
 
     if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
-      auto memOp = findMemInterface(storeOp.getAddressResult());
-      if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+      auto memOp = findMemInterface(storeOp);
+      if (!memOp || !mlir::isa<handshake::LSQOp>(*memOp))
         return true;
     }
 
