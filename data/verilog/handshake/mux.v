@@ -21,6 +21,7 @@ module mux #(
 );
   reg [DATA_TYPE - 1 : 0] selectedData;
   reg selectedData_valid;
+  wire tehb_ready;
 
   integer i;
   always @(*) begin
@@ -37,7 +38,7 @@ module mux #(
       selectedData_valid = 0;
 
       for (i = SIZE - 1; i >= 0; i = i - 1) begin
-        if (((i[SELECT_TYPE - 1 : 0] == index) & index_valid & outs_ready & ins_valid[i]) | ~ins_valid[i]) begin
+        if (((i[SELECT_TYPE - 1 : 0] == index) & index_valid & tehb_ready & ins_valid[i]) | ~ins_valid[i]) begin
           ins_ready[i] = 1;
         end else begin
           ins_ready[i] = 0;
@@ -52,8 +53,19 @@ module mux #(
 
   end
 
-  assign index_ready = ~index_valid | (selectedData_valid & outs_ready);
-  assign outs = selectedData;
-  assign outs_valid = selectedData_valid;
+  assign index_ready = ~index_valid | (selectedData_valid & tehb_ready);
+
+  tehb #(
+    .DATA_TYPE(DATA_TYPE)
+  ) tehb (
+    .clk        (clk               ),
+    .rst        (rst               ),
+    .ins        (selectedData      ),
+    .ins_valid  (selectedData_valid),
+    .ins_ready  (tehb_ready        ),
+    .outs       (outs              ),
+    .outs_valid (outs_valid        ),
+    .outs_ready (outs_ready        )
+  );
 
 endmodule
