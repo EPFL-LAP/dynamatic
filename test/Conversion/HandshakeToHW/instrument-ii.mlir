@@ -26,11 +26,13 @@
 module {
   handshake.func @selfLoop(%in0: <i32>, %in1: <i32>, %start: <>) -> (end: <>) {
     %0:2 = fork [2] %start {handshake.bb = 0 : ui32, handshake.name = "fork0"} : <>
+    sink %0#1 {handshake.name = "sink2"} : <>
+    %init = init %falseResult_3 {handshake.bb = 0 : ui32, handshake.name = "init0"} : <>
     %1 = mux %5#1 [%in0, %trueResult] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, [<i32>, <i32>] to <i32>
     %2:2 = fork [2] %1 {handshake.bb = 1 : ui32, handshake.name = "fork1"} : <i32>
     %3 = mux %5#0 [%in1, %trueResult_0] {handshake.bb = 1 : ui32, handshake.name = "mux1"} : <i1>, [<i32>, <i32>] to <i32>
     %4:2 = fork [2] %3 {handshake.bb = 1 : ui32, handshake.name = "fork2"} : <i32>
-    %result, %index = control_merge [%0#1, %trueResult_2]  {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : [<>, <>] to <>, <i1>
+    %result, %index = control_merge [%init, %trueResult_2]  {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : [<>, <>] to <>, <i1>
     %5:2 = fork [2] %index {handshake.bb = 1 : ui32, handshake.name = "fork3"} : <i1>
     %6 = cmpi eq, %2#0, %4#0 {handshake.bb = 1 : ui32, handshake.name = "cmpi0"} : <i32>
     %7:3 = fork [3] %6 {handshake.bb = 1 : ui32, handshake.name = "fork4"} : <i1>
@@ -39,7 +41,6 @@ module {
     %trueResult_0, %falseResult_1 = cond_br %7#1, %4#1 {handshake.bb = 1 : ui32, handshake.name = "cond_br1"} : <i1>, <i32>
     sink %falseResult_1 {handshake.name = "sink1"} : <i32>
     %trueResult_2, %falseResult_3 = cond_br %7#2, %result {handshake.bb = 1 : ui32, handshake.name = "cond_br2"} : <i1>, <>
-    sink %falseResult_3 {handshake.name = "sink3"} : <>
     end {handshake.bb = 2 : ui32, handshake.name = "end0"} %0#0 : <>
   }
 }
