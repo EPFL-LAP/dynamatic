@@ -629,6 +629,21 @@ static void logCFDFCUnions(FuncInfo &info,
   }
 }
 
+// Before running this function, make sure `CFDFC.throughput` is set
+// Look at FPGA20 and FPL22 for an example, where it is set inside
+// `populateCFDFCThroughputAndOccupancy()`
+void setCFDFCThroughputAttr(FuncInfo &funcInfo) {
+  llvm::MapVector<size_t, double> cfdfcTPResult;
+  for (auto [idx, cfdfcAndOpt] : llvm::enumerate(funcInfo.cfdfcs)) {
+    auto &[cfdfc, optimize] = cfdfcAndOpt;
+    if (optimize)
+      cfdfcTPResult[idx] = cfdfc->throughput;
+  }
+  auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
+      funcInfo.funcOp.getContext(), cfdfcTPResult);
+  setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
+}
+
 LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     FuncInfo &info, TimingDatabase &timingDB, BufferPlacement &placement) {
 
@@ -656,9 +671,10 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     }
     fpga20::FPGA20Buffers milp(solverKind, timeout, info, timingDB, targetCP,
                                writeTo, ftd);
-    return milp.solve(placement, calculatePathDelays);
-  }
-  if (algorithm == FPL22) {
+    if (failed(milp.solve(placement, calculatePathDelays)))
+      return failure();
+
+  } else if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
     SmallVector<CFDFC *, 8> cfdfcs;
     std::vector<CFDFCUnion> disjointUnions;
@@ -688,25 +704,24 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     // Solve last MILP on channels/units that are not part of any CFDFC
     fpl22::OutOfCycleBuffers milp(solverKind, timeout, info, timingDB, targetCP,
                                   writeTo);
-    return milp.solve(placement, calculatePathDelays);
-  }
+    if (failed(milp.solve(placement, calculatePathDelays)))
+      return failure();
 
-  if (algorithm == FPGA24) {
+  } else if (algorithm == FPGA24) {
     fpga24::FPGA24Buffers solver(solverKind, timeout, info, timingDB, targetCP);
     return solver.solve(placement);
-  }
 
-  if (algorithm == COST_AWARE) {
+  } else if (algorithm == COST_AWARE) {
     if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-cost-aware";
     }
     // Create and solve the MILP
     costaware::CostAwareBuffers milp(solverKind, timeout, info, timingDB,
                                      targetCP, writeTo);
-    return milp.solve(placement, calculatePathDelays);
-  }
+    if (failed(milp.solve(placement, calculatePathDelays)))
+      return failure();
 
-  if (algorithm == MAPBUF) {
+  } else if (algorithm == MAPBUF) {
     if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-mapbuf";
     }
@@ -714,10 +729,15 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     mapbuf::MAPBUFBuffers milp(solverKind, timeout, info, timingDB, targetCP,
                                blifFiles, lutDelay, lutSize, acyclicType,
                                writeTo);
-    return milp.solve(placement, calculatePathDelays);
+    if (failed(milp.solve(placement, calculatePathDelays)))
+      return failure();
+
+  } else {
+    llvm_unreachable("unknown algorithm");
   }
 
-  llvm_unreachable("unknown algorithm");
+  setCFDFCThroughputAttr(info);
+  return success();
 }
 
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
