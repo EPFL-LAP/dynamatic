@@ -721,11 +721,20 @@ void PredictedConstantDuplicationPass::runOnOperation() {
 
           // remove the previous name so NameAnalysis allows setting a new one
           cloned->removeAttr("handshake.name");
-          std::string newName = namer.getName(origOp).str() + "_dup" +
-                                std::to_string(i * pragmaNumber);
-          if (failed(namer.setName(cloned, newName))) {
-            llvm::errs() << "Renaming the duplicated operation failed.\n";
-            return signalPassFailure();
+
+          // only memory accesses are named at the cf level,
+          // so only a cloned memory access gets a name of its own
+          //
+          // TODO: a cloned memory access keeps the memory dependencies
+          // of the original, which refer to the original names,
+          // so the dependencies should be updated for the clone
+          if (isa<mlir::memref::LoadOp, mlir::memref::StoreOp>(origOp)) {
+            std::string newName = namer.getName(origOp).str() + "_dup" +
+                                  std::to_string(i * pragmaNumber);
+            if (failed(namer.setName(cloned, newName))) {
+              llvm::errs() << "Renaming the duplicated operation failed.\n";
+              return signalPassFailure();
+            }
           }
 
           for (unsigned j = 0; j < cloned->getNumResults(); j++) {
