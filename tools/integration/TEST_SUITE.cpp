@@ -515,7 +515,7 @@ TEST_P(LSQSizingFixture, basic) {
   logPerformance(config.simTime);
 }
 
-TEST_P(SpecFixture, spec) {
+TEST_P(SpecFixture, spec_NoCI) {
   IntegrationTest config{
       // clang-format off
       .name = GetParam(),
@@ -958,7 +958,7 @@ INSTANTIATE_TEST_SUITE_P(Tiny, VerifyInvariantsFixture,
                          testing::Values("fir", "iir", "matvec"),
                          [](const auto &info) { return info.param; });
 
-TEST_P(VerifyInvariantsFixture, basic) {
+TEST_P(VerifyInvariantsFixture, basic_NoCI) {
   IntegrationTest config{
       // clang-format off
       .name = GetParam(),
@@ -979,7 +979,7 @@ TEST_P(VerifyInvariantsFixture, basic) {
   logPerformance(config.simTime);
 }
 
-TEST_P(RigidificationFixture, basic) {
+TEST_P(RigidificationFixture, basic_NoCI) {
   IntegrationTest config{
       // clang-format off
       .name = GetParam(),

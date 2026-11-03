@@ -26,14 +26,6 @@
     "hdl": "smv"
   },
   {
-    "name": "handshake.init",
-    "parameters": [
-      {"name": "INITIAL_VALUE", "type": "unsigned"}
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t init -p bitwidth=$BITWIDTH initial_value=$INITIAL_VALUE",
-    "hdl": "smv"
-  },
-  {
     "name": "handshake.constant",
    "parameters": [
     {"name": "VALUE", "type": "string"}

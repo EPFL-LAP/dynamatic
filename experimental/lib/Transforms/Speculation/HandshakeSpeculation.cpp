@@ -417,21 +417,20 @@ std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
   // fork control token from directly above the control branch
   mlir::Value triggerChannelOrigin;
 
-  // Find the control branch we want to speculate on:
-  // the cf-to-handshake lowering marks the control branch
-  // of the speculation network in the speculated BB
+  // Find the control branch we want to speculate on.
+  // To find: Iterate over every branch, looking for 1) same bb as speculator,
+  // and 2) is a control branch
   bool isControlBranchFound = false;
   for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
     // Ignore branches that are not in the speculator's BB
     if (auto brBB = getLogicBB(branchOp); !brBB || brBB != targetBB)
       continue;
 
-    // We are looking for the marked control branch
-    if (branchOp->hasAttr(SPEC_TRIGGER_ATTR_NAME)) {
-      // BB should have only one marked control branch at most
+    // We are looking for the control branch: data should be of control type
+    if (isa<handshake::ControlType>(branchOp.getDataOperand().getType())) {
+      // BB should have only one control branch at most
       if (isControlBranchFound) {
-        branchOp->emitError("Multiple speculation trigger branches found in "
-                            "the BB #" +
+        branchOp->emitError("Multiple control branches found in the BB #" +
                             std::to_string(targetBB));
         return {};
       }
@@ -442,8 +441,8 @@ std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
 
   if (!isControlBranchFound) {
     funcOp->emitError("BB #" + std::to_string(targetBB) +
-                      " was marked for speculation, but no speculation "
-                      "trigger branch was found.");
+                      " was marked for speculation, but no corresponding "
+                      "control branch was found.");
     return {};
   }
 
@@ -627,8 +626,8 @@ addSpecTagToSpecRegionRecursive(MLIRContext &ctx, OpOperand &opOperand,
     return success();
   }
 
-  if (isa<handshake::ControlMergeOp, handshake::MergeOp>(op)) {
-    // Downstream traversal only of the cmerge or merge,
+  if (isa<handshake::ControlMergeOp>(op)) {
+    // Downstream traversal only of the cmerge,
     // we do not know if the operands are part of the spec region
     // so only if they are encountered through a separate downstream
     // are they labelled

@@ -499,7 +499,7 @@ HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(ModuleOp modOp) {
   for (const IOG &iog : iogs) {
     // We model the entry node as a buffer that initially has one token.
     std::vector<PropertyExpr> slots{
-        State(std::shared_ptr<InternalStateNamer>(iog.makeEntrySlot()))};
+        State(std::make_shared<EntrySlotNamer>(iog.entry))};
     std::vector<PropertyExpr> forks;
     // Collecting the slots and sents inside the IOG. The invariant relation of
     // num(slots) = 1 + num(eager fork sents), e.g.:
@@ -907,7 +907,7 @@ findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
     }
 
     if (cur.channel == iog.entry) {
-      EffectiveSlotNamer es(iog.makeEntrySlot());
+      EffectiveSlotNamer es(std::make_unique<EntrySlotNamer>(iog.entry));
       while (!cur.backSents.empty()) {
         es.addCopiedSent(cur.backSents.back());
         cur.backSents.pop_back();

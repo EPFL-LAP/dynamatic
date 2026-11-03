@@ -108,15 +108,14 @@ struct MemoryInterfaceInputs {
 };
 
 /// Routes the non-memory cfgs,
-/// routes the inputs to each memory interface on its MC cfg or LSQ cfg,
-/// and routes the speculator trigger of each speculation cfg.
+/// and routes the inputs to each memory interface on its MC cfg or LSQ cfg.
 /// Returns the memory interface inputs, keyed by memref.
-MapVector<MemrefValue, MemoryInterfaceInputs>
-routeCfgs(Region &body, const BlockToCond &blockToCond,
-          const MapVector<MemrefValue, ControlValue> &memStarts,
-          ArrayRef<Cfg> nonMemoryCfgs,
-          MapVector<std::pair<MemrefValue, McOrLsq>, TriggerCfg> &memoryCfgs,
-          SmallVectorImpl<TriggerCfg> &speculationCfgs, OpBuilder &builder);
+MapVector<MemrefValue, MemoryInterfaceInputs> routeCfgs(
+    Region &body, const BlockToCond &blockToCond,
+    const MapVector<MemrefValue, ControlValue> &memStarts,
+    ArrayRef<Cfg> nonMemoryCfgs,
+    MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> &memoryCfgs,
+    OpBuilder &builder);
 
 /// Labels each cond branch with the bb ids of the successors
 /// of its basic block in the base CFG, on the true and the false side.

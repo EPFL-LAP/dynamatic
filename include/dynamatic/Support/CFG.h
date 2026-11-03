@@ -33,11 +33,6 @@ namespace dynamatic {
 /// from in the std-level IR.
 constexpr llvm::StringLiteral BB_ATTR_NAME("handshake.bb");
 
-/// Marks the control branch whose data input triggers the speculator
-/// of its basic block, placed by the cf-to-handshake lowering
-constexpr llvm::StringLiteral
-    SPEC_TRIGGER_ATTR_NAME("dynamatic.speculate.trigger");
-
 /// ID of entry basic block of every Handshake function.
 constexpr unsigned ENTRY_BB = 0;
 

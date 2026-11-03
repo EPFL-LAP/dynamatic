@@ -24,24 +24,19 @@ struct IOGPathSet {
 
 // An In-order graph (IOG) of a dataflow circuit is a subgraph of the dataflow
 // circuit. It contains one and only one entry channel (i.e. an argument of a
-// FuncOp, or the output of an init, which holds a token on reset) which can
-// reach all other operations using only channels part of the IOG. The IOG does
-// not lose or gain any tokens: For any merge/mux, all the data inputs must be
-// contained in the IOG, and for any fork, only a single output can be part of
-// the IOG. Similarly, all branch outputs are part of the IOG, and for each
-// join-operation, only a single input is part of the IOG. This way, there is a
-// fixed number of tokens within the IOG.
+// FuncOp) which can reach all other operations using only channels part of the
+// IOG. The IOG does not lose or gain any tokens: For any merge/mux, all the
+// data inputs must be contained in the IOG, and for any fork, only a single
+// output can be part of the IOG. Similarly, all branch outputs are part of the
+// IOG, and for each join-operation, only a single input is part of the IOG.
+// This way, there is a fixed number of tokens within the IOG.
 struct IOG {
   IOG() = default;
   // Ordered by insertion, so that the properties derived from the IOG are
   // annotated in the same order in every run
   llvm::SetVector<Operation *> units;
   llvm::DenseSet<mlir::Value> channels;
-  mlir::Value entry;
-
-  /// The slot that holds the token of the IOG on reset:
-  /// the valid of a function argument, or the register of an init
-  std::unique_ptr<handshake::InternalStateNamer> makeEntrySlot() const;
+  BlockArgument entry;
 
   // isExitBranch() determines if a branch part of the IOG decides between
   // exiting a loop or continuing the loop. This is the case when one of the

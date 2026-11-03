@@ -55,14 +55,6 @@ private:
   /// solve out-of-order tokens
   LogicalResult findCommitsBetweenBBs();
 
-  /// Fixes an invalid spec region by placing commits
-  /// in front of joins of spec and non-spec tokens
-  LogicalResult findCommitsAtJoins();
-
-  /// Removes the commits that no speculative token can reach,
-  /// once all commits have been placed
-  LogicalResult removeUnreachableCommits();
-
   /// Identifies save-commit positions.
   LogicalResult findSaveCommits();
 

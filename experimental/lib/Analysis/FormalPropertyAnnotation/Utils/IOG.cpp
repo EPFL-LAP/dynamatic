@@ -26,24 +26,6 @@ IOGPathSet IOG::findUnitsOnPaths(Operation *startOp, Operation *endOp) const {
   return paths;
 }
 
-std::unique_ptr<InternalStateNamer> IOG::makeEntrySlot() const {
-  // a function argument: the token is its valid
-  if (auto arg = dyn_cast<BlockArgument>(entry))
-    return std::make_unique<EntrySlotNamer>(arg);
-
-  // an init: the token is in its register, as in a one slot break r buffer
-  auto initOp = entry.getDefiningOp<InitOp>();
-  assert(initOp && "the entry of an IOG is an argument or an init");
-  StringAttr nameAttr =
-      initOp->getAttrOfType<StringAttr>(NameAnalysis::ATTR_NAME);
-  assert(nameAttr && "an init has no name");
-  unsigned width = 0;
-  if (auto ct = dyn_cast<ChannelType>(entry.getType()))
-    width = ct.getDataBitWidth();
-  return std::make_unique<BufferSlotFullNamer>(nameAttr.str(), "full", "data",
-                                               width);
-}
-
 std::optional<int32_t>
 IOG::isExitBranch(handshake::ConditionalBranchOp branch) const {
   assert(contains(branch));
@@ -124,7 +106,7 @@ static std::optional<IOGPortGroups> getIOGPortGroups(Operation *op) {
             {{condBr.getDataOperand()}, {condBr.getConditionOperand()}},
             allOf(condBr->getResults())};
       })
-      .Case<ForkOp, LazyForkOp>([](Operation *forkOp) -> Groups {
+      .Case<ForkOp>([](ForkOp forkOp) -> Groups {
         // A fork copies the token to all its outputs, so the IOG takes one of
         // them, as the other copies leave the IOG
         return IOGPortGroups{allOf(forkOp->getOperands()),
@@ -145,12 +127,6 @@ static std::optional<IOGPortGroups> getIOGPortGroups(Operation *op) {
         return IOGPortGroups{allOf(cmerge.getDataOperands()),
                              eachOf(cmerge->getResults())};
       })
-      .Case<MergeOp>([](MergeOp merge) -> Groups {
-        // A merge passes on a token from one of its inputs, which can be
-        // any, so the IOG takes all of them, and its one output
-        return IOGPortGroups{allOf(merge->getOperands()),
-                             allOf(merge->getResults())};
-      })
       .Case<SinkOp, DeadBufferOp>([](Operation *sink) -> Groups {
         // A sink is the end of the IOG. The annotation replaces the sinks of
         // the IOGs by dead buffers, which keep the token
@@ -167,12 +143,6 @@ static std::optional<IOGPortGroups> getIOGPortGroups(Operation *op) {
         // source, so the number of tokens in the IOG would not be fixed. The
         // memory controllers are only reached by control signals, which give
         // trivial IOGs that can be skipped
-        return std::nullopt;
-      })
-      .Case<InitOp>([](Operation *) -> Groups {
-        // An init holds a token on reset, so the number of tokens in an IOG
-        // through it would not be fixed. Its token is counted by the IOG that
-        // starts at it
         return std::nullopt;
       })
       .Default([](Operation *op) -> Groups {
@@ -198,12 +168,8 @@ struct IOGCandidate {
   bool invalidIOG = false;
 
   IOGCandidate() = default;
-  IOGCandidate(mlir::Value entry) {
+  IOGCandidate(BlockArgument entry) {
     iog.entry = entry;
-    // an init entry is where the IOG starts, so it is not handled as a unit
-    // of the IOG, and the walk ends when the token comes back to it
-    if (Operation *defOp = entry.getDefiningOp())
-      iog.units.insert(defOp);
     markFollowed(entry);
   }
 
@@ -287,7 +253,7 @@ struct IOGCandidate {
 
 class IOGFinder {
 public:
-  IOGFinder(mlir::Value entry) {
+  IOGFinder(BlockArgument entry) {
     IOGCandidate cp(entry);
     candidates.push_back(cp);
   }
@@ -375,7 +341,7 @@ private:
 
 } // namespace
 
-static std::vector<IOG> findAllIOGsWithEntry(mlir::Value entry) {
+static std::vector<IOG> findAllIOGsWithEntry(BlockArgument entry) {
   IOGFinder finder(entry);
   while (!finder.isDone()) {
     finder.step();
@@ -389,12 +355,6 @@ std::vector<IOG> findAllIOGs(ModuleOp modOp) {
     // Each argument corresponds to an entry node.
     for (BlockArgument arg : funcOp.getRegion().getArguments()) {
       for (auto &iog : findAllIOGsWithEntry(arg)) {
-        ret.push_back(std::move(iog));
-      }
-    }
-    // Each init is also an entry node: it holds a token on reset
-    for (InitOp initOp : funcOp.getOps<InitOp>()) {
-      for (auto &iog : findAllIOGsWithEntry(initOp.getResult())) {
         ret.push_back(std::move(iog));
       }
     }
