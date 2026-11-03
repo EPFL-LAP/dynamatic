@@ -832,6 +832,21 @@ static void bufferContinuingTokens(const DenseMap<unsigned, Value> &controls) {
     assert(forkOp->getNumResults() == 2 &&
            "memory control lazy fork must have two outputs");
 
+    // a lazy fork in another block is the fork of that block's control,
+    // whose continuing token goes straight on as this block's control:
+    // its outputs are buffered when that block's control is visited
+    std::optional<unsigned> forkBB = getLogicBB(forkOp);
+    assert(forkBB && "memory control lazy fork has no bb");
+    if (forkBB.value() != blockNumber) {
+      continue;
+    }
+
+    // the fork's own control goes straight into the memory interface,
+    // so it is unbufferable
+    Channel controlChannel(control, /*updateProps=*/true);
+    controlChannel.props->maxTrans = 0;
+    controlChannel.props->maxOpaque = 0;
+
     // the continuing output gets
     // at least one buffer slot of capacity
     for (Value result : forkOp->getResults()) {
@@ -841,7 +856,19 @@ static void bufferContinuingTokens(const DenseMap<unsigned, Value> &controls) {
         continue;
       }
       Channel channel(result, /*updateProps=*/true);
-      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+
+      // what the continuing token goes into next
+      Operation *consumer = *result.getUsers().begin();
+
+      if (isa<handshake::LSQOp>(consumer)) {
+        // when it goes straight into the LSQ as the next group allocation,
+        // the slot must be opaque:
+        // the LSQ takes at most one group allocation at a time
+        channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
+      } else {
+        // otherwise a transparent slot is enough
+        channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+      }
     }
   }
 }

@@ -76,6 +76,10 @@ bool ChannelBufProps::isBufferizable() const {
          *maxOpaque != 0;
 }
 
+bool ChannelBufProps::isUnconstrained() const {
+  return *this == ChannelBufProps();
+}
+
 bool ChannelBufProps::operator==(const ChannelBufProps &rhs) const {
   return (this->minTrans == rhs.minTrans) && (this->maxTrans == rhs.maxTrans) &&
          (this->minOpaque == rhs.minOpaque) &&
