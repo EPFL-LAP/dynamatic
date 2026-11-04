@@ -73,3 +73,19 @@ handshake.func @store(%mem: memref<100xi32>, %memStart: <>, %start: <>) -> (mem_
   %memEnd = mem_controller[%mem : memref<100xi32>] start(%memStart) groups(bb0 %count: [store(%stAddr, %stData)]) end(%ctrl#3) {handshake.name = "mem_controller10"} : <i7>, <i32>, <i32>
   end {handshake.bb = 0 : ui32, handshake.name = "end10"} %memEnd, %ctrl#4 : <>, <>
 }
+
+// RUN: dynamatic-opt %s \
+// RUN:   --handshake-annotate-properties="json-path=%t.iog.json annotate-list=IOGSingleToken" \
+// RUN:   --exp-test-print-formal-properties="json-path=%t.iog.json" -o /dev/null \
+// RUN:   | FileCheck %s --check-prefix=IOG
+
+// x + x: the copies of x on both outputs of the fork meet at the adder before
+// any slot, so only the IOG through the first output is kept
+handshake.func @addSelf(%x: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
+  // IOG-NOT: fork20.outs_1_sent
+  // IOG:     IOGSingleToken: (count(x_valid, testbench.end_full) = (1 + count(fork20.outs_0_sent)))
+  // IOG-NOT: fork20.outs_1_sent
+  %xFork:2 = fork [2] %x {handshake.name = "fork20"} : <i32>
+  %sum = addi %xFork#0, %xFork#1 {handshake.name = "addi20"} : <i32>
+  end {handshake.name = "end20"} %sum, %start : <i32>, <>
+}

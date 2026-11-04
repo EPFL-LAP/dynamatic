@@ -1,6 +1,8 @@
 #include "IOG.h"
 #include "TraversalUtils.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace dynamatic::handshake;
@@ -155,6 +157,49 @@ static std::optional<IOGPortGroups> getIOGPortGroups(Operation *op) {
       });
 }
 
+/// The outputs of `forkOp` that the IOG search explores: all of them, except
+/// those whose copies meet the copies of a representative output before any
+/// merge or slot, e.g., at a combinational adder for `x + x`:
+///
+///          fork
+///    outs_0    outs_1   (outs_1 is skipped)
+///       \        /
+///        adder
+static SmallVector<Value> getRepresentativeOutputs(ForkOp forkOp) {
+  // An IOG through a skipped output has a counterpart through the
+  // representative output with the same slots, and the flow equations relate
+  // the tokens on the reconvergent paths. Not proven, but the stall properties
+  // proven on the formal benchmarks (and random buffer placements) are kept.
+  //
+  // TODO: The result depends on the order of the outputs, and an output that
+  // also reaches a slot no representative output reaches is still skipped.
+  // Discuss choosing the fewest outputs that together reach every first merge
+  // input or slot, which also prunes `x * x` with a pipelined multiplier.
+  //
+  // The copies stay apart at a merge, and can wait in different slots
+  auto isMergeOrSlot = [](Operation *op) {
+    return isa<ControlMergeOp, MuxOp>(op) ||
+           !getAllSlotsOfOperation(op).empty();
+  };
+  SmallVector<Value> representativeOutputs;
+  // The units that the representative outputs reach before any merge or slot
+  llvm::SmallPtrSet<Operation *, 8> representativeReach;
+  for (Value output : forkOp->getResults()) {
+    llvm::SetVector<Operation *> reach =
+        reachForward(/*starts=*/{output}, /*isBoundary=*/isMergeOrSlot);
+    // The paths reconverge at a common unit; the merges and units with slots
+    // that end them do not count (the latter conservatively, see the TODO)
+    bool meetsRepresentative = llvm::any_of(reach, [&](Operation *op) {
+      return representativeReach.contains(op) && !isMergeOrSlot(op);
+    });
+    if (!meetsRepresentative) {
+      representativeOutputs.push_back(output);
+      representativeReach.insert(reach.begin(), reach.end());
+    }
+  }
+  return representativeOutputs;
+}
+
 namespace {
 struct IOGCandidate {
   IOG iog;
@@ -303,6 +348,21 @@ public:
     std::optional<IOGPortGroups> groups = getIOGPortGroups(op);
     if (!groups)
       return;
+    // Only the representative outputs of a fork are explored (a candidate that
+    // already holds another one is discarded below)
+    if (auto forkOp = dyn_cast<ForkOp>(op)) {
+      // Computed when the search first reaches the fork
+      auto [it, inserted] = representativeOutputs.try_emplace(forkOp);
+      if (inserted)
+        it->second = getRepresentativeOutputs(forkOp);
+      const SmallVector<Value> &forkRepresentatives = it->second;
+      // An IOG takes exactly one output of a fork, so each output group of the
+      // fork holds a single output: drop the groups of the skipped outputs
+      llvm::erase_if(groups->outputs, [&](const SmallVector<Value> &group) {
+        Value output = group.front();
+        return !llvm::is_contained(forkRepresentatives, output);
+      });
+    }
     // A unit without outputs in the IOG (e.g., a sink) takes no output group
     SmallVector<SmallVector<Value>> outputs = groups->outputs;
     if (outputs.empty())
@@ -336,6 +396,9 @@ public:
 
 private:
   std::vector<IOGCandidate> candidates;
+  /// The outputs of each fork that the search explores (see
+  /// `getRepresentativeOutputs`), computed when the search first reaches it.
+  llvm::DenseMap<Operation *, SmallVector<Value>> representativeOutputs;
   std::vector<IOG> finals;
 };
 
