@@ -96,9 +96,8 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
   convertPhiToMu(region, bi);
   convertPhiToGamma(region, bi);
 
-  // After the conversion is done, `gatesPerBlock` will contain some phis, some
-  // MUs and some GAMMAs. Since we are only interested in the last two, we can
-  // remove all the phis.
+  // Remove phis that have been replaced by MU/GAMMA gates. Single-input phi
+  // roots are retained as passthroughs and need no condition.
   removePhiGates();
   printAllGates();
 }
@@ -404,9 +403,8 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
   convertPhiToMu(region, bi);
   convertPhiToGamma(region, bi);
 
-  // After the conversion is done, `gatesPerBlock` will contain some phis, some
-  // MUs and some GAMMAs. Since we are only interested in the last two, we can
-  // remove all the phis.
+  // Remove phis that have been replaced by MU/GAMMA gates. Single-input phi
+  // roots are retained as passthroughs and need no condition.
   removePhiGates();
   printAllGates();
 }
@@ -428,13 +426,36 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
       if (phi->gsaGateFunction != PhiGate)
         continue;
 
-      // Sort the operands of the phi so that Bi comes before Bj if Bi dominates
-      // Bj
+      // Equal incoming values can collapse a phi to one input. Preserve it as
+      // a passthrough root: no predicate exists to expand in this case.
+      if (phi->operands.size() == 1) {
+        phi->isRoot = true;
+        continue;
+      }
+
+      // Sort the operands of the phi in block order, so that Bi comes before Bj
+      // if Bj can be reached from Bi without going through a backedge (which
+      // includes Bi dominating Bj). Each operand avoids the blocks of the
+      // operands after it, since a definition later on a path overrides the
+      // earlier ones. Dominance alone is not enough: it does not order blocks
+      // that do not dominate each other.
+      //
+      // stable_sort keeps operands that compare equal (operands from the same
+      // block) in their order in phi->operands. llvm::sort leaves their order
+      // unspecified, so the gammas built from it could change across standard
+      // library implementations or builds
       SmallVector<GateInput *> phiOperands = phi->operands;
-      llvm::sort(phiOperands.begin(), phiOperands.end(),
-                 [&](GateInput *a, GateInput *b) {
-                   return domInfo.dominates(a->getBlock(), b->getBlock());
-                 });
+      // isLess treats a block with no index as equal to any block, which does
+      // not give a valid order for sorting
+      assert(llvm::all_of(
+                 phiOperands,
+                 [&](GateInput *in) {
+                   return bi.getIndexFromBlock(in->getBlock()).has_value();
+                 }) &&
+             "every phi operand must come from an indexed block");
+      llvm::stable_sort(phiOperands, [&](GateInput *a, GateInput *b) {
+        return bi.isLess(a->getBlock(), b->getBlock());
+      });
 
       // Find the nearest common dominator among all the blocks involved
       // in the phi inputs. Also add all the blocks to the list of 'blocks to
@@ -665,12 +686,12 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,
 void experimental::gsa::GSAAnalysis::removePhiGates() {
   for (auto const &[block, gates] : gatesPerBlock) {
 
-    // New vector of gates, which will contain only gamms and mus
+    // Keep MU/GAMMA gates and single-input passthrough roots.
     SmallVector<Gate *> gatesWithoutPhis;
     for (Gate *g : gates) {
-      // Delete the gate in case of a phi, otherwise keep it and insert it in
+      // Delete a replaced phi, otherwise keep the gate and insert it in
       // the new list.
-      if (g->gsaGateFunction == GateType::PhiGate)
+      if (g->gsaGateFunction == GateType::PhiGate && !g->isRoot)
         delete g;
       else
         gatesWithoutPhis.push_back(g);

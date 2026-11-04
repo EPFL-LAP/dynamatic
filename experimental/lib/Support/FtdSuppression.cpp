@@ -904,7 +904,7 @@ static Value generateReachabilityLogic(
               return bi.isLess(idA.value(), idB.value());
             });
 
-  BDD *bdd = buildBDD(fSuppress, cofactorList);
+  BDD *bdd = ftd::buildRoutingBDD(fSuppress, cofactorList);
 
   // Note: bddToCircuit uses registry.lookup. If the suppression logic involves
   // variables distributed earlier (like c3a), it will correctly find them.
@@ -1208,7 +1208,7 @@ Value ftd::expressionToCircuit(
   for (auto &p : tmp)
     cofactorList.push_back(p.second);
 
-  BDD *bdd = buildBDD(expr, cofactorList);
+  BDD *bdd = ftd::buildRoutingBDD(expr, cofactorList);
   return bddToCircuit(builder, bdd, insertBlock, registry, {}, bi,
                       pendingMuxOperands, shadow, forcedBBAttr);
 }
