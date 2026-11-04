@@ -88,6 +88,6 @@ func.func @lsq_in_loop_nest(%arg0: memref<4xi32> {handshake.arg_name = "mem0"}) 
   // CHECK-DAG: %[[INNER_BACK]], %[[LSQ_TO_BB3:[^ ]+]] = cond_br %{{[^,]+}}, %[[LSQ_LAZY_FORK]]#1
   // and then through the outer loop branch in bb3,
   // whose output leaving the loop is not used
-  // CHECK-DAG: %[[OUTER_BACK]], %{{[^ ]+}} = cond_br %{{[^,]+}}, %[[LSQ_TO_BB3]] {handshake.bb = 3
+  // CHECK-DAG: %[[OUTER_BACK]], %{{[^ ]+}} = cond_br %{{[^,]+}}, %[[LSQ_TO_BB3]], cfgSuccs {{.*}}{handshake.bb = 3
   return %v0 : i32
 }
