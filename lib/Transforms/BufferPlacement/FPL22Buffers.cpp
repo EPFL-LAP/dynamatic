@@ -284,7 +284,7 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
   for (MixedDomainConstraint &cons : constraints) {
     // The input/output channels must both be inside the CFDFC union
     if (!filter(cons.input.channel) || !filter(cons.output.channel))
-      return;
+      continue;
 
     // Find variables for arrival time at input/output pin
     CPVar &tPinIn = vars.channelVars[cons.input.channel]
