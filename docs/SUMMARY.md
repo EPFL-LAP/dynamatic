@@ -45,6 +45,7 @@
   - [Backend](DeveloperGuide/CompilerIntrinsics/Backend.md)
   - [Full Backend](DeveloperGuide/CompilerIntrinsics/FullBackend.md)
   - [C Frontend](DeveloperGuide/CompilerIntrinsics/Frontend.md)
+  - [CF to Handshake Lowering](DeveloperGuide/CompilerIntrinsics/CfToHandshake.md)
   - [Extra Signals Type Verification](DeveloperGuide/CompilerIntrinsics/ExtraSignalsTypeVerification.md)
   - [MLIR Op Instantiation C Level](DeveloperGuide/CompilerIntrinsics/MLIROpInstantiationCLevel.md)
   - [MLIR Primer](DeveloperGuide/CompilerIntrinsics/MLIRPrimer.md)

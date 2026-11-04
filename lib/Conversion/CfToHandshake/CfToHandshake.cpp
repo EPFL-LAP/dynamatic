@@ -1,4 +1,4 @@
-//===- CfToHandshake.cpp - cf to handshake, per-consumer ------------------===//
+//===- CfToHandshake.cpp - Lowering of cf to handshake --------------------===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,14 +6,24 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Lowers cf to handshake by routing. A routing delivers a value from the
-// blocks that produces it to a block that uses it. A memory interface is a
-// routing too: its single memory token goes from the memory's start through
-// every block that accesses the interface to the memory's end, which
-// sequentializes the interface's control signals. Every routing gets its own
-// control network, built on the function's cfg but optimized to that routing
-// alone, so that nothing waits on a control-flow decision that does not
-// concern it.
+// Lowers cf to handshake using the control-network routing algorithm.
+//
+// Implements one of Dynamatic's core features: efficient routing between
+// straight data paths, based on the control flow of the high-level program.
+//
+// Also converts from memrefs (representing array pointers) to memory
+// interfaces (memory controllers and LSQs), and uses the control-network
+// routing algorithm to produce their control-flow-related inputs.
+//
+// Each control network is optimized, and so considers only the control flow
+// required for the straight data paths it is responsible for.
+//
+// The number of control networks the control-network routing algorithm
+// produces sets the level of task-level parallelism.
+//
+// Sharing of control networks between unrelated straight data paths is
+// supported, but impedes optimization of the control network, potentially
+// introducing additional control-flow dependencies and reducing performance.
 //
 //===----------------------------------------------------------------------===//
 
@@ -85,8 +95,8 @@ static Type getHandshakeType(Type type) {
     return handshake::ChannelType::get(type);
   }
 
-  // a memory region (an array argument) is not routed:
-  // it stays a memref, for the memory interfaces
+  // In handshake, memrefs are treated as abstract references to an array,
+  // not as a channel, so a memref type stays a memref
   if (auto memrefType = dyn_cast<MemRefType>(type)) {
     // an array of anything but index is unchanged
     if (!isa<IndexType>(memrefType.getElementType())) {
@@ -875,8 +885,9 @@ static LogicalResult convertInternalArrays(func::FuncOp funcOp,
         continue;
       }
 
-      // lambda for converting the cf internal array op to a RAM op
-      auto makeRamOp = [&]() -> FailureOr<handshake::RAMOp> {
+      // lambda for converting a cf internal array op to a RAM op
+      auto makeRamOp = [](Operation &op,
+                          OpBuilder &builder) -> FailureOr<handshake::RAMOp> {
         if (auto allocaOp = dyn_cast<memref::AllocaOp>(op)) {
           // local array
 
@@ -909,7 +920,7 @@ static LogicalResult convertInternalArrays(func::FuncOp funcOp,
               global.getInitialValueAttr());
           if (!initialValue) {
             return global->emitError()
-                   << "the initial value must be denoted in DenseElementsAttr";
+                   << "global arrays require an initial value";
           }
           // make the RAM op holding the global's initial value
           return handshake::RAMOp::create(builder, op.getLoc(),
@@ -920,16 +931,18 @@ static LogicalResult convertInternalArrays(func::FuncOp funcOp,
 
       // make the RAM op in place of the cf internal array op
       builder.setInsertionPoint(&op);
-      FailureOr<handshake::RAMOp> ramOp = makeRamOp();
-      if (failed(ramOp)) {
+      FailureOr<handshake::RAMOp> maybeRamOp = makeRamOp(op, builder);
+      if (failed(maybeRamOp)) {
         return failure();
       }
+      // the conversion succeeded, so take the RAM op out of the FailureOr
+      handshake::RAMOp ramOp = *maybeRamOp;
 
       // name the RAM op
-      namer.setName(*ramOp);
+      namer.setName(ramOp);
 
       // the loads and stores now access the RAM op
-      op.replaceAllUsesWith(*ramOp);
+      op.replaceAllUsesWith(ramOp);
       op.erase();
     }
   }
@@ -942,12 +955,26 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // point at the function op if anything goes wrong
   Location loc = funcOp.getLoc();
 
+  // function calls are not supported yet
+  for (auto callOp : funcOp.getBody().getOps<func::CallOp>()) {
+    callOp.emitError() << "cf to handshake does not support function calls "
+                          "yet";
+    return failure();
+  }
+
   // this pass supports only functions with a single return
   // we transform functions with multiple returns in an earlier pass
   auto returnOps = funcOp.getOps<func::ReturnOp>();
   assert(std::distance(returnOps.begin(), returnOps.end()) == 1 &&
          "function must have a single return");
   func::ReturnOp returnOp = *returnOps.begin();
+
+  // Convert all CF internal array ops to RAM ops first.
+  // This is helpful for internal array processing,
+  // as it makes the memrefs easy to process
+  if (failed(convertInternalArrays(funcOp, namer, builder))) {
+    return failure();
+  }
 
   // map each basic block to its branch condition, for routing.
   // this reads the cf branch conditions, which must still be i1: a branch
@@ -1216,7 +1243,7 @@ struct CfToHandshakePass
     // handle the builder
     OpBuilder builder(&getContext());
 
-    // a single function, with no calls, is supported for now
+    // a single function is supported for now
     SmallVector<func::FuncOp> funcOps;
     for (auto funcOp : modOp.getOps<func::FuncOp>()) {
       if (!funcOp.isExternal()) {
@@ -1228,29 +1255,18 @@ struct CfToHandshakePass
       return signalPassFailure();
     }
     func::FuncOp funcOp = funcOps.front();
-    for (auto callOp : funcOp.getBody().getOps<func::CallOp>()) {
-      callOp.emitError() << "cf to handshake does not support function calls "
-                            "yet";
-      return signalPassFailure();
-    }
-
-    // Convert all CF internal array ops to RAM ops as step 1.
-    // This is helpful for internal array processing,
-    // as it makes the memrefs easy to process
-    if (failed(convertInternalArrays(funcOp, namer, builder))) {
-      return signalPassFailure();
-    }
-
-    // remove global ops
-    // (both internal arrays and external functions have been processed)
-    for (auto globalOp :
-         llvm::make_early_inc_range(modOp.getOps<memref::GlobalOp>())) {
-      globalOp.erase();
-    }
 
     // run cf to handshake on the one function
     if (failed(lowerFunction(funcOp, namer, builder))) {
       return signalPassFailure();
+    }
+
+    // remove the global ops
+    // (they can't be removed when adding RAMs,
+    // as a RAM is placed per reference to a global array in the kernel)
+    for (auto globalOp :
+         llvm::make_early_inc_range(modOp.getOps<memref::GlobalOp>())) {
+      globalOp.erase();
     }
 
     // name all unnamed operations in the IR
