@@ -210,4 +210,36 @@ for bb in cfg:
 
 #### Routing a Memory Interface CFG
 
-Each memory interface CFG is routed with the same algorithm. However, in each basic block with a control input, it places a lazy fork as the straight data path. The use of a lazy fork means the allocation credit cannot pass through the lazy fork towards the next control input until the current control input accepts it.
+Each memory interface CFG is routed with the same algorithm. The allocation credit comes from the array's start input, and must reach the control inputs in program order. Therefore, in each basic block with a control input, it places a lazy fork as the straight data path. The use of a lazy fork means the allocation credit cannot continue onwards to the next control input until the current control input accepts it.
+
+The largest complication is again the conditionally-present additional end control, which indicates to an MC (or an LSQ when no MC is present) that no other control inputs will arrive. LSQs which do not take this end input have the opposite problem: we must slightly special-case a rule to avoid routing the allocation credit to the exit basic block for no reason.
+
+#### Labelling the CFG Successors
+
+To simplify CFDFC extraction, we label each `handshake.cond_br` op with its "CFG successors". The key aspect of these "CFG successors" of a handshake branch is they correspond to the original program CFG, not the optimized CFG used during routing. To extract a CFDFC, we specify the path taken through the control flow of the original program, and return the section of the circuit that executes for that path. We still have this information at this stage, but after CF to Handshake finishes, how the original program control flow corresponds to the circuit will be lost if we do not otherwise store it in the IR.
+
+### Step 16: Label Each Op With Its Basic Block
+
+The memory interface builder reads the `handshake.bb` attribute, so it must be set before the memory interfaces are built.
+
+### Step 17: Build the Memory Interfaces
+
+Each array's memory interfaces (an MC and/or an LSQ) are built by a `MemoryInterfaceBuilder`. Each load and store recorded in `memrefToAccesses` is registered with the builder as an MC port or an LSQ port, according to its memory interface label, and the builder then places the MC op, the LSQ op, or both, and connects them to the routed control inputs, the end control, and the array's loads and stores.
+
+### Step 18: Set the Memory-Allocation-Credit Lazy-Fork Buffering Properties
+
+For correctness, the allocation credit has strict buffering requirements. There are two cases, identified as 1) only one output of the lazy fork is consumed by the LSQ or 2) both side outputs of the lazy fork are consumed by the LSQ.
+
+<img alt="Buffering of the lazy fork outputs on the allocation credit path" src="./Figures/lsq_buffers.png" width="700" />
+
+Case 1: If the non-LSQ output joins with data from a load dependent on the allocation before reaching a buffer, the circuit will deadlock. The load will not happen until after its allocation, and allocation cannot happen until after the load returns data. To avoid detailed analysis of if this happens, we unconditionally use a buffering property to enforce the non-LSQ output immediately reaches a transparent buffer. We also enforce that the output to the LSQ is unbuffered.
+
+Case 2: To simplify the internal architecture of the LSQ, it assumes that control inputs will arrive sequentially. If both sides of a lazy fork reach an LSQ, they will arrive simultaneously. We therefore use a buffering property to enforce an opaque buffer is placed on the control input which is later in program order, guaranteeing the assumption of sequential arrival. We also enforce that the control input which is earlier in program order is unbuffered.
+
+### Step 19: Erase the Load Data Temporaries
+
+With the placement of the memory interfaces, we now erase the temporary operations which stood in for data returning to a load from its memory interface.
+
+### Step 20: Flatten the Function and Create the End Op
+
+In typical MLIR, the control flow graph is encoded by splitting the IR into sections, one per basic block, with block args representing a traditional phi instruction. Now we have routed, we can discard this information, removing the CF terminators (branches, conditional branches, and function returns), and merging all the sections into one. We then add the `handshake.end` op, which represents data leaving the circuit: one operand for each result from the CF function, as well as one operand per array, indicating that all stores to that array have completed, and finally a general "end" control output. The end control output is generated as soon as the kernel starts, as all kernels end, and so is fully redundant.

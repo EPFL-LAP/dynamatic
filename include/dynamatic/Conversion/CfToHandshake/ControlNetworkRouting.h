@@ -69,15 +69,6 @@ public:
     return blockToCondReader.lookup(block).getValue();
   }
 
-  /// the basic blocks that have a branch condition
-  SmallVector<Block *> getBlocks() const {
-    SmallVector<Block *> blocks;
-    for (auto &[block, condReader] : blockToCondReader) {
-      blocks.push_back(block);
-    }
-    return blocks;
-  }
-
   /// erase the cond readers, and the temporary producers
   /// of the CondBranchOp conditions,
   /// once the branches are erased
@@ -109,18 +100,14 @@ struct MemoryInterfaceInputs {
 
 /// Routes the non-memory cfgs,
 /// and routes the inputs to each memory interface on its MC cfg or LSQ cfg.
+/// Then labels each cond branch with the cfg successors of its basic block.
 /// Returns the memory interface inputs, keyed by memref.
 MapVector<MemrefValue, MemoryInterfaceInputs> routeCfgs(
     Region &body, const BlockToCond &blockToCond,
     const MapVector<MemrefValue, ControlValue> &memStarts,
     ArrayRef<Cfg> nonMemoryCfgs,
     MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> &memoryCfgs,
-    OpBuilder &builder);
-
-/// Labels each cond branch with the bb ids of the successors
-/// of its basic block in the base CFG, on the true and the false side.
-void labelCondBranchSuccessors(Region &body, const BlockToCond &blockToCond,
-                               const Cfg &base, OpBuilder &builder);
+    const Cfg &base, OpBuilder &builder);
 
 } // namespace cf_to_handshake
 } // namespace experimental
