@@ -101,7 +101,7 @@ def FtdCfToHandshake : Pass<"ftd-lower-cf-to-handshake", "mlir::ModuleOp"> {
 
     This pass aims at implementing this work, by substituting the current `CfToHandshake` pass.
     As the algorithm does not require any parameter, no input is necessary. This pass can 
-    be used through the flag "--fast-token-delivery" at compile tile in dynamatic.
+    be used through the option "--cf-to-handshake ftd" at compile tile in dynamatic.
   }];
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
