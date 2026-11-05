@@ -160,7 +160,7 @@ struct HandshakeSizeSelectDepthPass
     if (!cfdfcAnalysis) {
       mod.emitWarning() << "No CFDFC analysis from MILP-based buffer placement "
                            "(--handshake-place-buffers) in the same pass "
-                           "pipeline, LSQs keep their default depth";
+                           "pipeline, Select keep their default depth.";
       markAllAnalysesPreserved();
       return;
     }
