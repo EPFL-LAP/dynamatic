@@ -163,15 +163,17 @@ def HandshakeSizeSelectDepth
   let summary = "Size the antitoken depth of selects from the CFDFC II.";
   let description = [{
     For each `handshake::SelectOp` inside a CFDFC, takes the lowest II among
-    the CFDFCs (from the `handshake.cfdfcThroughput` and
-    `handshake.cfdfcToBBList` function attributes set by buffer placement) that
-    contain the select's basic block. Then finds the closest fork that is an
-    ancestor of both data inputs of the select, computes the maximum latency
-    from that fork to each data input, and sets the select's `antitokenDepth`
-    attribute to ceil(|latency_true - latency_false| / II), i.e., how many
-    iterations the faster data input may run ahead of the slower one. Equal
-    latencies give a depth of 0, which makes the select a join. Selects outside
-    of any CFDFC, or without a common ancestor fork, are left unchanged.
+    the CFDFCs that contain the select's basic block. The CFDFCs and their
+    throughputs come from the `CFDFCAnalysis` filled in by MILP-based buffer
+    placement, so `--handshake-place-buffers` must run earlier in the same pass
+    pipeline. Then finds the closest fork that is an ancestor of both data
+    inputs of the select, computes the maximum latency from that fork to each
+    data input, and sets the select's `antitokenDepth` attribute to
+    ceil(|latency_true - latency_false| / II), i.e., how many iterations the
+    faster data input may run ahead of the slower one. Equal latencies give a
+    depth of 0, which makes the select a join. Selects outside of any CFDFC, or
+    without a common ancestor fork, are left unchanged. If the analysis is not
+    available, the pass emits a warning and leaves all selects unchanged.
   }];
 }
 

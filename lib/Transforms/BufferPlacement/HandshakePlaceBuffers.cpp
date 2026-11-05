@@ -260,24 +260,6 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
     for (CFDFC &cf : cfdfcs)
       info.cfdfcs[&cf] = true;
 
-    // Create a new map for the cfdfc extraction
-    llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
-
-    // Iterate through all extracted cfdfc
-    for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
-      auto &[cf, _] = cfAndOpt;
-      for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
-        // Add the bb to the corresponding in the cfdfc result map
-        cfdfcResult[idx].push_back(cf->cycle[i]);
-      }
-      cfdfcResult[idx].push_back(cf->cycle.back());
-    }
-
-    // Create and add the handshake.cfdfc attribute
-    auto cfdfcMap = handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(),
-                                                      cfdfcResult);
-    setDialectAttr(info.funcOp, cfdfcMap);
-
     LLVM_DEBUG(logFuncInfo(info););
 
     // Solve the MILP to obtain a buffer placement
@@ -629,21 +611,6 @@ static void logCFDFCUnions(FuncInfo &info,
   }
 }
 
-// Before running this function, make sure `CFDFC.throughput` is set
-// Look at FPGA20 and FPL22 for an example, where it is set inside
-// `populateCFDFCThroughputAndOccupancy()`
-void setCFDFCThroughputAttr(FuncInfo &funcInfo) {
-  llvm::MapVector<size_t, double> cfdfcTPResult;
-  for (auto [idx, cfdfcAndOpt] : llvm::enumerate(funcInfo.cfdfcs)) {
-    auto &[cfdfc, optimize] = cfdfcAndOpt;
-    if (optimize)
-      cfdfcTPResult[idx] = cfdfc->throughput;
-  }
-  auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
-      funcInfo.funcOp.getContext(), cfdfcTPResult);
-  setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
-}
-
 LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     FuncInfo &info, TimingDatabase &timingDB, BufferPlacement &placement) {
 
@@ -736,7 +703,6 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     llvm_unreachable("unknown algorithm");
   }
 
-  setCFDFCThroughputAttr(info);
   return success();
 }
 
