@@ -27,6 +27,7 @@ ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
 USE_LSQ_SIZING=${20:-0}
+TCAD20=${21:-0}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -339,6 +340,11 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+elif [[ $TCAD20 -ne 0 ]]; then
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --func-maximize-ssa --lower-cf-to-handshake-tcad20 \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake with TCAD'20" "Compiled cf to handshake with TCAD'20"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
     --lower-cf-to-handshake \

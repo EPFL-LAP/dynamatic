@@ -1,4 +1,5 @@
 add_dynamatic_library(DynamaticConversionUtils
+  CfToHandshakeTranslator.cpp
   FtdCfToHandshakeTranslator.cpp
 
   LINK_LIBS PUBLIC

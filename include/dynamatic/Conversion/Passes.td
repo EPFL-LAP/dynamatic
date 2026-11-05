@@ -70,6 +70,23 @@ def CfToHandshake : Pass<"lower-cf-to-handshake", "mlir::ModuleOp"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Tcad20CfToHandshake
+//===----------------------------------------------------------------------===//
+
+def Tcad20CfToHandshake
+    : Pass<"lower-cf-to-handshake-tcad20", "mlir::ModuleOp"> {
+  let summary = "Lowers func and cf dialects to handshake.";
+  let description = [{
+    Lowers func-level functions whose body have unstructured control flow into
+      their handshake counterparts,
+      which represent dataflow circuits that can ultimately be converted to an
+          RTL design.
+    Functions must be in maximal SSA form (see --func-maximize-ssa).
+  }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
+}
+
+//===----------------------------------------------------------------------===//
 // FtdCfToHandshake
 //===----------------------------------------------------------------------===//
 
