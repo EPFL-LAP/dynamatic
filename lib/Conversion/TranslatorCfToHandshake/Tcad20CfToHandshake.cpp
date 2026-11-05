@@ -7,11 +7,12 @@
 //===----------------------------------------------------------------------===//
 //
 // Implements the --lower-cf-to-handshake-tcad20 pass. See
-// lib/Conversion/Utils/CfToHandshakeTranslator.h for the translation.
+// lib/Conversion/TranslatorCfToHandshake/CfToHandshakeTranslator.h for the
+// translation.
 //
 //===----------------------------------------------------------------------===//
 
-#include "../Utils/CfToHandshakeTranslator.h"
+#include "CfToHandshakeTranslator.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Support/DynamaticPass.h"
@@ -28,7 +29,7 @@ using namespace dynamatic;
 
 namespace {
 
-/// FPGA18's elastic pass. Translates every function (func::FuncOp) of the
+/// TCAD20's elastic pass. Translates every function (func::FuncOp) of the
 /// module it is applied on into a Handshake function.
 struct Tcad20CfToHandshakePass
     : public dynamatic::impl::Tcad20CfToHandshakeBase<Tcad20CfToHandshakePass> {

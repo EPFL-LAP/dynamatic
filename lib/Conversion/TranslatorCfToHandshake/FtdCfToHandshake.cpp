@@ -7,11 +7,12 @@
 //===----------------------------------------------------------------------===//
 //
 // Implements the --ftd-lower-cf-to-handshake pass. See
-// lib/Conversion/Utils/FtdCfToHandshakeTranslator.h for the translation.
+// lib/Conversion/TranslatorCfToHandshake/FtdCfToHandshakeTranslator.h for the
+// translation.
 //
 //===----------------------------------------------------------------------===//
 
-#include "../Utils/FtdCfToHandshakeTranslator.h"
+#include "FtdCfToHandshakeTranslator.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Support/DynamaticPass.h"
