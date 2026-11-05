@@ -260,24 +260,6 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
     for (CFDFC &cf : cfdfcs)
       info.cfdfcs[&cf] = true;
 
-    // Create a new map for the cfdfc extraction
-    llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
-
-    // Iterate through all extracted cfdfc
-    for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
-      auto &[cf, _] = cfAndOpt;
-      for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
-        // Add the bb to the corresponding in the cfdfc result map
-        cfdfcResult[idx].push_back(cf->cycle[i]);
-      }
-      cfdfcResult[idx].push_back(cf->cycle.back());
-    }
-
-    // Create and add the handshake.cfdfc attribute
-    auto cfdfcMap = handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(),
-                                                      cfdfcResult);
-    setDialectAttr(info.funcOp, cfdfcMap);
-
     LLVM_DEBUG(logFuncInfo(info););
 
     // Solve the MILP to obtain a buffer placement
@@ -656,9 +638,10 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     }
     fpga20::FPGA20Buffers milp(solverKind, timeout, info, timingDB, targetCP,
                                writeTo, ftd);
-    return milp.solve(placement, calculatePathDelays);
-  }
-  if (algorithm == FPL22) {
+    if (failed(milp.solve(placement, calculatePathDelays)))
+      return failure();
+
+  } else if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
     SmallVector<CFDFC *, 8> cfdfcs;
     std::vector<CFDFCUnion> disjointUnions;
@@ -688,25 +671,24 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     // Solve last MILP on channels/units that are not part of any CFDFC
     fpl22::OutOfCycleBuffers milp(solverKind, timeout, info, timingDB, targetCP,
                                   writeTo);
-    return milp.solve(placement, calculatePathDelays);
-  }
+    if (failed(milp.solve(placement, calculatePathDelays)))
+      return failure();
 
-  if (algorithm == FPGA24) {
+  } else if (algorithm == FPGA24) {
     fpga24::FPGA24Buffers solver(solverKind, timeout, info, timingDB, targetCP);
     return solver.solve(placement);
-  }
 
-  if (algorithm == COST_AWARE) {
+  } else if (algorithm == COST_AWARE) {
     if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-cost-aware";
     }
     // Create and solve the MILP
     costaware::CostAwareBuffers milp(solverKind, timeout, info, timingDB,
                                      targetCP, writeTo);
-    return milp.solve(placement, calculatePathDelays);
-  }
+    if (failed(milp.solve(placement, calculatePathDelays)))
+      return failure();
 
-  if (algorithm == MAPBUF) {
+  } else if (algorithm == MAPBUF) {
     if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-mapbuf";
     }
@@ -714,10 +696,14 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     mapbuf::MAPBUFBuffers milp(solverKind, timeout, info, timingDB, targetCP,
                                blifFiles, lutDelay, lutSize, acyclicType,
                                writeTo);
-    return milp.solve(placement, calculatePathDelays);
+    if (failed(milp.solve(placement, calculatePathDelays)))
+      return failure();
+
+  } else {
+    llvm_unreachable("unknown algorithm");
   }
 
-  llvm_unreachable("unknown algorithm");
+  return success();
 }
 
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {

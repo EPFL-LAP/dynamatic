@@ -86,19 +86,6 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
 
   LLVM_DEBUG(logResults(placement));
 
-  llvm::MapVector<size_t, double> cfdfcTPResult;
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-    auto [cf, cfVars] = cfdfcWithVars;
-    double tmpThroughput = model->getValue(cfVars.throughput);
-
-    cfdfcTPResult[idx] = tmpThroughput;
-  }
-
-  // Create and add the handshake.tp attribute
-  auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
-      funcInfo.funcOp.getContext(), cfdfcTPResult);
-  setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
-
   populateCFDFCThroughputAndOccupancy();
 }
 

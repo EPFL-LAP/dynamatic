@@ -15,11 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "llvm/ADT/DenseMap.h"
@@ -43,6 +42,7 @@ namespace dynamatic {
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::buffer;
 
 /// Returns the latency (in cycles) an operation adds on the data path.
 static int64_t getOpLatency(Operation *op) {
@@ -130,22 +130,14 @@ getMaxLatencyFrom(Value val, Operation *forkOp,
 }
 
 /// Maps each basic block to the lowest II among the CFDFCs that contain it.
-static DenseMap<unsigned, double> getLowestIIPerBB(handshake::FuncOp funcOp) {
+static DenseMap<unsigned, double> getLowestIIPerBB(ArrayRef<CFDFC> cfdfcs) {
   DenseMap<unsigned, double> lowestII;
-  auto throughputAttr = getDialectAttr<handshake::CFDFCThroughputAttr>(funcOp);
-  auto bbListAttr = getDialectAttr<handshake::CFDFCToBBListAttr>(funcOp);
-  if (!throughputAttr || !bbListAttr)
-    return lowestII;
-
-  for (NamedAttribute cfdfc : bbListAttr.getCfdfcMap()) {
-    auto throughput = dyn_cast_if_present<FloatAttr>(
-        throughputAttr.getThroughputMap().get(cfdfc.getName()));
-    if (!throughput || throughput.getValueAsDouble() <= 0)
+  for (const CFDFC &cfdfc : cfdfcs) {
+    if (cfdfc.throughput <= 0)
       continue;
-    double ii = 1.0 / throughput.getValueAsDouble();
-    for (Attribute bb : cast<ArrayAttr>(cfdfc.getValue())) {
-      unsigned bbIdx = cast<IntegerAttr>(bb).getUInt();
-      auto [it, inserted] = lowestII.try_emplace(bbIdx, ii);
+    double ii = 1.0 / cfdfc.throughput;
+    for (unsigned bb : cfdfc.cycle) {
+      auto [it, inserted] = lowestII.try_emplace(bb, ii);
       if (!inserted)
         it->second = std::min(it->second, ii);
     }
@@ -160,18 +152,37 @@ struct HandshakeSizeSelectDepthPass
           HandshakeSizeSelectDepthPass> {
 
   void runOnOperation() override {
-    for (auto funcOp : getOperation().getOps<handshake::FuncOp>())
-      sizeSelects(funcOp);
+    ModuleOp mod = getOperation();
+
+    // The CFDFCs and their throughputs are provided by the buffer placement
+    // pass, which must run before this pass in the same pass pipeline.
+    auto cfdfcAnalysis = getCachedAnalysis<CFDFCAnalysis>();
+    if (!cfdfcAnalysis) {
+      mod.emitWarning() << "No CFDFC analysis from MILP-based buffer placement "
+                           "(--handshake-place-buffers) in the same pass "
+                           "pipeline, Select keep their default depth.";
+      markAllAnalysesPreserved();
+      return;
+    }
+
+    for (auto funcOp : mod.getOps<handshake::FuncOp>()) {
+      auto &cfdfcMap = cfdfcAnalysis->get().mapFuncOpToCFDFCs;
+      auto cfdfcsIt = cfdfcMap.find(funcOp);
+      if (cfdfcsIt != cfdfcMap.end())
+        sizeSelects(funcOp, cfdfcsIt->second);
+    }
+    markAllAnalysesPreserved();
   }
 
 private:
-  void sizeSelects(handshake::FuncOp funcOp);
+  void sizeSelects(handshake::FuncOp funcOp, ArrayRef<CFDFC> cfdfcs);
 };
 
 } // namespace
 
-void HandshakeSizeSelectDepthPass::sizeSelects(handshake::FuncOp funcOp) {
-  DenseMap<unsigned, double> lowestII = getLowestIIPerBB(funcOp);
+void HandshakeSizeSelectDepthPass::sizeSelects(handshake::FuncOp funcOp,
+                                               ArrayRef<CFDFC> cfdfcs) {
+  DenseMap<unsigned, double> lowestII = getLowestIIPerBB(cfdfcs);
   MLIRContext *ctx = funcOp.getContext();
 
   funcOp.walk([&](handshake::SelectOp selectOp) {
