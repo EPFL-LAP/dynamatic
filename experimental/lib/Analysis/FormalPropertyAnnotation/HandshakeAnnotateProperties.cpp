@@ -36,6 +36,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -121,7 +123,6 @@ private:
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
   LogicalResult annotateIOGSingleToken(ModuleOp modOp);
   LogicalResult annotateIOGConsecutiveTokens(ModuleOp modOp);
-  void annotateIOGConsecutiveTokensOf(const IOG &iog);
   LogicalResult annotateEntryTokenOrderPaths(ControlMergeOp cmerge,
                                              int32_t entryValue);
   LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
@@ -454,15 +455,14 @@ struct IOGSlotHolder {
   size_t numSlots;
 };
 
-// This function finds appropriate fork sent state namers for the consecutive
-// tokens invariant: Given the IOG, a starting slot holder, and an ending slot
-// holder, it determines all forks for which:
+// This function finds appropriate fork outputs for the consecutive tokens
+// invariant: Given the IOG, a starting slot holder, and an ending slot holder,
+// it determines the outputs in the IOG of all forks for which:
 // 1. The start holder holds the copied slot of the fork
 // 2. The fork is part of a path from start to end along the IOG
 // There is no path into the entry, as nothing produces it.
-std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
-                                                const IOGSlotHolder &start,
-                                                const IOGSlotHolder &end) {
+SmallVector<Value> findCopiedSents(const IOG &iog, const IOGSlotHolder &start,
+                                   const IOGSlotHolder &end) {
   // The units that reach the end without going through the start. If the start
   // unit is null, the start is the entry channel: no unit is a boundary, and
   // the walk stops at the entry, which no unit produces
@@ -470,7 +470,7 @@ std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
       /*starts=*/end.inputs,
       /*isBoundary=*/[&](Operation *op) { return op == start.unit; },
       /*isFollowed=*/[&](Value channel) { return iog.contains(channel); });
-  std::vector<EagerForkSentNamer> sents;
+  SmallVector<Value> sents;
   SmallVector<Value> stack(start.outputs);
   while (!stack.empty()) {
     Value channel = stack.pop_back_val();
@@ -480,11 +480,8 @@ std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
     assert(iog.contains(next));
     if (next != end.unit && !reachingEnd.contains(next))
       continue;
-    if (auto forkOp =
-            dyn_cast_or_null<EagerForkLikeOpInterface>(channel.getDefiningOp()))
-      sents.push_back(
-          forkOp.getInternalSentStateNamers()[cast<OpResult>(channel)
-                                                  .getResultNumber()]);
+    if (isa_and_nonnull<EagerForkLikeOpInterface>(channel.getDefiningOp()))
+      sents.push_back(channel);
     // Stop following this path if it contains a buffer, as following forks
     // will not have the start buffer as copied slot
     if (getAllSlotsOfOperation(next).empty())
@@ -492,7 +489,61 @@ std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
   }
   return sents;
 }
+
+// The sent state of a fork output
+EagerForkSentNamer getSentNamer(Value forkOutput) {
+  auto forkOp = cast<EagerForkLikeOpInterface>(forkOutput.getDefiningOp());
+  return forkOp.getInternalSentStateNamers()[cast<OpResult>(forkOutput)
+                                                 .getResultNumber()];
+}
+
+// Identifies the IOGConsecutiveTokens invariant of two slot holders: it does
+// not depend on the IOG, nor on the order of the holders and of the fork
+// outputs.
+struct IOGPairKey {
+  // The units of the two holders, ordered by address; null for the entry
+  Operation *unit1;
+  Operation *unit2;
+  // The entry channel if one of the holders is the entry, null otherwise
+  Value entry;
+  // The fork outputs that can copy a token between the holders, ordered by
+  // address and unique, to compare them as a set
+  SmallVector<Value> forkOutputs;
+
+  IOGPairKey(const IOGSlotHolder &slot1, const IOGSlotHolder &slot2,
+             ArrayRef<Value> copiedSents)
+      : unit1(slot1.unit), unit2(slot2.unit), forkOutputs(copiedSents) {
+    if (std::less<Operation *>()(unit2, unit1))
+      std::swap(unit1, unit2);
+    // The entry holds no unit, and has its channel as only output
+    if (!unit1)
+      entry = (slot1.unit ? slot2 : slot1).outputs.front();
+    auto byAddress = [](Value lhs, Value rhs) {
+      return lhs.getAsOpaquePointer() < rhs.getAsOpaquePointer();
+    };
+    llvm::sort(forkOutputs, byAddress);
+    // The search from each holder of the pair can find the same output
+    forkOutputs.erase(llvm::unique(forkOutputs), forkOutputs.end());
+  }
+
+  bool operator==(const IOGPairKey &other) const {
+    return unit1 == other.unit1 && unit2 == other.unit2 &&
+           entry == other.entry && forkOutputs == other.forkOutputs;
+  }
+};
 } // namespace
+
+template <>
+struct llvm::DenseMapInfo<IOGPairKey> {
+  static unsigned getHashValue(const IOGPairKey &key) {
+    return hash_combine(
+        key.unit1, key.unit2, key.entry,
+        hash_combine_range(key.forkOutputs.begin(), key.forkOutputs.end()));
+  }
+  static bool isEqual(const IOGPairKey &lhs, const IOGPairKey &rhs) {
+    return lhs == rhs;
+  }
+};
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(ModuleOp modOp) {
@@ -539,70 +590,76 @@ HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(ModuleOp modOp) {
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(ModuleOp modOp) {
-  for (const IOG &iog : iogs)
-    annotateIOGConsecutiveTokensOf(iog);
-  return success();
-}
-
-void HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokensOf(
-    const IOG &iog) {
-  // The entry forms a pair with every other slot, e.g.:
-  //   ((start_valid & (count(buffer3.full) > 0)) -> fork0.outs_0_sent)
-  std::vector<IOGSlotHolder> holders;
-  holders.push_back(
-      {/*unit=*/nullptr, /*inputs=*/{}, /*outputs=*/{iog.entry},
-       /*occupied=*/State(std::make_shared<EntrySlotNamer>(iog.entry)),
-       /*numSlots=*/1});
-  for (auto &op : iog.units) {
-    auto slotCountNamer = getTokenCountNamerOfOperation(op);
-    if (slotCountNamer.has_value()) {
-      size_t numSlots = slotCountNamer->slots->size();
-      holders.push_back({/*unit=*/op,
-                         /*inputs=*/SmallVector<Value>(op->getOperands()),
-                         /*outputs=*/SmallVector<Value>(op->getResults()),
-                         /*occupied=*/
-                         BinaryExpr(State(*slotCountNamer), BinaryExpr::Gt,
-                                    Constant::integer(0)),
-                         /*numSlots=*/numSlots});
-    }
-  }
-  for (auto slot1 = holders.begin(); slot1 != holders.end(); ++slot1) {
-    for (auto slot2 = slot1 + 1; slot2 != holders.end(); ++slot2) {
-      if (slot1->unit == slot2->unit) {
-        // TODO: Handle loops, i.e. if the slot contains >=2 tokens, there
-        // should be a copied fork within a loop
-        if (slot1->numSlots >= 2) {
-          slot1->unit->emitWarning("Should annotate self-loop");
-        }
-        continue;
+  // The pairs already annotated: IOGs that differ only by fork outputs
+  // elsewhere have the same pairs
+  llvm::DenseSet<IOGPairKey> annotatedPairs;
+  for (const IOG &iog : iogs) {
+    // The entry forms a pair with every other slot, e.g.:
+    //   ((start_valid & (count(buffer3.full) > 0)) -> fork0.outs_0_sent)
+    std::vector<IOGSlotHolder> holders;
+    holders.push_back(
+        {/*unit=*/nullptr, /*inputs=*/{}, /*outputs=*/{iog.entry},
+         /*occupied=*/State(std::make_shared<EntrySlotNamer>(iog.entry)),
+         /*numSlots=*/1});
+    for (auto &op : iog.units) {
+      auto slotCountNamer = getTokenCountNamerOfOperation(op);
+      if (slotCountNamer.has_value()) {
+        size_t numSlots = slotCountNamer->slots->size();
+        holders.push_back({/*unit=*/op,
+                           /*inputs=*/SmallVector<Value>(op->getOperands()),
+                           /*outputs=*/SmallVector<Value>(op->getResults()),
+                           /*occupied=*/
+                           BinaryExpr(State(*slotCountNamer), BinaryExpr::Gt,
+                                      Constant::integer(0)),
+                           /*numSlots=*/numSlots});
       }
+    }
+    for (auto slot1 = holders.begin(); slot1 != holders.end(); ++slot1) {
+      for (auto slot2 = slot1 + 1; slot2 != holders.end(); ++slot2) {
+        if (slot1->unit == slot2->unit) {
+          // TODO: Handle loops, i.e. if the slot contains >=2 tokens, there
+          // should be a copied fork within a loop
+          if (slot1->numSlots >= 2) {
+            slot1->unit->emitWarning("Should annotate self-loop");
+          }
+          continue;
+        }
 
-      std::vector<EagerForkSentNamer> copiedSents =
-          findCopiedSents(iog, *slot1, *slot2);
+        SmallVector<Value> copiedSents = findCopiedSents(iog, *slot1, *slot2);
 
-      std::vector<EagerForkSentNamer> extra =
-          findCopiedSents(iog, *slot2, *slot1);
+        SmallVector<Value> extra = findCopiedSents(iog, *slot2, *slot1);
 
-      copiedSents.insert(copiedSents.end(), extra.begin(), extra.end());
+        copiedSents.append(extra.begin(), extra.end());
 
-      // Note:
-      // Even if the copiedSents is empty, this invariant is interesting! It
-      // means that both slots cannot be occupied at the same time, as there is
-      // only (at most) one token in the IOG
+        // Another IOG with the same two slots and fork outputs already gave the
+        // same invariant
+        if (!annotatedPairs.insert(IOGPairKey(*slot1, *slot2, copiedSents))
+                 .second)
+          continue;
 
-      // If both slots hold a token, one of the forks copied it, e.g.:
-      //   (((count(buffer1.full) > 0) & (count(buffer0.outs_valid_i) > 0))
-      //    -> (fork2.outs_2_sent | fork4.outs_0_sent))
-      // or, if no fork can copy the token between the two slots:
-      //   (((count(buffer14.full) > 0) & (count(testbench.end_full) > 0))
-      //    -> FALSE)
-      PropertyExpr bothOccupied =
-          conjunction({slot1->occupied, slot2->occupied});
-      addProperty(FormalProperty::IOG_CONSECUTIVE_TOKENS,
-                  FormalProperty::TAG::INVAR,
-                  implies(bothOccupied, disjunction(getStates(copiedSents))));
+        // Note:
+        // Even if the copiedSents is empty, this invariant is interesting! It
+        // means that both slots cannot be occupied at the same time, as there
+        // is only (at most) one token in the IOG
+
+        // If both slots hold a token, one of the forks copied it, e.g.:
+        //   (((count(buffer1.full) > 0) & (count(buffer0.outs_valid_i) > 0))
+        //    -> (fork2.outs_2_sent | fork4.outs_0_sent))
+        // or, if no fork can copy the token between the two slots:
+        //   (((count(buffer14.full) > 0) & (count(testbench.end_full) > 0))
+        //    -> FALSE)
+        std::vector<EagerForkSentNamer> sentNamers;
+        for (Value output : copiedSents)
+          sentNamers.push_back(getSentNamer(output));
+        PropertyExpr bothOccupied =
+            conjunction({slot1->occupied, slot2->occupied});
+        addProperty(FormalProperty::IOG_CONSECUTIVE_TOKENS,
+                    FormalProperty::TAG::INVAR,
+                    implies(bothOccupied, disjunction(getStates(sentNamers))));
+      }
     }
   }
+  return success();
 }
 namespace {
 
