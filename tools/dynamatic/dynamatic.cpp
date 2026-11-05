@@ -293,8 +293,7 @@ public:
 
 class Compile : public Command {
 public:
-  static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
-      "fast-token-delivery";
+  static constexpr llvm::StringLiteral CF_TO_HANDSHAKE = "cf-to-handshake";
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral MILP_SOLVER = "milp-solver";
   static constexpr llvm::StringLiteral SHARING = "sharing";
@@ -331,8 +330,10 @@ public:
                "option is gurobi and it will fall back to cbc if gurobi is not "
                "available."});
     addFlag({SHARING, "Use credit-based resource sharing"});
-    addFlag({FAST_TOKEN_DELIVERY,
-             "Use fast token delivery strategy to build the circuit"});
+    addOption({CF_TO_HANDSHAKE,
+               "The cf to handshake lowering to use, values are 'cnr' (default "
+               "option: control-network routing), 'tcad20', or 'ftd' (fast "
+               "token delivery)"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
     addOption(
         {K_INDUCTION, "Use the k-induction algorithm for rigidification"});
@@ -767,8 +768,17 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string milpSolver = "cbc";
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-  std::string fastTokenDelivery =
-      args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
+  std::string cfToHandshake = "cnr";
+  if (auto it = args.options.find(CF_TO_HANDSHAKE); it != args.options.end()) {
+    if (it->second != "cnr" && it->second != "tcad20" && it->second != "ftd") {
+      llvm::errs() << "Unknown cf to handshake lowering " << it->second
+                   << "! Possible options are 'cnr' (control-network routing), "
+                      "'tcad20', or 'ftd' (fast token delivery).";
+      return CommandResult::FAIL;
+    }
+    cfToHandshake = it->second;
+  }
+
   std::string straightToQueue =
       args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
 
@@ -814,7 +824,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
-                 fastTokenDelivery, milpSolver, straightToQueue, speculation,
+                 cfToHandshake, milpSolver, straightToQueue, speculation,
                  enableShortCircuit, enableDuplication, calculatePathDelays,
                  instrumentII, lsqSizing);
 }

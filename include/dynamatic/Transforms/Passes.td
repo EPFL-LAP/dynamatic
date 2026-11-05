@@ -320,8 +320,7 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     Option<"dumpMILPModels", "dump-milp-models", "bool", "false",
     "If true, dump MILP models into a directory named 'buffer-placement'.">,
     Option<"ftd", "ftd", "bool", "false",
-    "If true, use FTD-specific CFDFC extraction and backedge "
-    "identification.">,
+    "If true, use FTD-specific backedge identification.">,
     Option<"calculatePathDelays", "calculate-path-delays", "bool", "false",
     "After buffer placement, re-run the MILP with the buffering decisions "
     "locked in to calculate the path delays the MILP believes are present in "

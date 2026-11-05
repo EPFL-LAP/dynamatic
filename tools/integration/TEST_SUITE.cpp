@@ -145,8 +145,9 @@ struct IntegrationTest {
   // Use model checking to remove redundant logic.
   bool useRigidification = false;
   bool verifyInvariants = false;
-  // Use fast token delivery (FTD) and straight-to-the-queue
-  bool useFTD = false;
+  // The cf to handshake lowering: cnr, tcad20, or ftd.
+  // ftd also uses straight-to-the-queue
+  std::string cfToHandshake = "cnr";
   // Enable speculation, using the speculate pragma
   bool useSpeculation = false;
   bool useDuplication = false;
@@ -197,7 +198,8 @@ int IntegrationTest::run() {
              << " --buffer-algorithm " << this->bufferAlgorithm
              << (this->useSharing ? " --sharing" : "")
              << (this->useRigidification ? " --rigidification" : "")
-             << (this->useFTD ? " --straight-to-queue --fast-token-delivery" : "")
+             << " --cf-to-handshake " << this->cfToHandshake
+             << (this->cfToHandshake == "ftd" ? " --straight-to-queue" : "")
              << (this->useSpeculation ? " --speculation" : "")
              << (this->useDuplication ? " --enable-duplication" : "")
              << (this->instrumentII ? " --instrument-ii" : "")
@@ -521,6 +523,7 @@ TEST_P(SpecFixture, spec) {
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .testVerilog = false,
       .useSharing = false,
+      .cfToHandshake = "tcad20",
       .useSpeculation = true,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpl22",
@@ -562,7 +565,7 @@ TEST_P(FtdFixture, basic) {
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .testVerilog = false,
       .useSharing = false,
-      .useFTD = true,
+      .cfToHandshake = "ftd",
       .milpSolver = "gurobi",
       .bufferAlgorithm = "on-merges",
       .simTime = -1
@@ -585,6 +588,7 @@ protected:
         .testName = "IIMonitorTests",
         .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
         .testVerilog = false,
+        .cfToHandshake = "tcad20",
         .instrumentII = true,
     };
     EXPECT_EQ(config.run(), 0);
@@ -980,6 +984,7 @@ TEST_P(VerifyInvariantsFixture, basic) {
       .useSharing = false,
       .useRigidification = false,
       .verifyInvariants = true,
+      .cfToHandshake = "tcad20",
       .milpSolver = "gurobi",
       .bufferAlgorithm = "on-merges",
       .simTime = -1
@@ -1000,6 +1005,7 @@ TEST_P(RigidificationFixture, basic) {
       .testVerilog = false,
       .useSharing = false,
       .useRigidification = true,
+      .cfToHandshake = "tcad20",
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
       .simTime = -1

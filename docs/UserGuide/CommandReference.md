@@ -17,7 +17,7 @@ This document provides an overview of the different commands available in the Dy
 
 The `--buffer-algorithm` flag allows users to use smart buffer placement algorithms notably `fpga20` and `fpl22` for throughput and timing optimizations.
 
-The `--fast-token-delivery` flag enables the *Fast Token Delivery (FTD)* algorithm during the CF → Handshake lowering stage. Note that this option is currently incompatible with smart buffer placement algorithms.
+The `--cf-to-handshake` option chooses the CF → Handshake lowering: `cnr` (the default, control-network routing), `tcad20`, or `ftd`. `ftd` enables the *Fast Token Delivery (FTD)* algorithm.
 
 - `write-hdl [--hdl <vhdl|verilog|smv>]`: Convert results from `compile` to a VHDL, Verilog or SMV file.
 - `simulate [--simulator <vsim|xsim|ghdl|verilator]`: Simulates the HDL produced by `write-hdl`. 

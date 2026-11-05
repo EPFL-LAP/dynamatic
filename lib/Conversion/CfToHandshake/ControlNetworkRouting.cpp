@@ -1,0 +1,583 @@
+//===- ControlNetworkRouting.cpp - Control-network routing ------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
+#include "dynamatic/Conversion/CfToHandshake/ControlNetworkRouting.h"
+#include "dynamatic/Conversion/CfToHandshake/TempOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+
+using namespace mlir;
+using namespace dynamatic;
+using namespace dynamatic::experimental::cf_to_handshake;
+
+namespace {
+/// Check if two cfg edges are the same:
+/// both edges start at the same basic block,
+/// both edges end at the same basic block,
+/// and both edges are taken on the same side of the branch
+static bool isSameEdge(const CfgEdge &first, const CfgEdge &second) {
+  return first.from == second.from && first.to == second.to &&
+         first.condition == second.condition;
+}
+
+/// The output of a control network:
+/// a dict mapping from basic block to control merge select output,
+/// and a dict mapping from basic block to control merge input order
+/// (a multiplexer which uses the select from a control merge
+/// must have inputs in the same order as that control merge)
+struct Selects {
+  DenseMap<Block *, Value> select;
+  DenseMap<Block *, SmallVector<CfgEdge>> controlMergeInputOrders;
+
+  /// Uses block as a key to get the control merge select output
+  /// for multiplexers in that block.
+  /// Also takes the cfg edges into the basic block
+  /// (the annotated cfg edges,
+  /// which hold the live outs we need to multiplex between),
+  /// and returns them in the input order of the control merge
+  /// (the dataless cfg edges of the control network),
+  /// so that the multiplexers can mirror that order
+  std::pair<Value, SmallVector<const CfgEdge *>>
+  getSelect(Block *block, ArrayRef<const CfgEdge *> annotatedEdges) const {
+    // only basic blocks with a control merge have a select
+    assert(select.contains(block) && "basic block has no control merge");
+
+    // the input order of this basic block's control merge
+    SmallVector<CfgEdge> inputOrder = controlMergeInputOrders.lookup(block);
+
+    // we fill this with the annotated cfg edges,
+    // sorted into the input order of the control merge
+    SmallVector<const CfgEdge *> annotatedEdgesSorted;
+
+    // for each of the control merge inputs (stored as a dataless cfg edge),
+    // find the annotated cfg edge it corresponds to
+    // and insert it into the list
+    // as we iterate the control merge inputs in order,
+    // the list will then hold the annotated cfg edges in order
+    // (they're probably in order already
+    // but it's better not to rely on that blindly)
+    for (const CfgEdge &controlMergeInput : inputOrder) {
+      for (const CfgEdge *annotatedEdge : annotatedEdges) {
+        if (isSameEdge(controlMergeInput, *annotatedEdge)) {
+          annotatedEdgesSorted.push_back(annotatedEdge);
+          break;
+        }
+      }
+    }
+
+    // check we built annotatedEdgesSorted correctly
+    assert(annotatedEdgesSorted.size() == annotatedEdges.size() &&
+           "edges into the basic block differ from the control merge's");
+
+    // return the control merge select output,
+    // and the annotated cfg edges in the input order of the control merge
+    return {select.lookup(block), annotatedEdgesSorted};
+  }
+};
+
+/// Dictionary mapping from each live-out of a control network (an edge)
+/// to the value that produces it.
+/// The value is read through a temporary consumer,
+/// so it stays current as temporary producers are replaced:
+/// a routed out can itself be a temporary producer,
+/// passed straight through a basic block with one predecessor
+class ControlLiveOutToProd {
+public:
+  /// record the producer of a live-out, at the builder's position
+  void set(OpBuilder &builder, CfgEdge *liveOut, Value producer) {
+    liveOutToReader[liveOut] = TempCons(builder, producer);
+  }
+
+  /// index by live-out to get its current producer
+  Value operator[](CfgEdge *liveOut) const {
+    assert(liveOutToReader.contains(liveOut) && "live-out has no producer");
+    return liveOutToReader.lookup(liveOut).getValue();
+  }
+
+  // remove the readers from the IR once routing is done
+  ~ControlLiveOutToProd() {
+    for (auto &[liveOut, reader] : liveOutToReader) {
+      reader.erase();
+    }
+  }
+
+private:
+  DenseMap<CfgEdge *, TempCons> liveOutToReader;
+};
+
+/// Dictionary mapping from each live-out of a routing
+/// to the value that produces it.
+/// The value is read through a temporary consumer,
+/// so it stays current as temporary producers are replaced:
+/// a routed out can itself be a temporary producer,
+/// passed straight through a basic block with one predecessor
+class LiveOutToProd {
+public:
+  /// record the producer of a live-out, at the builder's position
+  void set(OpBuilder &builder, const LiveOut *liveOut, Value producer) {
+    liveOutToReader[liveOut] = TempCons(builder, producer);
+  }
+
+  /// index by live-out to get its current producer
+  Value operator[](const LiveOut *liveOut) const {
+    assert(liveOutToReader.contains(liveOut) && "live-out has no producer");
+    return liveOutToReader.lookup(liveOut).getValue();
+  }
+
+  // remove the readers from the IR once routing is done
+  ~LiveOutToProd() {
+    for (auto &[liveOut, reader] : liveOutToReader) {
+      reader.erase();
+    }
+  }
+
+private:
+  DenseMap<const LiveOut *, TempCons> liveOutToReader;
+};
+} // namespace
+
+/// Builds the control network of a CFG,
+/// needed to provide the select input of multiplexers.
+/// If the built control network would have no outputs,
+/// the function returns without building anything
+static Selects buildControlNetwork(const Cfg &cfg,
+                                   const BlockToCond &blockToCond,
+                                   OpBuilder &builder) {
+  Selects selects;
+
+  // control network doesn't correspond
+  // to any specific part of the IR
+  Location loc = builder.getUnknownLoc();
+
+  // MLIR type stuff handled here-
+  // we need this to build dataless control units later
+  Type controlType = handshake::ControlType::get(builder.getContext());
+
+  // the control network is only needed
+  // if there will be multiplexers to control
+  // multiplexers are placed when a basic block
+  // has 2 or more predecessors, and block inputs arriving over them
+  bool hasOutput = false;
+  // for each basic block
+  for (Block *block : cfg.blocks) {
+    // check if it has 2 or more predecessors
+    // whose edges carry live-outs into it
+    SmallVector<const CfgEdge *> inEdges = cfg.getInEdges(block);
+    if (inEdges.size() >= 2 && !inEdges.front()->liveOuts.empty()) {
+      hasOutput = true;
+    }
+  }
+
+  // return early if the control network is not needed
+  if (!hasOutput) {
+    return selects;
+  }
+
+  Cfg controlNetworkCfg = cfg;
+
+  // we add an additional edge to the cfg
+  // for the control network:
+  // from the exit block to the entry block
+  // which marks that the routing network only restarts
+  // after it finishes
+  controlNetworkCfg.edges.push_back({/*from=*/cfg.exit,
+                                     /*to=*/cfg.entry,
+                                     /*condition=*/std::nullopt,
+                                     /*liveOuts=*/{}});
+
+  // the control network carries no values,
+  // so its live-out on an edge is just the edge
+  using ControlLiveOut = CfgEdge *;
+
+  // we place a temp for each live-out at the beginning
+  // and work down from the live-outs
+  DenseMap<ControlLiveOut, TempProd> temps;
+  // at the end, we have all the real values of those live-outs
+  // and will use them to replace the temp
+  ControlLiveOutToProd routedOuts;
+
+  // for each basic block
+  for (Block *block : controlNetworkCfg.blocks) {
+    // on the control network, there is only one input into the basic block,
+    // and the incoming live-outs of that input are the edges
+    // from each predecessor
+    SmallVector<ControlLiveOut> incomingLiveOuts =
+        controlNetworkCfg.getInEdges(block);
+
+    // handle insertion point
+    builder.setInsertionPointToStart(block);
+
+    // on the control network,
+    // there is only one value into the basic block
+    Value routedIn;
+
+    if (incomingLiveOuts.size() == 1) {
+      // if there is one predecessor
+
+      // get the live-out from the predecessor
+      // (the live-out is a CFG construct)
+      ControlLiveOut liveOut = incomingLiveOuts.front();
+
+      // and place a temporary producer for it in the IR
+      temps[liveOut] = TempProd(builder, controlType);
+
+      // the value in the basic block comes directly
+      // from the producer
+      routedIn = temps[liveOut].getValue();
+    } else if (incomingLiveOuts.size() > 1) {
+      // if there is more than 1 predecessor
+
+      // we need to add a control merge
+      SmallVector<Value> cmergeInputs;
+
+      // the control merge needs a temp producer in the IR
+      // one for each live-out of this basic block input
+      // (each predecessor has one live-out that
+      // could become the input)
+      for (ControlLiveOut liveOut : incomingLiveOuts) {
+        temps[liveOut] = TempProd(builder, controlType);
+        // we build the cmerge inputs in the order of incomingLiveOuts
+        // will handle order matching later
+        cmergeInputs.push_back(temps[liveOut].getValue());
+      }
+
+      // make the cmerge from the input list
+      auto cmergeOp =
+          handshake::ControlMergeOp::create(builder, loc, cmergeInputs);
+
+      // record the select, and the edge each of its indices stands for,
+      // for the basic block's multiplexers
+      selects.select[block] = cmergeOp.getIndex();
+      for (ControlLiveOut liveOut : incomingLiveOuts) {
+        selects.controlMergeInputOrders[block].push_back(*liveOut);
+      }
+
+      // the value in the basic block comes from the cmerge output
+      routedIn = cmergeOp.getResult();
+    } else {
+      llvm_unreachable(
+          "every basic block in the control network has a predecessor");
+    }
+
+    // the "straight data path" of the control network
+    // is almost always just a wire
+    Value sdpOut = routedIn;
+    // but in the entry block, it's an init op
+    if (block == controlNetworkCfg.entry) {
+      sdpOut = handshake::InitOp::create(builder, loc, controlType, sdpOut)
+                   .getResult();
+    }
+
+    // in the control network, a basic block has either one or two live-outs
+    // because the basic block has one output to send (the control token)
+    // but live-outs are per edge
+    // so the number of live-outs is the number of outgoing edges
+    SmallVector<ControlLiveOut> outgoingLiveOuts =
+        controlNetworkCfg.getOutEdges(block);
+
+    if (outgoingLiveOuts.size() == 1) {
+      // if this basic block has one successor
+      // the live-out comes directly from the straight data path
+      routedOuts.set(builder, outgoingLiveOuts.front(), sdpOut);
+    } else if (outgoingLiveOuts.size() == 2) {
+      // if this basic block has two successors,
+      // we must place a cond control branch
+
+      // handle insertion point
+      builder.setInsertionPoint(block->getTerminator());
+
+      // add the cond control branch to the IR, using blockToCond
+      // to get the branch condition of this basic block
+      auto condBrOp = handshake::ConditionalBranchOp::create(
+          builder, loc, TypeRange{controlType, controlType},
+          ValueRange{blockToCond[block], sdpOut});
+
+      // then store the real value of the live-outs of this basic block
+      // (the branch output for true or false)
+      for (ControlLiveOut liveOut : outgoingLiveOuts) {
+        routedOuts.set(builder, liveOut,
+                       *liveOut->condition ? condBrOp.getTrueResult()
+                                           : condBrOp.getFalseResult());
+      }
+    } else {
+      llvm_unreachable("every basic block in the control network has one or "
+                       "two successors");
+    }
+  }
+
+  // Now that we have all the real values of the live-outs
+  // we want to use them to replace the temps
+
+  // for each basic block
+  for (Block *block : controlNetworkCfg.blocks) {
+    // get the live-outs of the basic block's one input
+    for (ControlLiveOut liveOut : controlNetworkCfg.getInEdges(block)) {
+      // replace the temp producer with the real value
+      assert(routedOuts[liveOut] != temps[liveOut].getValue() &&
+             "temporary producer would replace itself");
+      temps[liveOut].replace(routedOuts[liveOut]);
+    }
+  }
+
+  return selects;
+}
+
+/// Builds the routing of the live-outs of a CFG,
+/// with multiplexers taking their select from the control network,
+/// and feeds the routed values to the readers of the CFG's block uses.
+static void buildRouting(const Cfg &cfg, const BlockToCond &blockToCond,
+                         const Selects &selects, OpBuilder &builder) {
+  // routing doesn't correspond
+  // to any specific part of the IR
+  Location loc = builder.getUnknownLoc();
+
+  // we place a temp for each live-out at the beginning
+  // and work down from the live-outs
+  DenseMap<const LiveOut *, TempProd> temps;
+  // at the end, we have all the real values of those live-outs
+  // and will use them to replace the temp
+  LiveOutToProd routedOuts;
+
+  // the value into the basic block for each input
+  DenseMap<BlockInput, Value> routedIns;
+
+  // for each basic block
+  for (Block *block : cfg.blocks) {
+    // each edge into this basic block
+    // contains the live-outs from that predecessor
+    // but also the block inputs of this basic block
+    // which are the values we must route to here
+    SmallVector<const CfgEdge *> inEdges = cfg.getInEdges(block);
+
+    // vector to collect the basic block inputs
+    SmallVector<BlockInput> blockInputs;
+
+    // entry block has no block inputs
+    if (block == cfg.entry) {
+      if (!inEdges.empty()) {
+        llvm_unreachable("the entry block has no predecessors");
+      }
+    } else {
+      if (inEdges.empty()) {
+        llvm_unreachable("non entry blocks must have a predecessor");
+      }
+      // get the live-outs from the first incoming cfg edge
+      const SmallVector<LiveOut> &liveOuts = inEdges.front()->liveOuts;
+      // collect the block input of each live-out into inputs
+      for (const LiveOut &liveOut : liveOuts) {
+        BlockInput input = liveOut.blockInput;
+        blockInputs.push_back(input);
+      }
+
+      // by construction, every incoming cfg edge should agree
+      // on what block inputs this basic block has,
+      // so assert this
+      for (const CfgEdge *inEdge : inEdges) {
+        assert(inEdge->liveOuts.size() == blockInputs.size() &&
+               "incoming cfg edges have different block inputs");
+        for (const LiveOut &liveOut : inEdge->liveOuts) {
+          assert(llvm::is_contained(blockInputs, liveOut.blockInput) &&
+                 "incoming cfg edges have different block inputs");
+        }
+      }
+    }
+
+    // handle insertion point
+    builder.setInsertionPointToStart(block);
+
+    // for each block input
+    for (BlockInput blockInput : blockInputs) {
+      if (inEdges.size() == 1) {
+        // if there is one predecessor
+
+        // get the one incoming edge
+        const CfgEdge *inEdge = inEdges.front();
+
+        // get the live-out for this blockInput for that edge
+        const LiveOut *liveOut = inEdge->getLiveOut(blockInput);
+
+        // and place a temporary producer for it in the IR
+        temps[liveOut] = TempProd(builder, blockInput.getType());
+
+        // the value in the basic block comes directly
+        // from the producer
+        routedIns[blockInput] = temps[liveOut].getValue();
+      } else if (inEdges.size() > 1) {
+        // if there is more than 1 predecessor
+
+        // we need to add a multiplexer,
+        // which must be controlled by the cmerge
+        // the order of cfg edges into both must match
+        // so when we ask for the cmerge select output
+        // we also ask it to sort our cfg edges
+        auto [select, sortedInEdges] = selects.getSelect(block, inEdges);
+
+        // the multiplexer needs a temp producer in the IR
+        // one for each live-out of this basic block input
+        SmallVector<Value> muxInputs;
+        for (const CfgEdge *inEdge : sortedInEdges) {
+          const LiveOut *liveOut = inEdge->getLiveOut(blockInput);
+          temps[liveOut] = TempProd(builder, blockInput.getType());
+          muxInputs.push_back(temps[liveOut].getValue());
+        }
+
+        // make the mux from the input list
+        auto muxOp = handshake::MuxOp::create(
+            builder, loc, blockInput.getType(), select, muxInputs);
+
+        // the value in the basic block comes from the mux output
+        routedIns[blockInput] = muxOp.getResult();
+      } else {
+        llvm_unreachable("a basic block with an input must have a predecessor");
+      }
+    }
+  }
+
+  // the straight data paths:
+  // once all the block uses of this cfg have routed inputs
+  // (coming from the temp live-outs)
+  // we want the straight data paths
+  // in that basic block to use the routed input
+  for (BlockUse blockUse : cfg.blockUses) {
+    blockUse.replaceAllUsesWith(routedIns[blockUse]);
+  }
+
+  // for each basic block
+  for (Block *block : cfg.blocks) {
+    // whether we need discarders (branch ops in practice)
+    // depends on the number of successors this basic block has
+    SmallVector<const CfgEdge *> outEdges = cfg.getOutEdges(block);
+
+    // handle insertion point
+    builder.setInsertionPoint(block->getTerminator());
+
+    // for each live-out of this basic block
+    for (const CfgEdge *outEdge : outEdges) {
+      for (const LiveOut &liveOut : outEdge->liveOuts) {
+        // the value the live-out leaves with:
+        // from the straight data path if this basic block produces it,
+        // otherwise the value routed in
+        Value liveOutValue;
+
+        // if a basic block produces its live-out,
+        // it's the output of one of the straight data paths
+        // and so routing hasn't affected it
+        if (isProducedIn(liveOut.liveOut, block)) {
+          liveOutValue = liveOut.liveOut;
+        } else {
+          // otherwise, it means the basic block's live-out is
+          // a block input.
+          // We need to use the routed block input instead of the original
+
+          // first cast to block input (this asserts the cast succeeds)
+          BlockInput blockInput = cast<BlockInput>(liveOut.liveOut);
+          // the block input should belong to the
+          // same basic block as the live-out
+          assert(blockInput.getOwner() == block &&
+                 "live-out is not a block input of this basic block");
+          // and all the block inputs should be routed
+          assert(routedIns.contains(blockInput) &&
+                 "block input has no routed value");
+          // then, get the routed block input
+          liveOutValue = routedIns.lookup(blockInput);
+        }
+
+        if (outEdges.size() == 1) {
+          // if this basic block has one successor
+          // there is no branch added
+          routedOuts.set(builder, &liveOut, liveOutValue);
+        } else if (outEdges.size() == 2) {
+          // if this basic block has two successors,
+          // we must place a cond branch for each live-out
+
+          // add the cond branch to the IR, using blockToCond
+          // to get the branch condition of this basic block
+          auto condBrOp = handshake::ConditionalBranchOp::create(
+              builder, loc,
+              TypeRange{liveOutValue.getType(), liveOutValue.getType()},
+              ValueRange{blockToCond[block], liveOutValue});
+
+          // then store the real value of the live-out
+          // (the branch output for true or false)
+          routedOuts.set(builder, &liveOut,
+                         *outEdge->condition ? condBrOp.getTrueResult()
+                                             : condBrOp.getFalseResult());
+        } else {
+          llvm_unreachable("every basic block has at most two successors");
+        }
+      }
+    }
+  }
+
+  // Now that we have all the real values of the live-outs
+  // we want to use them to replace the temps
+
+  // for each basic block
+  for (Block *block : cfg.blocks) {
+    // get the live-outs of each of the basic block's inputs
+    for (const CfgEdge *inEdge : cfg.getInEdges(block)) {
+      for (const LiveOut &liveOut : inEdge->liveOuts) {
+        // replace the temp producer with the real value
+        assert(routedOuts[&liveOut] != temps[&liveOut].getValue() &&
+               "temporary producer would replace itself");
+        temps[&liveOut].replace(routedOuts[&liveOut]);
+      }
+    }
+  }
+}
+
+/// Routes the block uses of one optimized CFG.
+static void route(const Cfg &cfg, const BlockToCond &blockToCond,
+                  OpBuilder &builder) {
+  Selects selects = buildControlNetwork(cfg, blockToCond, builder);
+  buildRouting(cfg, blockToCond, selects, builder);
+}
+
+/// Labels each cond branch with the bb ids of the successors
+/// of its basic block in the base CFG, on the true and the false side.
+static void labelCondBranchSuccessors(Region &body, const Cfg &base,
+                                      OpBuilder &builder) {
+  // for every handshake.cond_br
+  for (auto condBrOp : body.getOps<handshake::ConditionalBranchOp>()) {
+    // routing places each branch in the basic block it branches out of
+    Block *block = condBrOp->getBlock();
+
+    SmallVector<const CfgEdge *> outEdges = base.getOutEdges(block);
+    assert(outEdges.size() == 2 &&
+           "a basic block with a cond branch must have two out edges");
+
+    // get the two successor labels
+    unsigned trueSucc = 0, falseSucc = 0;
+    for (const CfgEdge *edge : outEdges) {
+      assert(edge && "getOutEdges gave null ptr");
+      assert(edge->condition && "edge has no condition");
+      if (edge->condition.value())
+        trueSucc = getBlockNumber(edge->to);
+      else
+        falseSucc = getBlockNumber(edge->to);
+    }
+
+    // store the basic block successor outputs on the branch
+    condBrOp.setCfgSuccsAttr(handshake::CfgSuccsAttr::get(builder.getContext(),
+                                                          trueSucc, falseSucc));
+  }
+}
+
+void dynamatic::experimental::cf_to_handshake::routeCfgs(
+    Region &body, const BlockToCond &blockToCond, ArrayRef<Cfg> cfgs,
+    const Cfg &base, OpBuilder &builder) {
+  // route each cfg
+  for (const Cfg &cfg : cfgs) {
+    route(cfg, blockToCond, builder);
+  }
+
+  // label each cond branch with the cfg successors of its basic block,
+  // for buffering to match the branch sides to the cfg arcs
+  labelCondBranchSuccessors(body, base, builder);
+}

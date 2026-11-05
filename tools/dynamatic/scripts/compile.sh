@@ -18,7 +18,7 @@ FPUNITS_GEN=$8
 USE_RIGIDIFICATION=${9}
 USE_K_INDUCTION=${10}
 DISABLE_LSQ=${11}
-FAST_TOKEN_DELIVERY=${12}
+CF_TO_HANDSHAKE=${12}
 MILP_SOLVER=${13}
 STRAIGHT_TO_QUEUE=${14}
 SPECULATION=${15}
@@ -27,6 +27,12 @@ ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
 USE_LSQ_SIZING=${20:-0}
+
+# buffer placement takes FTD as a 0 or 1
+FAST_TOKEN_DELIVERY=0
+if [[ $CF_TO_HANDSHAKE == "ftd" ]]; then
+  FAST_TOKEN_DELIVERY=1
+fi
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -286,6 +292,7 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
+  --func-merge-returns \
   --sort-blocks-rpo \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
@@ -331,19 +338,28 @@ else
 fi
 
 # cf level -> handshake level
-if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
-  echo_info "Running FTD algorithm for handshake conversion"
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
-    --ftd-lower-cf-to-handshake \
-    --handshake-combine-steering-logic \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
-else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
-    --func-maximize-ssa --lower-cf-to-handshake \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
-fi
+case "$CF_TO_HANDSHAKE" in
+  ftd)
+    echo_info "Running FTD algorithm for handshake conversion"
+    "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+      --ftd-lower-cf-to-handshake \
+      --handshake-combine-steering-logic \
+      > "$F_HANDSHAKE"
+    exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+    ;;
+  tcad20)
+    "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+      --func-maximize-ssa --lower-cf-to-handshake-tcad20 \
+      > "$F_HANDSHAKE"
+    exit_on_fail "Failed to compile cf to handshake with TCAD'20" "Compiled cf to handshake with TCAD'20"
+    ;;
+  cnr)
+    "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+      --lower-cf-to-handshake \
+      > "$F_HANDSHAKE"
+    exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+    ;;
+esac
 
 if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
@@ -370,9 +386,9 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
 else
 
-  # handshake transformations
+  # handshake transformations, without the LSQ minimization passes
+  # (shrink it or shed it), which need rebuilding for the new routing
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \

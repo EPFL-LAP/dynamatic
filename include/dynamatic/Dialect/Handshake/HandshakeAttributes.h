@@ -67,6 +67,10 @@ struct ChannelBufProps {
   /// any buffer on the associated channel.
   bool isBufferizable() const;
 
+  /// Determines whether these buffering properties are the defaults,
+  /// i.e., whether nothing has constrained the channel's buffering.
+  bool isUnconstrained() const;
+
   /// Computes member-wise equality.
   bool operator==(const ChannelBufProps &rhs) const;
 };

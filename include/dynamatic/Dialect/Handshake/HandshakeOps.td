@@ -750,6 +750,9 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     branch.  The data input is propagated to one of the two outputs
     based on the condition input.
 
+    The optional `cfgSuccs` attribute holds the successors of this branch
+    in the "original" CFG, to help with CFDFC extraction.
+
     Example:
 
     ```mlir
@@ -759,14 +762,30 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   }];
 
   let arguments = (ins ChannelType:$conditionOperand,
-                       HandshakeType:$dataOperand);
+                       HandshakeType:$dataOperand,
+                       OptionalAttr<CfgSuccsAttr>:$cfgSuccs);
   let results = (outs HandshakeType:$trueResult,
                       HandshakeType:$falseResult);
 
   let assemblyFormat = [{
-    $conditionOperand `,` $dataOperand attr-dict
+    $conditionOperand `,` $dataOperand (`,` `cfgSuccs` $cfgSuccs^ `,`)? attr-dict
       `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
   }];
+
+  // the builders without cfgSuccs
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$conditionOperand,
+                   "::mlir::Value":$dataOperand), [{
+      build($_builder, $_state, conditionOperand, dataOperand,
+            /*cfgSuccs=*/nullptr);
+    }]>,
+    OpBuilder<(ins "::mlir::TypeRange":$resultTypes,
+                   "::mlir::Value":$conditionOperand,
+                   "::mlir::Value":$dataOperand), [{
+      build($_builder, $_state, resultTypes, conditionOperand, dataOperand,
+            /*cfgSuccs=*/nullptr);
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
