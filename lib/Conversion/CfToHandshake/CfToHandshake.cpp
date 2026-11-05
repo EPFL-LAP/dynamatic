@@ -949,6 +949,386 @@ static LogicalResult convertInternalArrays(func::FuncOp funcOp,
   return success();
 }
 
+/// A memref dialect load or store
+using MemrefAccess = memref::IndexedAccessOpInterface;
+
+/// Identifies a memory interface: a memref, and its MC or its LSQ
+using MemInterfaceKey = std::pair<MemrefValue, McOrLsq>;
+
+/// Maps each memory interface (the MC or the LSQ of a memref)
+/// to its loads and stores, in program order.
+static MapVector<MemInterfaceKey, SmallVector<MemrefAccess>>
+getMemInterfaceToAccesses(Region &body) {
+  MapVector<MemInterfaceKey, SmallVector<MemrefAccess>> memInterfaceToAccesses;
+
+  // iterate loads and stores
+  for (Block &block : body) {
+    for (Operation &op : block) {
+      auto access = dyn_cast<MemrefAccess>(op);
+      if (!access) {
+        continue;
+      }
+
+      // get which memref (array) the access is to
+      auto memref = cast<MemrefValue>(access.getAccessedMemref());
+
+      // get if this access belongs to an MC or an LSQ
+      auto label = getDialectAttr<handshake::MemInterfaceAttr>(&op);
+      assert(label && "memory access must carry its interface label");
+      McOrLsq mcOrLsq = label.connectsToMC() ? McOrLsq::MC : McOrLsq::LSQ;
+
+      // store in data structure
+      memInterfaceToAccesses[{memref, mcOrLsq}].push_back(access);
+    }
+  }
+
+  return memInterfaceToAccesses;
+}
+
+/// A memory interface's control inputs
+struct MemInterfaceControls {
+  // the control input from each basic block, keyed by its number
+  DenseMap<unsigned, Value> blockToControl;
+  // the end control, if the interface takes it
+  Value ctrlEnd;
+};
+
+/// The block uses to route per memory interface
+using MemInterfaceToBlockUses = MapVector<MemInterfaceKey, SetVector<BlockUse>>;
+
+/// The control inputs per memory interface
+using MemInterfaceToControls = MapVector<MemInterfaceKey, MemInterfaceControls>;
+
+/// We must deliver the control inputs of each memory interface
+/// in sequential program order.
+///
+/// This function places a network of dataless handshake units
+/// which provides the desired behaviour.
+///
+/// The output of this function is the provided memory interface
+/// control inputs, as well as the block uses required to route each network
+/// using the control-network routing algorithm.
+static std::pair<MemInterfaceToBlockUses, MemInterfaceToControls>
+buildMemInterfaceControls(
+    const Cfg &base,
+    const MapVector<MemInterfaceKey, SmallVector<MemrefAccess>>
+        &memInterfaceToAccesses,
+    const MapVector<MemrefValue, ControlValue> &memStarts,
+    OpBuilder &builder) {
+  // store the block uses of each memory interface:
+  // use these to route with the control-network routing algorithm,
+  // once per memory interface
+  MemInterfaceToBlockUses blockUses;
+  // store the control inputs of each memory interface
+  MemInterfaceToControls memInterfaceToControls;
+
+  // the allocation credit is dataless
+  Type controlType = handshake::ControlType::get(builder.getContext());
+
+  // for each memory interface
+  for (auto &[memInterfaceKey, accesses] : memInterfaceToAccesses) {
+    auto [memref, mcOrLsq] = memInterfaceKey;
+
+    // if there is an error building the control inputs for a memory interface,
+    // point at its memref
+    Location loc = memref.getLoc();
+
+    // an MC always takes the end control,
+    // and an LSQ takes it only if its memref has no MC
+    bool takesEnd = mcOrLsq == McOrLsq::MC ||
+                    !memInterfaceToAccesses.contains({memref, McOrLsq::MC});
+
+    // collect the basic blocks that take a control input from an access
+    SetVector<Block *> accessBlocks;
+    for (MemrefAccess access : accesses) {
+      if (mcOrLsq == McOrLsq::LSQ) {
+        // an LSQ takes a control input from each basic block with an access
+        accessBlocks.insert(access->getBlock());
+      } else if (mcOrLsq == McOrLsq::MC) {
+        // an MC takes a control input from each basic block with a store
+        if (isa<memref::StoreOp>(access.getOperation())) {
+          accessBlocks.insert(access->getBlock());
+        }
+      } else {
+        llvm_unreachable("a memory interface is an MC or an LSQ");
+      }
+    }
+
+    // With an MC, some control inputs come from blocks with stores through an
+    // LSQ
+    if (mcOrLsq == McOrLsq::MC) {
+      MemInterfaceKey lsqKey = {memref, McOrLsq::LSQ};
+
+      // if this memref has an LSQ
+      if (memInterfaceToAccesses.contains(lsqKey)) {
+        // for each access to the LSQ
+        for (MemrefAccess access : memInterfaceToAccesses.lookup(lsqKey)) {
+          // if the access is a store, the MC takes a control input from its
+          // block
+          if (isa<memref::StoreOp>(access.getOperation())) {
+            accessBlocks.insert(access->getBlock());
+          }
+        }
+      }
+    }
+
+    // the needed basic blocks are those that use the allocation credit:
+    // the basic blocks with accesses,
+    // and the exit block if the memory interface takes the end control
+    SetVector<Block *> needed = accessBlocks;
+    if (takesEnd) {
+      needed.insert(base.exit);
+    }
+
+    // To build the memory control network, we introduce a new concept,
+    // which we call the allocation credit.
+    //
+    // The allocation credit begins as the start argument of the handshake
+    // function, and is SSA maximized to every basic block
+    // reachable on the path to a needed basic block.
+    //
+    // To ensure the allocation credit reaches the basic blocks sequentially
+    // and in program order, we redefine it in blocks where it is used.
+    //
+    // To do so, we place a lazy fork operation:
+    // one output of the lazy fork
+    // is stored as the memory interface control input,
+    // and the other continues as the new definition of the allocation credit.
+
+    // find the set of basic blocks reachable on the path from a needed basic
+    // block, by traversing upwards from the needed basic blocks.
+    SetVector<Block *> reachable = needed;
+    // this for loop structure iterates over blocks added during iteration
+    for (unsigned idx = 0; idx < reachable.size(); ++idx) {
+      for (Block *predecessor : reachable[idx]->getPredecessors()) {
+        reachable.insert(predecessor);
+      }
+    }
+
+    //===---------------------------------------------------------------===//
+    // Step 1: SSA maximize the allocation credit to the reachable basic blocks
+    //===---------------------------------------------------------------===//
+
+    // handle insertion point
+    builder.setInsertionPointToStart(base.entry);
+
+    // Use of a temporary producer makes it easier
+    // to build the allocation credits of each interface in isolation
+    TempProd startCredit(builder, controlType);
+
+    // The main complication in SSA maximization
+    // is that branch operands and block arg results are linked by order.
+    //
+    // To SSA maximize the allocation credit to all reachable blocks,
+    // we therefore first handle each block arg
+    // and the branches that connect to it.
+    //
+    // We first add a new result to the block arg.
+    // Then for each branch "side" that reaches that block arg,
+    // we add a new operand, fed by a temporary producer.
+    //
+    // At that point, branch -> block arg is handled,
+    // but block arg -> branch is not.
+    //
+    // By replacing the temporary producers
+    // with the correct (newly placed) block arg result,
+    // the SSA maximization is complete.
+
+    // dictionary mapping each reachable basic block
+    // to its new block arg result
+    DenseMap<Block *, Value> blockToBlockArg;
+
+    // the entry block has no block arg, so it maps to the temporary producer
+    blockToBlockArg[base.entry] = startCredit.getValue();
+
+    // temporary producers standing in for the allocation credit
+    // reaching the bottom of a basic block
+    SmallVector<TempProd> newOperandTemps;
+
+    // for each reachable basic block except the entry block
+    for (Block *block : reachable) {
+      if (block == base.entry) {
+        continue;
+      }
+
+      // add the new block arg
+      BlockArgument blockArg = block->addArgument(controlType, loc);
+      blockToBlockArg[block] = blockArg;
+
+      // the arrival of the allocation credit at a needed basic block
+      // is a block use
+      if (needed.contains(block)) {
+        blockUses[memInterfaceKey].insert(blockArg);
+      }
+
+      // get the predecessors of this basic block.
+      // a set, as a predecessor with both sides going here appears twice
+      SetVector<Block *> predecessors(block->pred_begin(), block->pred_end());
+
+      // for each predecessor of this basic block
+      for (Block *predecessor : predecessors) {
+        // get the cf branch at the end of the predecessor
+        Operation *terminator = predecessor->getTerminator();
+
+        // handle insertion point
+        builder.setInsertionPoint(terminator);
+
+        // add a temporary producer into each side going to this basic block
+        if (auto brOp = dyn_cast<cf::BranchOp>(terminator)) {
+          TempProd temp(builder, controlType);
+          brOp.getDestOperandsMutable().append(temp.getValue());
+          newOperandTemps.push_back(temp);
+        } else if (auto condBrOp = dyn_cast<cf::CondBranchOp>(terminator)) {
+          if (condBrOp.getTrueDest() == block) {
+            TempProd temp(builder, controlType);
+            condBrOp.getTrueDestOperandsMutable().append(temp.getValue());
+            newOperandTemps.push_back(temp);
+          }
+          if (condBrOp.getFalseDest() == block) {
+            TempProd temp(builder, controlType);
+            condBrOp.getFalseDestOperandsMutable().append(temp.getValue());
+            newOperandTemps.push_back(temp);
+          }
+        } else {
+          llvm_unreachable("a predecessor ends in a cf.br or a cf.cond_br");
+        }
+      }
+    }
+
+    // replace each temporary producer
+    // with the new block arg result of its basic block
+    for (TempProd &temp : newOperandTemps) {
+      Block *block = temp.getValue().getParentBlock();
+      temp.replace(blockToBlockArg[block]);
+    }
+
+    //===---------------------------------------------------------------===//
+    // Step 2: redefine the allocation credit in the needed basic blocks
+    //===---------------------------------------------------------------===//
+
+    // for each needed basic block
+    for (Block *block : needed) {
+      // get the allocation credit arriving at this basic block
+      Value credit = blockToBlockArg[block];
+
+      // handle insertion point
+      builder.setInsertionPointToStart(block);
+
+      // a basic block with accesses redefines the allocation credit
+      if (accessBlocks.contains(block)) {
+        // place a lazy fork which takes the allocation credit,
+        // to provide the control input
+        // and allow the allocation credit to continue on
+        auto forkOp = handshake::LazyForkOp::create(builder, loc, credit, 2);
+
+        // the first output is the control input from this basic block
+        Value controlInput = forkOp->getResult(0);
+
+        // store the first output
+        // as the control input to the memory interface for this block
+        unsigned blockNumber = getBlockNumber(block);
+        memInterfaceToControls[memInterfaceKey].blockToControl[blockNumber] =
+            controlInput;
+
+        // the second output is the new definition of the allocation credit
+        Value newCredit = forkOp->getResult(1);
+        credit.replaceAllUsesExcept(newCredit, forkOp);
+
+        // if this is also the exit block
+        // and the memory interface takes the end control,
+        // the end control lazy fork must take the second output as input
+        credit = newCredit;
+      }
+
+      // the exit block provides the end control,
+      // if the memory interface takes the end control
+      if (takesEnd && block == base.exit) {
+        // place a lazy fork which takes the allocation credit,
+        // to provide the end control.
+        //
+        // This is the last use of the allocation credit,
+        // so the second output of the lazy fork is unused.
+        //
+        // As "last use of the allocation credit" can also happen
+        // for the lazy forks placed above and is hard to detect,
+        // we do not special case it.
+        // Instead we clean up such lazy forks after the network is routed.
+        auto forkOp = handshake::LazyForkOp::create(builder, loc, credit, 2);
+
+        // the first output is the end control
+        Value endControl = forkOp->getResult(0);
+
+        // store the first output as the end control of the memory interface
+        memInterfaceToControls[memInterfaceKey].ctrlEnd = endControl;
+      }
+    }
+
+    // once the network is built,
+    // connect it to the memory interface start argument
+    startCredit.replace(memStarts.lookup(memref));
+  }
+
+  return {blockUses, memInterfaceToControls};
+}
+
+/// Removes the lazy forks which aren't needed
+/// from the memory interface control inputs,
+/// once the networks producing them are routed.
+///
+/// These lazy forks are useful to place
+/// despite being later removed, for two reasons:
+///
+/// 1) they are mildly annoying to detect,
+/// as any basic block providing a control input
+/// that cannot reach another basic block providing a control input
+/// (including itself) will have one
+///
+/// 2) if we remove them,
+/// there would be no use of the allocation credit in their basic block,
+/// and routing would not deliver it properly.
+/// Some kind of placeholder would need to replace them if they were removed.
+static void
+removeUnneededLazyForks(MemInterfaceToControls &memInterfaceToControls) {
+  // a lazy fork with an unused continuing output isn't needed,
+  // as the control can take the lazy fork's input directly:
+  // if the lazy fork producing the control has an unused continuing output,
+  // remove the lazy fork and return its input.
+  // otherwise, return the control unchanged
+  auto removeLazyForkIfUnneeded = [](Value control) -> Value {
+    // get the lazy fork producing the control
+    auto forkOp = control.getDefiningOp<handshake::LazyForkOp>();
+    assert(forkOp && "memory control must come from a lazy fork");
+    assert(forkOp->getNumResults() == 2 &&
+           "memory control lazy fork must have two outputs");
+
+    // the continuing output is the one that's not the control
+    Value continuing = forkOp->getResult(0) == control ? forkOp->getResult(1)
+                                                       : forkOp->getResult(0);
+
+    if (!continuing.use_empty()) {
+      // if the allocation credit is used, the lazy fork is needed
+      return control;
+    } else {
+      // otherwise, the control takes the lazy fork's input directly.
+      // the memory interfaces aren't built yet, so the control has no uses
+      assert(control.use_empty() && "memory control already has a consumer");
+      Value input = forkOp->getOperand(0);
+      forkOp->erase();
+      return input;
+    }
+  };
+
+  // remove any unneeded lazy forks
+  for (auto &[memInterfaceKey, controls] : memInterfaceToControls) {
+    for (auto &[blockNumber, control] : controls.blockToControl) {
+      control = removeLazyForkIfUnneeded(control);
+    }
+    if (controls.ctrlEnd) {
+      controls.ctrlEnd = removeLazyForkIfUnneeded(controls.ctrlEnd);
+    }
+  }
+}
+
 /// Lowers one function to handshake.
 static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
                                    OpBuilder &builder) {
@@ -999,12 +1379,15 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // build the base CFG from the IR
   Cfg base = getBaseCfg(body);
 
-  // We need to collect the routing CFGs for the memory interfaces before we go
-  // from memref loads and stores to handshake loads and stores
-  // because we find the loads and stores of each memory region
-  // by walking the memref
-  MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> memoryCfgs =
-      collectMemoryInterfaceCfgs(base, memStarts);
+  // store the loads and stores of each memory interface
+  MapVector<MemInterfaceKey, SmallVector<MemrefAccess>> memInterfaceToAccesses =
+      getMemInterfaceToAccesses(body);
+
+  // place the unrouted network producing the control inputs
+  // of each memory interface
+  auto [memInterfaceToBlockUses, memInterfaceToControls] =
+      buildMemInterfaceControls(base, memInterfaceToAccesses, memStarts,
+                                builder);
 
   // convert constants
   if (failed(convertConstants(body, start, builder))) {
@@ -1035,6 +1418,12 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // collect all block uses that must be routed
   SetVector<BlockUse> blockUses = collectBlockUses(body);
 
+  // the memory interface block uses are routed per memory interface,
+  // so remove them before clustering the rest
+  for (auto &[memInterfaceKey, memBlockUses] : memInterfaceToBlockUses) {
+    blockUses.set_subtract(memBlockUses);
+  }
+
   // cluster the block uses into sets, and we will run the
   // control-network routing algorithm per set
   // for now, we always do one set per unique block use
@@ -1051,23 +1440,27 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   //
   // using small vector on the heap over std::vector
   // based on the programmers manual
-  SmallVector<Cfg, 0> nonMemoryCfgs;
+  SmallVector<Cfg, 0> cfgs;
   for (const SetVector<BlockUse> &blockUseSet : blockUseSets) {
-    nonMemoryCfgs.push_back(buildCfg(base, blockUseSet));
+    cfgs.push_back(buildCfg(base, blockUseSet));
+  }
+
+  // build one cfg per memory interface
+  for (auto &[memInterfaceKey, memBlockUses] : memInterfaceToBlockUses) {
+    cfgs.push_back(buildCfg(base, memBlockUses));
   }
 
   // for each cfg, optimize based on the block uses annotated on it
-  for (Cfg &cfg : nonMemoryCfgs) {
+  for (Cfg &cfg : cfgs) {
     optimizeCfg(cfg);
-  }
-  // for each memory cfg, optimize
-  for (auto &[key, memoryCfg] : memoryCfgs) {
-    optimizeMemoryCfg(memoryCfg);
   }
 
   // run the control-network routing algorithm once per cfg
-  MapVector<MemrefValue, MemoryInterfaceInputs> memoryInputs = routeCfgs(
-      body, blockToCond, memStarts, nonMemoryCfgs, memoryCfgs, base, builder);
+  routeCfgs(body, blockToCond, cfgs, base, builder);
+
+  // now that the networks are routed,
+  // remove any unneeded lazy forks
+  removeUnneededLazyForks(memInterfaceToControls);
 
   // label every op with the number of its basic block (its bb attribute).
   // the memory interface builder reads it off each memory access
@@ -1088,21 +1481,28 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // for each memory region (unpacking its memref and mem start function arg)
   for (auto [memref, memStart] : memStarts) {
 
-    // what the region's memory routing delivers to its interfaces
-    MemoryInterfaceInputs &inputs = memoryInputs[memref];
+    // get the control inputs of the region's memory interfaces.
+    // an interface the region doesn't have gives empty control inputs
+    MemInterfaceControls mcControls =
+        memInterfaceToControls.lookup({memref, McOrLsq::MC});
+    MemInterfaceControls lsqControls =
+        memInterfaceToControls.lookup({memref, McOrLsq::LSQ});
+
+    // the end control comes from the MC if there is one, else the LSQ
+    Value ctrlEnd = mcControls.ctrlEnd ? mcControls.ctrlEnd : lsqControls.ctrlEnd;
 
     // a memory region (array) without accesses
     // ends immediately after starting:
     // its memEnd comes from its memStart
-    if (!inputs.ctrlEnd) {
+    if (!ctrlEnd) {
       memEnds.push_back(memStart);
       continue;
     }
 
     // make the builder of MC and LSQ handshake operations
-    MemoryInterfaceBuilder memBuilder(newFuncOp, memref, memStart,
-                                      inputs.ctrlEnd, inputs.mcControls,
-                                      inputs.lsqControls);
+    MemoryInterfaceBuilder memBuilder(newFuncOp, memref, memStart, ctrlEnd,
+                                      mcControls.blockToControl,
+                                      lsqControls.blockToControl);
 
     // for each memory access of this memref
     // tell the builder about it
@@ -1133,9 +1533,8 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
     memEnds.push_back(mcOp ? mcOp.getMemEnd() : lsqOp.getMemEnd());
   }
 
-  for (auto &[memref, inputs] : memoryInputs) {
-    bufferContinuingTokens(inputs.mcControls);
-    bufferContinuingTokens(inputs.lsqControls);
+  for (auto &[memInterfaceKey, controls] : memInterfaceToControls) {
+    bufferContinuingTokens(controls.blockToControl);
   }
 
   // Since memBuilder.instantiateInterfaces rewires

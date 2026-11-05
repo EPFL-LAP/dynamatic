@@ -51,33 +51,11 @@ using MemrefValue = TypedValue<MemRefType>;
 /// A value known to be a dataless control channel
 using ControlValue = TypedValue<handshake::ControlType>;
 
-/// The CFG for routing the control inputs of one memory interface,
-/// sequentialized by a single memory token.
-struct MemoryInterfaceCfg {
-  Cfg cfg;
-  // the basic blocks the memory interface takes control inputs from
-  SetVector<Block *> interfacingBlocks;
-  // whether the interface takes the region's end control
-  bool takesEnd;
-};
-
-/// Builds the CFGs for routing the control inputs
-/// of each memory interface of the function:
-/// per memory region (each memref with a memStart),
-/// one for its memory controller if it has one,
-/// and one for its LSQ if it has one.
-MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg>
-collectMemoryInterfaceCfgs(
-    const Cfg &base, const MapVector<MemrefValue, ControlValue> &memStarts);
-
 /// Optimizes the CFG for routing:
 /// removes the control flow
 /// that does not concern its needed blocks,
 /// one rewrite at a time, until none applies.
 void optimizeCfg(Cfg &cfg);
-
-/// Optimizes a memory interface CFG for routing
-void optimizeMemoryCfg(MemoryInterfaceCfg &memoryCfg);
 
 } // namespace cf_to_handshake
 } // namespace experimental

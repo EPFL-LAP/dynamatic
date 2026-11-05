@@ -87,27 +87,10 @@ private:
   DenseMap<Block *, TempProd> blockToTempProd;
 };
 
-/// What the memory routing delivers to one memory region's interfaces,
-/// in the form the memory interface builder takes
-struct MemoryInterfaceInputs {
-  // the MC's control input for each basic block, keyed by its number
-  DenseMap<unsigned, Value> mcControls;
-  // the LSQ's group allocation for each basic block, keyed by its number
-  DenseMap<unsigned, Value> lsqControls;
-  // the end control, for whichever interface takes it
-  Value ctrlEnd;
-};
-
-/// Routes the non-memory cfgs,
-/// and routes the inputs to each memory interface on its MC cfg or LSQ cfg.
+/// Routes each cfg.
 /// Then labels each cond branch with the cfg successors of its basic block.
-/// Returns the memory interface inputs, keyed by memref.
-MapVector<MemrefValue, MemoryInterfaceInputs> routeCfgs(
-    Region &body, const BlockToCond &blockToCond,
-    const MapVector<MemrefValue, ControlValue> &memStarts,
-    ArrayRef<Cfg> nonMemoryCfgs,
-    MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> &memoryCfgs,
-    const Cfg &base, OpBuilder &builder);
+void routeCfgs(Region &body, const BlockToCond &blockToCond,
+               ArrayRef<Cfg> cfgs, const Cfg &base, OpBuilder &builder);
 
 } // namespace cf_to_handshake
 } // namespace experimental
