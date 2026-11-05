@@ -1022,7 +1022,8 @@ LogicalResult CfToHandshakeTranslator::createMemInterfaces() {
     SmallPtrSet<Block *, 4> controlBlocks;
 #endif
     MemoryInterfaceBuilder memBuilder(funcOp, valueMap.lookup(memref),
-                                      memAccesses.memStart, ctrlEnd, ctrlVals);
+                                      memAccesses.memStart, ctrlEnd, ctrlVals,
+                                      ctrlVals);
 
     for (auto &[_, mcBlockOps] : memAccesses.mcPorts)
       for (handshake::MemPortOpInterface portOp : mcBlockOps)

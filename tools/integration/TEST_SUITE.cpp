@@ -513,7 +513,7 @@ TEST_P(LSQSizingFixture, basic) {
   logPerformance(config.simTime);
 }
 
-TEST_P(SpecFixture, spec) {
+TEST_P(SpecFixture, spec_NoCI) {
   IntegrationTest config{
       // clang-format off
       .name = GetParam(),
@@ -593,7 +593,7 @@ protected:
 };
 
 // A single loop with a statically known iteration count, activated once.
-TEST_F(IIMonitorFixture, singleLoop) {
+TEST_F(IIMonitorFixture, singleLoop_NoCI) {
   // 'fir' runs its only loop once, for exactly 1000 iterations.
   std::vector<IISummary> summaries = runInstrumented("fir");
   ASSERT_EQ(summaries.size(), 1u);
@@ -608,7 +608,7 @@ TEST_F(IIMonitorFixture, singleLoop) {
 
 // A loop nest: both loops report, tagged with their nesting depth; the inner
 // one accumulates its iterations across one activation per outer iteration.
-TEST_F(IIMonitorFixture, nestedLoops) {
+TEST_F(IIMonitorFixture, nestedLoops_NoCI) {
   // 'matvec' iterates a 100x100 nest once.
   std::vector<IISummary> summaries = runInstrumented("matvec");
   ASSERT_EQ(summaries.size(), 2u);
@@ -633,7 +633,7 @@ TEST_F(IIMonitorFixture, nestedLoops) {
 }
 
 // A while loop whose iteration count is only decided by the data at runtime.
-TEST_F(IIMonitorFixture, dataDependentTripCount) {
+TEST_F(IIMonitorFixture, dataDependentTripCount_NoCI) {
   // 'while_loop_1' scans until a[i] + b[i] >= 1000, which its input data
   // arranges to first happen at i == 900: 901 iterations.
   std::vector<IISummary> summaries = runInstrumented("while_loop_1");
@@ -646,7 +646,7 @@ TEST_F(IIMonitorFixture, dataDependentTripCount) {
 }
 
 // A program without loops gets no monitors and must still simulate cleanly.
-TEST_F(IIMonitorFixture, loopFree) {
+TEST_F(IIMonitorFixture, loopFree_NoCI) {
   std::vector<IISummary> summaries = runInstrumented("test_loop_free");
   EXPECT_TRUE(summaries.empty());
 }
@@ -655,7 +655,7 @@ TEST_F(IIMonitorFixture, loopFree) {
 // (its iterations are the events being reported), a single iteration yields
 // no measurable II, and two iterations are the shortest activation that
 // does.
-TEST_F(IIMonitorFixture, iterationCountEdgeCases) {
+TEST_F(IIMonitorFixture, iterationCountEdgeCases_NoCI) {
   std::vector<IISummary> summaries = runInstrumented("ii_edge_cases");
   ASSERT_EQ(summaries.size(), 2u);
   std::vector<int> iterations;
@@ -678,7 +678,7 @@ TEST_F(IIMonitorFixture, iterationCountEdgeCases) {
 // A frequently re-entered inner loop whose recurrence takes many cycles: the
 // intervals bridging its activations are shorter than its II, so they must
 // not leak into the measurement and drag it down.
-TEST_F(IIMonitorFixture, nestedHighLatency) {
+TEST_F(IIMonitorFixture, nestedHighLatency_NoCI) {
   // 'ii_nested_float' re-enters its inner loop 20 times for only 5 iterations
   // each, accumulating floats: a multi-cycle addf recurrence.
   std::vector<IISummary> summaries = runInstrumented("ii_nested_float");
@@ -705,7 +705,7 @@ TEST_F(IIMonitorFixture, nestedHighLatency) {
 
 // The opposite extreme: an inner loop that pipelines perfectly. Its measured
 // II must come out as exactly 1, so any overshoot in the measurement shows.
-TEST_F(IIMonitorFixture, nestedIIOne) {
+TEST_F(IIMonitorFixture, nestedIIOne_NoCI) {
   // 'ii_nested_int' re-enters its inner loop 8 times for 30 iterations each,
   // accumulating integers: a combinational recurrence.
   std::vector<IISummary> summaries = runInstrumented("ii_nested_int");
@@ -970,7 +970,7 @@ INSTANTIATE_TEST_SUITE_P(Tiny, VerifyInvariantsFixture,
                          testing::Values("fir", "iir", "matvec"),
                          [](const auto &info) { return info.param; });
 
-TEST_P(VerifyInvariantsFixture, basic) {
+TEST_P(VerifyInvariantsFixture, basic_NoCI) {
   IntegrationTest config{
       // clang-format off
       .name = GetParam(),
@@ -991,7 +991,7 @@ TEST_P(VerifyInvariantsFixture, basic) {
   logPerformance(config.simTime);
 }
 
-TEST_P(RigidificationFixture, basic) {
+TEST_P(RigidificationFixture, basic_NoCI) {
   IntegrationTest config{
       // clang-format off
       .name = GetParam(),

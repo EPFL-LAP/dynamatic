@@ -60,6 +60,27 @@ def CfToHandshake : Pass<"lower-cf-to-handshake", "mlir::ModuleOp"> {
       their handshake counterparts,
       which represent dataflow circuits that can ultimately be converted to an
           RTL design.
+    Every consumer is routed with the control-network routing algorithm on a
+    CFG optimized to that consumer.
+    Functions must have a single return (see --func-merge-returns),
+    function arguments must have names (handshake.arg_name),
+    and memory accesses must have names (handshake.name).
+  }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
+}
+
+//===----------------------------------------------------------------------===//
+// Tcad20CfToHandshake
+//===----------------------------------------------------------------------===//
+
+def Tcad20CfToHandshake
+    : Pass<"lower-cf-to-handshake-tcad20", "mlir::ModuleOp"> {
+  let summary = "Lowers func and cf dialects to handshake.";
+  let description = [{
+    Lowers func-level functions whose body have unstructured control flow into
+      their handshake counterparts,
+      which represent dataflow circuits that can ultimately be converted to an
+          RTL design.
     Functions must be in maximal SSA form (see --func-maximize-ssa).
   }];
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];

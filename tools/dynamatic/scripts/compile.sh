@@ -27,6 +27,7 @@ ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
 USE_LSQ_SIZING=${20:-0}
+TCAD20=${21:-0}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -286,6 +287,7 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
+  --func-merge-returns \
   --sort-blocks-rpo \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
@@ -338,9 +340,14 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+elif [[ $TCAD20 -ne 0 ]]; then
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --func-maximize-ssa --lower-cf-to-handshake-tcad20 \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake with TCAD'20" "Compiled cf to handshake with TCAD'20"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
-    --func-maximize-ssa --lower-cf-to-handshake \
+    --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
@@ -370,9 +377,9 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
 else
 
-  # handshake transformations
+  # handshake transformations, without the LSQ minimization passes
+  # (shrink it or shed it), which need rebuilding for the new routing
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \

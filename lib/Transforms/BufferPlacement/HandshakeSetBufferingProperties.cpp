@@ -236,12 +236,14 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
     makeUnbufferizable(arg);
   }
 
-  // Ports of memory interfaces are unbufferizable
+  // Ports of memory interfaces (if they have not been already dealt with)
+  // should be marked unbufferizable
   for (auto memOp : funcOp.getOps<handshake::MemoryOpInterface>()) {
     FuncMemoryPorts ports = getMemoryPorts(memOp);
     for (size_t i = 0, e = ports.getNumGroups(); i < e; ++i) {
       for (Value inputVal : ports.getGroupInputs(i))
-        makeUnbufferizable(inputVal);
+        if (Channel(inputVal).props->isUnconstrained())
+          makeUnbufferizable(inputVal);
       for (Value outputVal : ports.getGroupResults(i))
         makeUnbufferizable(outputVal);
     }

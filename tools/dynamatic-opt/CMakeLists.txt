@@ -28,6 +28,7 @@ target_link_libraries(dynamatic-opt
   DynamaticFormalPropertyAnnotation
   DynamaticResourceSharing
   DynamaticCfToHandshake
+  DynamaticTcad20CfToHandshake
   DynamaticFtdCfToHandshake
   DynamaticHandshake
   DynamaticHandshakeToHW

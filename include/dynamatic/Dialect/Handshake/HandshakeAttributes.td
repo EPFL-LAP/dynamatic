@@ -431,6 +431,20 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
   let assemblyFormat = "`[` $loadQueueDepth `,` $storeQueueDepth `]`";
 }
 
+//===----------------------------------------------------------------------===//
+// Branch CFG Successors
+//===----------------------------------------------------------------------===//
+def CfgSuccsAttr : Handshake_Attr<"CfgSuccs", "cfgSuccs"> {
+  let summary = "Successors of a branch in the original CFG";
+  let description = [{
+    Holds the bb ids of the successors of a branch's basic block
+    in the original CFG, on the true side and on the false side.
+  }];
+
+  let parameters = (ins "unsigned":$trueSucc, "unsigned":$falseSucc);
+  let assemblyFormat = "`{` `true` `:` $trueSucc `,` `false` `:` $falseSucc `}`";
+}
+
 
 //===----------------------------------------------------------------------===//
 // FPU Implementation
