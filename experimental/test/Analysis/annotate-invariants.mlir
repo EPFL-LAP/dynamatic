@@ -27,9 +27,9 @@ handshake.func @countLoop(%n: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
   // CONSEC-DAG: IOGConsecutiveTokens: ((start_valid & (count(testbench.end_full) > 0)) -> fork0.outs_0_sent)
   // CONSEC-DAG: IOGConsecutiveTokens: ((n_valid & (count(buffer0.outs_valid_i) > 0)) -> fork1.outs_1_sent)
   %startFork:2 = fork [2] %start {handshake.bb = 0 : ui32, handshake.name = "fork0"} : <>
-  // The control merge holds the entry token (index 0) only if the buffer after
-  // it is empty
-  // CHECK: EntryTokenOrder: ((control_merge0.slot_full & (control_merge0.data = FALSE)) -> (! buffer2.outs_valid_i))
+  // The control merge holds the entry token (index 0), and has not sent its
+  // index yet, only if the buffer after it is empty
+  // CHECK: EntryTokenOrder: (((control_merge0.slot_full & (control_merge0.data = FALSE) & !control_merge0.index_sent)) -> (! buffer2.outs_valid_i))
   %indexBuf = buffer %index, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer2"} : <i1>
   %i = mux %indexBuf [%n, %iBack] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, [<i32>, <i32>] to <i32>
   %iFork:2 = fork [2] %i {handshake.bb = 1 : ui32, handshake.name = "fork1"} : <i32>
@@ -88,4 +88,39 @@ handshake.func @addSelf(%x: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
   %xFork:2 = fork [2] %x {handshake.name = "fork20"} : <i32>
   %sum = addi %xFork#0, %xFork#1 {handshake.name = "addi20"} : <i32>
   end {handshake.name = "end20"} %sum, %start : <i32>, <>
+}
+
+// RUN: dynamatic-opt %s \
+// RUN:   --handshake-annotate-properties="json-path=%t.exit.json annotate-list=ExitTokenOrder" \
+// RUN:   --exp-test-print-formal-properties="json-path=%t.exit.json" -o /dev/null \
+// RUN:   | FileCheck %s --check-prefix=EXIT
+
+// A loop whose decider sends its exit decision through a fork to two branches.
+// The buffer before the decider keeps the decider in an IOG; without it, the
+// copies of the counter would meet at a branch before any slot
+handshake.func @exitPaths(%n: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
+  %startFork:2 = fork [2] %start {handshake.bb = 0 : ui32, handshake.name = "fork30"} : <>
+  %indexBuf = buffer %index, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer32"} : <i1>
+  %i = mux %indexBuf [%n, %iBack] {handshake.bb = 1 : ui32, handshake.name = "mux30"} : <i1>, [<i32>, <i32>] to <i32>
+  %iFork:2 = fork [2] %i {handshake.bb = 1 : ui32, handshake.name = "fork31"} : <i32>
+  %ctrl, %index = control_merge [%startFork#1, %ctrlBack] {handshake.bb = 1 : ui32, handshake.name = "control_merge30"} : [<>, <>] to <>, <i1>
+  %zero = source {handshake.bb = 1 : ui32, handshake.name = "source30"} : <>
+  %c0 = constant %zero {value = 0 : i32, handshake.bb = 1 : ui32, handshake.name = "constant30"} : <>, <i32>
+  %iBuf = buffer %iFork#0, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer33"} : <i32>
+  %cond = cmpi ne, %iBuf, %c0 {handshake.bb = 1 : ui32, handshake.name = "cmpi30"} : <i32>
+  // While the exit decision is on a path to a branch, the ancestors of the
+  // decider are empty. The decider's slot only counts if the fork has not sent
+  // its token to that path. There is one invariant per path, in the order of
+  // the walk to the branches, which does not matter, hence EXIT-DAG
+  // EXIT-DAG: ExitTokenNoAncestors: ((count((buffer34.outs_valid_i & (buffer34.data = FALSE))) > 0) -> (count((buffer30.outs_valid_i & !fork31.outs_0_sent), (buffer33.outs_valid_i & !fork32.outs_0_sent)) = 0))
+  // EXIT-DAG: ExitTokenNoAncestors: ((count((buffer35.outs_valid_i & (buffer35.data = FALSE))) > 0) -> (count((buffer30.outs_valid_i & !fork31.outs_0_sent), (buffer33.outs_valid_i & !fork32.outs_1_sent)) = 0))
+  %condFork:2 = fork [2] %cond {handshake.bb = 1 : ui32, handshake.name = "fork32"} : <i1>
+  %condBuf0 = buffer %condFork#0, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer34"} : <i1>
+  %condBuf1 = buffer %condFork#1, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer35"} : <i1>
+  %iTrue, %iFalse = cond_br %condBuf0, %iFork#1 {handshake.bb = 1 : ui32, handshake.name = "cond_br30"} : <i1>, <i32>
+  %ctrlTrue, %ctrlFalse = cond_br %condBuf1, %ctrl {handshake.bb = 1 : ui32, handshake.name = "cond_br31"} : <i1>, <>
+  %iBack = buffer %iTrue, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer30"} : <i32>
+  %ctrlBack = buffer %ctrlTrue, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer31"} : <>
+  sink %ctrlFalse {handshake.name = "sink30"} : <>
+  end {handshake.bb = 2 : ui32, handshake.name = "end30"} %iFalse, %startFork#0 : <i32>, <>
 }
