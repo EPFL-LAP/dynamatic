@@ -92,7 +92,7 @@ Block *MarkSubloopPass::getTrueDefiningBlock(Value val) {
   // if it's not a blockarg, its defining block is just the block
   if (Operation *defOp = val.getDefiningOp())
     return defOp->getBlock();
-
+  // return nullptr;
   // If it's a blockArg, inspect predecessor branches
   if (auto blockArg = dyn_cast<BlockArgument>(val)) {
     Block *ownerBlock = blockArg.getOwner();

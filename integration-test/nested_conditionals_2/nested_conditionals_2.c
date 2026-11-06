@@ -1,7 +1,7 @@
 #include "nested_conditionals_2.h"
 #include "dynamatic/Integration.h"
 
-void nested_conditionals_2(inout_int_t a[N], in_int_t c) {
+void nested_conditionals_2(inout_int_t a[N], inout_int_t b[N], in_int_t c) {
   for (unsigned i = 0; i < N; ++i) {
     int x = a[i];
 #pragma DYN predict variable = x values = [2] location = start marker =        \
@@ -20,17 +20,18 @@ void nested_conditionals_2(inout_int_t a[N], in_int_t c) {
     }
     int z = y + 3;
 #pragma DYN predict variable = z location = end marker = 0
-    a[i] = z;
+    b[i] = z;
   }
 }
 
 int main(void) {
-  in_int_t a[N];
+  in_int_t a[N], b[N];
   int c = 7;
   for (unsigned j = 0; j < N; ++j) {
     a[j] = 10;
+    b[j] = j;
   }
 
-  CALL_KERNEL(nested_conditionals_2, a, c);
+  CALL_KERNEL(nested_conditionals_2, a, b, c);
   return 0;
 }

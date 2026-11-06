@@ -752,9 +752,21 @@ void bypassAndEraseOldBranches(
       if (ownerBB.getInt() != userBB)
         continue;
 
-      // check if the consumer is a MuxOp located inside the same bb
-      if (isa<handshake::MuxOp, handshake::RegionInputOp>(owner)) {
-        // llvm::errs() << "Bypassing suppressor.\n";
+      // If we are moving past a Loop Header (user is a MuxOp), ONLY bypass
+      // the entry input (dataOperands[0], which is operand index 1 on MuxOp)
+      if (isa<handshake::MuxOp>(user)) {
+        if (auto muxOwner = dyn_cast<handshake::MuxOp>(owner)) {
+          if (use.getOperandNumber() == 1) {
+            use.set(dataOperand);
+          }
+        }
+        continue;
+      }
+
+      // If we are moving past a Conditional Region (user is RegionInputOp),
+      // ONLY bypass RegionInputOp!
+      if (isa<handshake::RegionInputOp>(user) &&
+          isa<handshake::RegionInputOp>(owner)) {
         use.set(dataOperand);
         continue;
       }

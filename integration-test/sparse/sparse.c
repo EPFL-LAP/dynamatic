@@ -1,4 +1,3 @@
-// clang-format off
 #include "sparse.h"
 #include "dynamatic/Integration.h"
 #include "stdbool.h"
@@ -8,16 +7,10 @@ float sparse(in_float_t a[N], in_float_t x[N]) {
   float sum = 0.0f;
   int i = 0;
   float mul;
-  bool loopAgain;
-  do {
-    mul = a[i] * x[i];
-    #pragma DYN predict variable=mul values=[0] location=start marker=0 type=float
+  for (i = 0; i < N; i++) {
+    mul = 12.0f * x[i];
     sum += mul;
-    #pragma DYN predict variable=sum location=end marker=0
-    i++;
-    loopAgain = sum >= 0.0f;
-    #pragma DYN speculate variable=loopAgain max_predictions=3 style=standard
-  } while (loopAgain);
+  }
   return sum;
 }
 
@@ -25,12 +18,13 @@ int main(void) {
   in_float_t a[N];
   in_float_t x[N];
 
-  srand(13);
   for (int j = 0; j < N; ++j) {
-    // a[j] = 1.2f - j;
-    // x[j] = j;
     a[j] = 40.0f - j;
-    x[j] = 1.0f;
+    if (j < 0) {
+      x[j] = 7.0f;
+    } else {
+      x[j] = 0.0f;
+    }
   }
 
   CALL_KERNEL(sparse, a, x);

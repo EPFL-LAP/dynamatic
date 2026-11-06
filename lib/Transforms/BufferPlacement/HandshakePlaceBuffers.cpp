@@ -835,6 +835,18 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       }
     }
 
+    for (auto ri : funcOp.getOps<handshake::RepeatingInitOp>()) {
+      ChannelBufProps &resProps = channelProps[ri.getResult()];
+      resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+      resProps.minTrans = std::max(resProps.minTrans, 1U);
+    }
+
+    for (auto initOp : funcOp.getOps<handshake::InitOp>()) {
+      ChannelBufProps &resProps = channelProps[initOp.getResult()];
+      resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+      resProps.minTrans = std::max(resProps.minTrans, 1U);
+    }
+
     // Place the minimal number of buffers (as specified by the buffering
     // constraints on each channel) for each channel, deducting internal unit
     // buffers at the same time
