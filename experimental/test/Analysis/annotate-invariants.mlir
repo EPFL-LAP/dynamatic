@@ -27,9 +27,9 @@ handshake.func @countLoop(%n: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
   // CONSEC-DAG: IOGConsecutiveTokens: ((start_valid & (count(testbench.end_full) > 0)) -> fork0.outs_0_sent)
   // CONSEC-DAG: IOGConsecutiveTokens: ((n_valid & (count(buffer0.outs_valid_i) > 0)) -> fork1.outs_1_sent)
   %startFork:2 = fork [2] %start {handshake.bb = 0 : ui32, handshake.name = "fork0"} : <>
-  // The control merge holds the entry token (index 0) only if the buffer after
-  // it is empty
-  // CHECK: EntryTokenOrder: ((control_merge0.slot_full & (control_merge0.data = FALSE)) -> (! buffer2.outs_valid_i))
+  // The control merge holds the entry token (index 0), and has not sent its
+  // index yet, only if the buffer after it is empty
+  // CHECK: EntryTokenOrder: (((control_merge0.slot_full & (control_merge0.data = FALSE) & !control_merge0.index_sent)) -> (! buffer2.outs_valid_i))
   %indexBuf = buffer %index, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer2"} : <i1>
   %i = mux %indexBuf [%n, %iBack] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, [<i32>, <i32>] to <i32>
   %iFork:2 = fork [2] %i {handshake.bb = 1 : ui32, handshake.name = "fork1"} : <i32>

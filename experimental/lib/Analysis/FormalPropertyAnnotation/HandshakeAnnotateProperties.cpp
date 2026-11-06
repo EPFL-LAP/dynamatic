@@ -691,7 +691,9 @@ std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
         Operation *op = operand.getOwner();
         if (isa<ControlMergeOp>(op))
           return PathStep::End;
-        if (isa<BufferOp, ForkOp>(op))
+        // A control merge is an eager fork too, but must not match here: the
+        // check above ends the path at it
+        if (isa<BufferOp, EagerForkLikeOpInterface>(op))
           return PathStep::Traverse;
         // The entry token reaches another unit before any control merge, so
         // the path does not lead to an entry control merge
@@ -721,19 +723,32 @@ std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
 
 // This function finds any path from a control merge to a mux operation. Note
 // that there can be multiple paths due to forks that replicate the index token
-// of the CMerge to multiple muxes.
+// of the CMerge to multiple muxes. Each path is the list of its effective
+// slots: a slot only counts if the sents after it have not copied its token.
+// For example, with two muxes:
+//
+//   control_merge0 --index--> fork0 --outs_0----------------> mux0
+//       [slot]                  |
+//                               +-----outs_1--> buffer0 --> mux1
+//                                                [slot]
+//
+// there are two paths, with these effective slots:
+//   to mux0: (control_merge0 slot & !index_sent & !fork0.outs_0_sent)
+//   to mux1: (control_merge0 slot & !index_sent & !fork0.outs_1_sent), buffer0
 std::vector<std::vector<EffectiveSlotNamer>>
 findCMergeMuxPaths(ControlMergeOp cmerge) {
   // The paths start at the slot of the control merge, which holds the index
   std::vector<EffectiveSlotNamer> mergeSlot;
   mergeSlot.emplace_back(std::make_unique<BufferSlotFullNamer>(
       cmerge.getInternalSlotStateNamers()[0]));
+  // The index output that the paths start from copies the token of the slot
+  mergeSlot.back().addCopiedSent(getSentNamer(cmerge.getIndex()));
   std::vector<SlotPath> paths = findSlotPaths(
       cmerge.getIndex(), std::move(mergeSlot), [](OpOperand &operand) {
         Operation *op = operand.getOwner();
         if (isa<MuxOp>(op))
           return PathStep::End;
-        if (isa<BufferOp, ForkOp>(op))
+        if (isa<BufferOp, EagerForkLikeOpInterface>(op))
           return PathStep::Traverse;
         return PathStep::Unexpected;
       });
@@ -799,11 +814,15 @@ HandshakeAnnotatePropertiesPass::annotateSingleEntryToken(ModuleOp modOp) {
         for (const auto &cm : findCMergeMuxPaths(ec.cmerge)) {
           // If the path from the control merge to the mux holds a token, the
           // path from the entry to the control merge is empty, e.g.:
-          //   ((count((control_merge0.slot_full & !fork3.outs_0_sent)) > 0)
+          //   ((count(control_merge0.slot_full, buffer8.full) > 0)
           //    -> (count((start_valid & !fork0.outs_2_sent)) = 0))
+          // The control merge keeps the token in its slot after sending it on
+          // the path, so its slot counts whatever its copied sents are
+          std::vector<PropertyExpr> cmStates = getStates(cm);
+          cmStates.front() = State(cm.front().slot);
           PropertyExpr cmOccupied =
-              BinaryExpr(NaryExpr(NaryExpr::Count, getStates(cm)),
-                         BinaryExpr::Gt, Constant::integer(0));
+              BinaryExpr(NaryExpr(NaryExpr::Count, cmStates), BinaryExpr::Gt,
+                         Constant::integer(0));
           PropertyExpr ecEmpty =
               BinaryExpr(NaryExpr(NaryExpr::Count, getStates(ec.slots)),
                          BinaryExpr::Eq, Constant::integer(0));
@@ -882,7 +901,7 @@ std::vector<UnstartedPath> findDeciderBranchPaths(Operation *dec) {
     stack.pop_back();
 
     Operation *next = *path.cur.getUsers().begin();
-    if (auto fork = dyn_cast<ForkOp>(next)) {
+    if (auto fork = dyn_cast<EagerForkLikeOpInterface>(next)) {
       auto sents = fork.getInternalSentStateNamers();
       for (auto [i, channel] : llvm::enumerate(next->getResults())) {
         PartialPath nextPath = {
@@ -894,7 +913,7 @@ std::vector<UnstartedPath> findDeciderBranchPaths(Operation *dec) {
           EffectiveSlotNamer &back = nextPath.slots.back();
           back.copiedSents.push_back(sents[i]);
         } else {
-          path.startSents.push_back(sents[i]);
+          nextPath.startSents.push_back(sents[i]);
         }
         stack.push_back(nextPath);
       }
@@ -1095,15 +1114,17 @@ HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
       }
 
       auto ancestorPaths = findAncestorSlots(iog, dec, *iogBranch);
-      for (auto ancestorPath : ancestorPaths) {
+      for (const auto &ancestorPath : ancestorPaths) {
         if (ancestorPath.empty())
           continue;
         for (const auto &decPath : slotPaths) {
           if (decPath.started.empty())
             continue;
-          // Extend the ancestor path using the startSents
+          // Extend the ancestor path using the startSents of this path from
+          // the decider to the branch
+          std::vector<EffectiveSlotNamer> extendedPath = ancestorPath;
           for (const auto &startSent : decPath.startSents) {
-            ancestorPath.back().addCopiedSent(startSent);
+            extendedPath.back().addCopiedSent(startSent);
           }
           // If a slot on the path from the decider to the branch holds the
           // exit token, the ancestors of the decider are empty, e.g.:
@@ -1119,7 +1140,7 @@ HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
               BinaryExpr(NaryExpr(NaryExpr::Count, exitTokens), BinaryExpr::Gt,
                          Constant::integer(0));
           PropertyExpr ancestorsEmpty =
-              BinaryExpr(NaryExpr(NaryExpr::Count, getStates(ancestorPath)),
+              BinaryExpr(NaryExpr(NaryExpr::Count, getStates(extendedPath)),
                          BinaryExpr::Eq, Constant::integer(0));
           addProperty(FormalProperty::EXIT_TOKEN_NO_ANCESTORS,
                       FormalProperty::TAG::INVAR,
