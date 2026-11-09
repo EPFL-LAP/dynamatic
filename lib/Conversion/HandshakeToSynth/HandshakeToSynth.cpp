@@ -473,8 +473,8 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
       buildPortInfoFromHandshakeUnitPorts(handshakeUnbundledPortsTop, ctx);
   builder.setInsertionPointToStart(modOp.getBody());
   StringAttr topName = StringAttr::get(ctx, getUniqueName(topFunction));
-  topHWModule = builder.create<hw::HWModuleOp>(topFunction.getLoc(), topName,
-                                               topHWPortInfo);
+  topHWModule = hw::HWModuleOp::create(builder, topFunction.getLoc(), topName,
+                                       topHWPortInfo);
 
   // Initialize the backedge builder for creating placeholders for unbundled
   // bits
@@ -637,8 +637,8 @@ hw::HWModuleOp HandshakeUnbundler::createHWModuleHandshakeOp(
 
   // Insert submodule definitions before the top module.
   builder.setInsertionPointToEnd(modOp.getBody());
-  hwModRes = builder.create<hw::HWModuleOp>(
-      handshakeOp->getLoc(), StringAttr::get(ctx, moduleName), portInfo);
+  hwModRes = hw::HWModuleOp::create(builder, handshakeOp->getLoc(),
+                                    StringAttr::get(ctx, moduleName), portInfo);
 
   // Create subckt placeholder body for the new module
   OpBuilder bodyBuilder(hwModRes.getBodyBlock(),
@@ -649,8 +649,9 @@ hw::HWModuleOp HandshakeUnbundler::createHWModuleHandshakeOp(
     if (port.isOutput())
       outputTypes.push_back(port.type);
   Operation *term = hwModRes.getBodyBlock()->getTerminator();
-  auto subckt = bodyBuilder.create<synth::SubcktOp>(
-      term->getLoc(), TypeRange(outputTypes), bodyInputs, "synth_subckt");
+  auto subckt = synth::SubcktOp::create(bodyBuilder, term->getLoc(),
+                                        TypeRange(outputTypes), bodyInputs,
+                                        "synth_subckt");
   term->setOperands(subckt.getResults());
 
   // Record BLIF path for this handshake op
@@ -739,8 +740,8 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
   // The input of the instance should be the unbundled operands we collected
   // The output of the instance are specified by the hw module definition we
   // created or looked up (hwModDef)
-  auto instOp = builder.create<hw::InstanceOp>(
-      loc, hwModDef, StringAttr::get(ctx, opName.str() + "_inst"),
+  auto instOp = hw::InstanceOp::create(
+      builder, loc, hwModDef, StringAttr::get(ctx, opName.str() + "_inst"),
       hwInstOperands);
 
   // Save the mapping between the old handshake channels for the op output and

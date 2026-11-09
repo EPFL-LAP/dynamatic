@@ -121,7 +121,7 @@ HandshakeRigidificationPass::insertReadyRemover(const Signal &valid) {
   builder.setInsertionPointAfter(ownerOp);
   auto loc = channel.getLoc();
 
-  auto newOp = builder.create<handshake::ReadyRemoverOp>(loc, channel);
+  auto newOp = handshake::ReadyRemoverOp::create(builder, loc, channel);
   channel.replaceAllUsesExcept(newOp.getResult(), newOp);
 
   return success();
@@ -144,8 +144,8 @@ HandshakeRigidificationPass::insertValidMerger(const Signal &ownerValid,
   Location loc =
       FusedLoc::get(ctx, {ownerChannel.getLoc(), targetChannel.getLoc()});
 
-  auto newOp = builder.create<handshake::ValidMergerOp>(loc, ownerChannel,
-                                                        targetChannel);
+  auto newOp = handshake::ValidMergerOp::create(builder, loc, ownerChannel,
+                                                targetChannel);
 
   ownerChannel.replaceAllUsesExcept(newOp.getLhsOut(), newOp);
   targetChannel.replaceAllUsesExcept(newOp.getRhsOut(), newOp);

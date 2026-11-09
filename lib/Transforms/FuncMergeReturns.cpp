@@ -62,13 +62,13 @@ static void mergeReturns(func::FuncOp funcOp, OpBuilder &builder) {
       builder.createBlock(&body, body.end(), funcOp.getResultTypes(), argLocs);
 
   // add a return op fed by the block args
-  builder.create<func::ReturnOp>(funcOp.getLoc(), exit->getArguments());
+  func::ReturnOp::create(builder, funcOp.getLoc(), exit->getArguments());
 
   // turn each of the original return ops into a cf::BranchOp
   for (func::ReturnOp returnOp : returnOps) {
     builder.setInsertionPoint(returnOp);
-    builder.create<cf::BranchOp>(returnOp.getLoc(), exit,
-                                 returnOp.getOperands());
+    cf::BranchOp::create(builder, returnOp.getLoc(), exit,
+                         returnOp.getOperands());
     returnOp.erase();
   }
 }

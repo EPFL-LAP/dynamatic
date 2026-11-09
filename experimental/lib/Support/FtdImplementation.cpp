@@ -75,7 +75,7 @@ void ftd::resolveCondPlaceholders(handshake::FuncOp funcOp, OpBuilder &builder,
 
     // Forward the real condition through a NotIOp that keeps the placeholder
     // tag, so finalizeCondPlaceholders can later short-circuit and remove it.
-    auto notOp = builder.create<handshake::NotIOp>(loc, chanI1, realCond);
+    auto notOp = handshake::NotIOp::create(builder, loc, chanI1, realCond);
     notOp->setAttr(FTD_COND_VAR, builder.getUnitAttr());
     notOp->setAttr("handshake.bb", bbAttr);
 
@@ -350,8 +350,8 @@ LogicalResult experimental::ftd::createPhiNetwork(
 
   for (auto *bb : blocksToAddPhi) {
     rewriter.setInsertionPointToStart(bb);
-    auto mergeOp = rewriter.create<handshake::MergeOp>(bb->front().getLoc(),
-                                                       operandsPerPhi[bb]);
+    auto mergeOp = handshake::MergeOp::create(rewriter, bb->front().getLoc(),
+                                              operandsPerPhi[bb]);
     mergeOp->setAttr(NEW_PHI, rewriter.getUnitAttr());
     newMergePerPhi.insert({bb, mergeOp});
   }
@@ -449,8 +449,8 @@ LogicalResult ftd::createPhiNetworkDeps(
     // connected with an SSA network, and then everything is joined.
     ValueRange operands = dependencies;
     rewriter.setInsertionPointToStart(operand->getOwner()->getBlock());
-    auto joinOp = rewriter.create<handshake::JoinOp>(
-        operand->getOwner()->getLoc(), operands);
+    auto joinOp = handshake::JoinOp::create(
+        rewriter, operand->getOwner()->getLoc(), operands);
     joinOp->moveBefore(operandOwner);
 
     for (unsigned i = 0; i < dependencies.size(); i++) {
@@ -552,8 +552,8 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
         builder, loopHeader, realBlock, bi, nullptr, &shadow);
 
     Operation *initOp;
-    initOp =
-        builder.create<handshake::InitOp>(consumerOp->getLoc(), conditionValue);
+    initOp = handshake::InitOp::create(builder, consumerOp->getLoc(),
+                                       conditionValue);
 
     initOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
     initOp->setAttr("handshake.bb", headerBBAttr);
@@ -564,9 +564,9 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
     selectSignal.setType(channelifyType(selectSignal.getType()));
 
     SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
-    auto muxOp = builder.create<handshake::MuxOp>(regeneratedValue.getLoc(),
-                                                  regeneratedValue.getType(),
-                                                  selectSignal, muxOperands);
+    auto muxOp = handshake::MuxOp::create(builder, regeneratedValue.getLoc(),
+                                          regeneratedValue.getType(),
+                                          selectSignal, muxOperands);
 
     muxOp->setOperand(2, muxOp->getResult(0));
     muxOp->setAttr(FTD_REGEN, builder.getUnitAttr());
@@ -863,7 +863,7 @@ LogicalResult experimental::ftd::addGsaGates(
         mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
         Operation *initOp;
-        initOp = rewriter.create<handshake::InitOp>(loc, conditionValue);
+        initOp = handshake::InitOp::create(rewriter, loc, conditionValue);
 
         initOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
         setBBAttr(initOp, gate->getBlock(), rewriter);
@@ -882,9 +882,9 @@ LogicalResult experimental::ftd::addGsaGates(
       }
 
       // Create the multiplexer
-      auto mux = rewriter.create<handshake::MuxOp>(
-          loc, ftd::channelifyType(gate->result.getType()), conditionValue,
-          operands);
+      auto mux = handshake::MuxOp::create(
+          rewriter, loc, ftd::channelifyType(gate->result.getType()),
+          conditionValue, operands);
 
       // The one input gamma is marked as an operation to skip in the IR and
       // later removed

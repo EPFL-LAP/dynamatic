@@ -74,8 +74,8 @@ struct DowngradeIndexlessControlMerge
     // the control merge we are replacing. The merge has the exact same inputs
     // as the control merge
     rewriter.setInsertionPoint(cmergeOp);
-    handshake::MergeOp newMergeOp = rewriter.create<handshake::MergeOp>(
-        cmergeOp.getLoc(), cmergeOp->getOperands());
+    handshake::MergeOp newMergeOp = handshake::MergeOp::create(
+        rewriter, cmergeOp.getLoc(), cmergeOp->getOperands());
 
     // We are modifying the operation
     rewriter.modifyOpInPlace(cmergeOp, [&] {

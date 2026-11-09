@@ -894,8 +894,9 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
       if (numSlots == 0)
         return;
 
-      auto bufOp = builder.create<handshake::BufferOp>(
-          bufferIn.getLoc(), bufferIn, numSlots, bufferType, dvLatency);
+      auto bufOp =
+          handshake::BufferOp::create(builder, bufferIn.getLoc(), bufferIn,
+                                      numSlots, bufferType, dvLatency);
       placedBuffers.push_back(bufOp);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);

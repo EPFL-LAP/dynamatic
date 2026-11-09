@@ -61,7 +61,7 @@ struct AddTreeHeightReduction : public OpRewritePattern<handshake::AddIOp> {
       auto mid = vals.size() / 2;
       auto lhs = build(vals.take_front(mid));
       auto rhs = build(vals.drop_front(mid));
-      return rewriter.create<handshake::AddIOp>(op.getLoc(), lhs, rhs);
+      return handshake::AddIOp::create(rewriter, op.getLoc(), lhs, rhs);
     };
 
     Value newTree = build(addTreeOperands);

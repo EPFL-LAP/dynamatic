@@ -151,7 +151,7 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
   OpBuilder::InsertionGuard guard(builder);
   auto funcType = builder.getFunctionType({}, {});
   auto dummyFunc =
-      builder.create<func::FuncOp>(loc, "__ftd_layered_cfg__", funcType);
+      func::FuncOp::create(builder, loc, "__ftd_layered_cfg__", funcType);
   Region &R = dummyFunc.getBody();
   newGraph->region = &R;
   newGraph->containerOp = dummyFunc;
@@ -284,29 +284,29 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
     if (auto cbr = dyn_cast<cf::CondBranchOp>(origTerm)) {
       if (keepSuccessor[0] && keepSuccessor[1]) {
         // Both paths survived; keep conditional branch.
-        Value cond = builder.create<arith::ConstantIntOp>(loc, 1, 1);
-        builder.create<cf::CondBranchOp>(loc, cond, validSuccessors[0],
-                                         validSuccessors[1]);
+        Value cond = arith::ConstantIntOp::create(builder, loc, 1, 1);
+        cf::CondBranchOp::create(builder, loc, cond, validSuccessors[0],
+                                 validSuccessors[1]);
       } else if (keepSuccessor[0] && !keepSuccessor[1]) {
         // Only the true path survived.
-        builder.create<cf::BranchOp>(loc, validSuccessors[0]);
+        cf::BranchOp::create(builder, loc, validSuccessors[0]);
       } else if (!keepSuccessor[0] && keepSuccessor[1]) {
         // Only the false path survived.
-        builder.create<cf::BranchOp>(loc, validSuccessors[1]);
+        cf::BranchOp::create(builder, loc, validSuccessors[1]);
       }
       // If neither survived the block is left without a terminator (dead).
     } else if (auto br = dyn_cast<cf::BranchOp>(origTerm)) {
       if (keepSuccessor[0]) {
-        builder.create<cf::BranchOp>(loc, validSuccessors[0]);
+        cf::BranchOp::create(builder, loc, validSuccessors[0]);
       }
       // If the sole successor was cut, no terminator is created (dead).
     }
   }
 
   builder.setInsertionPointToEnd(trueTerm);
-  builder.create<cf::BranchOp>(loc, falseTerm);
+  cf::BranchOp::create(builder, loc, falseTerm);
   builder.setInsertionPointToEnd(falseTerm);
-  builder.create<func::ReturnOp>(loc);
+  func::ReturnOp::create(builder, loc);
 
   // Graph simplification.
   //
@@ -356,11 +356,11 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
               predTerm->erase();
             } else if (trueDest == &block) {
               // True leg is dead; degrade to unconditional false branch.
-              localBuilder.create<cf::BranchOp>(loc, falseDest);
+              cf::BranchOp::create(localBuilder, loc, falseDest);
               predTerm->erase();
             } else if (falseDest == &block) {
               // False leg is dead; degrade to unconditional true branch.
-              localBuilder.create<cf::BranchOp>(loc, trueDest);
+              cf::BranchOp::create(localBuilder, loc, trueDest);
               predTerm->erase();
             }
           }
@@ -380,7 +380,7 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
         if (condBr.getTrueDest() == condBr.getFalseDest()) {
           OpBuilder localBuilder(term->getContext());
           localBuilder.setInsertionPoint(term);
-          localBuilder.create<cf::BranchOp>(loc, condBr.getTrueDest());
+          cf::BranchOp::create(localBuilder, loc, condBr.getTrueDest());
           term->erase();
           term = block.getTerminator();
           changed = true;
@@ -776,7 +776,7 @@ static Value boolExpressionToCircuit(
       Location loc = block->getOperations().front().getLoc();
       Type chanI1 = ftd::channelifyType(builder.getI1Type());
 
-      auto notOp = builder.create<handshake::NotIOp>(loc, chanI1, val);
+      auto notOp = handshake::NotIOp::create(builder, loc, chanI1, val);
       notOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
       setBBAttrWithFallback(notOp, forcedBBAttr, block, builder);
       return notOp->getResult(0);
@@ -786,12 +786,12 @@ static Value boolExpressionToCircuit(
   }
 
   // Case 2: Constant
-  auto sourceOp = builder.create<handshake::SourceOp>(block->front().getLoc());
+  auto sourceOp = handshake::SourceOp::create(builder, block->front().getLoc());
   auto intType = builder.getIntegerType(1);
   int constVal = (expr->type == ExpressionType::One ? 1 : 0);
   auto cstAttr = builder.getIntegerAttr(intType, constVal);
-  auto constOp = builder.create<handshake::ConstantOp>(
-      block->front().getLoc(), cstAttr, sourceOp.getResult());
+  auto constOp = handshake::ConstantOp::create(builder, block->front().getLoc(),
+                                               cstAttr, sourceOp.getResult());
   constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
   setBBAttrWithFallback(sourceOp, forcedBBAttr, block, builder);
   setBBAttrWithFallback(constOp, forcedBBAttr, block, builder);
@@ -842,8 +842,9 @@ Value ftd::bddToCircuit(
                                      block, registry, truePath, bi,
                                      pendingMuxOperands, shadow, forcedBBAttr));
 
-  auto muxOp = builder.create<handshake::MuxOp>(
-      muxCond.getLoc(), muxOperands[0].getType(), muxCond, muxOperands);
+  auto muxOp =
+      handshake::MuxOp::create(builder, muxCond.getLoc(),
+                               muxOperands[0].getType(), muxCond, muxOperands);
   muxOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
   setBBAttrWithFallback(muxOp, forcedBBAttr, block, builder);
 
@@ -1016,8 +1017,9 @@ static void buildBranchTreeRecursive(
   // 'activeSelectSignal' (Pass Token).
   SmallVector<Type> suppResultTypes = {conditionVal.getType(),
                                        conditionVal.getType()};
-  auto suppBranch = builder.create<handshake::ConditionalBranchOp>(
-      conditionVal.getLoc(), suppResultTypes, suppressCondition, conditionVal);
+  auto suppBranch = handshake::ConditionalBranchOp::create(
+      builder, conditionVal.getLoc(), suppResultTypes, suppressCondition,
+      conditionVal);
   suppBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
   setBBAttr(suppBranch, conditionVal.getParentBlock(), builder);
 
@@ -1029,8 +1031,8 @@ static void buildBranchTreeRecursive(
 
   // Create the branch that splits the 'sourceVal' based on the (possibly
   // filtered) 'activeSelectSignal'.
-  auto branchOp = builder.create<handshake::ConditionalBranchOp>(
-      sourceVal.getLoc(), resultTypes, activeSelectSignal, sourceVal);
+  auto branchOp = handshake::ConditionalBranchOp::create(
+      builder, sourceVal.getLoc(), resultTypes, activeSelectSignal, sourceVal);
   branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
   setBBAttr(branchOp, sourceVal.getParentBlock(), builder);
 
@@ -1322,7 +1324,7 @@ ftd::buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
   OpBuilder::InsertionGuard guard(builder);
   auto funcType = builder.getFunctionType({}, {});
   auto dummyFunc =
-      builder.create<func::FuncOp>(loc, "__ftd_local_cfg__", funcType);
+      func::FuncOp::create(builder, loc, "__ftd_local_cfg__", funcType);
   Region &R = dummyFunc.getBody();
   L->region = &R;
   L->containerOp = dummyFunc;
@@ -1354,7 +1356,7 @@ ftd::buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
     // Dead End: Implicit flow to Sink.
     if (!term || term->getNumSuccessors() == 0) {
       builder.setInsertionPointToEnd(currNew);
-      builder.create<cf::BranchOp>(loc, L->sinkBB);
+      cf::BranchOp::create(builder, loc, L->sinkBB);
       return;
     }
 
@@ -1391,7 +1393,7 @@ ftd::buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
             // Terminate SecondVisit immediately to Sink
             OpBuilder::InsertionGuard g(builder);
             builder.setInsertionPointToEnd(L->secondVisitBB);
-            builder.create<cf::BranchOp>(loc, L->sinkBB);
+            cf::BranchOp::create(builder, loc, L->sinkBB);
           }
           nextBlockInLocalCFG = L->secondVisitBB;
           L->newCons = L->secondVisitBB;
@@ -1405,7 +1407,7 @@ ftd::buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
             // Terminate Proxy immediately to Sink
             OpBuilder::InsertionGuard g(builder);
             builder.setInsertionPointToEnd(proxy);
-            builder.create<cf::BranchOp>(loc, L->sinkBB);
+            cf::BranchOp::create(builder, loc, L->sinkBB);
           }
           nextBlockInLocalCFG = L->newCons;
         }
@@ -1458,15 +1460,15 @@ ftd::buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
     // Create the branch instruction
     builder.setInsertionPointToEnd(currNew);
     if (localSuccessors.size() == 1) {
-      builder.create<cf::BranchOp>(loc, localSuccessors[0]);
+      cf::BranchOp::create(builder, loc, localSuccessors[0]);
     } else if (localSuccessors.size() == 2) {
       // Placeholder condition for 2-way branches
-      Value cond = builder.create<arith::ConstantIntOp>(loc, 1, 1);
-      builder.create<cf::CondBranchOp>(loc, cond, localSuccessors[0],
-                                       localSuccessors[1]);
+      Value cond = arith::ConstantIntOp::create(builder, loc, 1, 1);
+      cf::CondBranchOp::create(builder, loc, cond, localSuccessors[0],
+                               localSuccessors[1]);
     } else {
       // Default fall-through for complex control flow
-      builder.create<cf::BranchOp>(loc, L->sinkBB);
+      cf::BranchOp::create(builder, loc, L->sinkBB);
     }
 
     // Continue DFS
@@ -1480,7 +1482,7 @@ ftd::buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
 
   // Finalize Sink
   builder.setInsertionPointToEnd(L->sinkBB);
-  builder.create<func::ReturnOp>(loc);
+  func::ReturnOp::create(builder, loc);
 
   if (!L->newCons)
     L->newCons = L->sinkBB;
@@ -1546,7 +1548,7 @@ ftd::buildDecisionGraph(const ftd::LocalCFG &rawGraph,
 
   auto funcType = builder.getFunctionType({}, {});
   auto newContainer =
-      builder.create<func::FuncOp>(loc, "__ftd_decision_graph__", funcType);
+      func::FuncOp::create(builder, loc, "__ftd_decision_graph__", funcType);
   Region &newRegion = newContainer.getBody();
   newL->region = &newRegion;
   newL->containerOp = newContainer;
@@ -1617,16 +1619,16 @@ ftd::buildDecisionGraph(const ftd::LocalCFG &rawGraph,
   // Wire the dummy start unconditionally to the true logic entry
   builder.setInsertionPointToEnd(dummyStart);
   if (newL->newProd) {
-    builder.create<cf::BranchOp>(loc, newL->newProd);
+    cf::BranchOp::create(builder, loc, newL->newProd);
   } else {
-    builder.create<func::ReturnOp>(loc);
+    func::ReturnOp::create(builder, loc);
   }
 
   for (auto [oldBlock, newBlock] : oldToNew) {
     // Sink Logic: Terminate
     if (oldBlock == rawGraph.sinkBB) {
       builder.setInsertionPointToEnd(newBlock);
-      builder.create<func::ReturnOp>(loc);
+      func::ReturnOp::create(builder, loc);
       continue;
     }
 
@@ -1637,10 +1639,10 @@ ftd::buildDecisionGraph(const ftd::LocalCFG &rawGraph,
       // We replicate this connection in the new graph.
       Block *newSink = newL->sinkBB;
       if (newSink) {
-        builder.create<cf::BranchOp>(loc, newSink);
+        cf::BranchOp::create(builder, loc, newSink);
       } else {
         // Should not happen if Sink is in nodeSet
-        builder.create<func::ReturnOp>(loc);
+        func::ReturnOp::create(builder, loc);
       }
       continue;
     }
@@ -1678,8 +1680,8 @@ ftd::buildDecisionGraph(const ftd::LocalCFG &rawGraph,
         }
       }
 
-      Value cond = builder.create<arith::ConstantIntOp>(loc, 1, 1);
-      builder.create<cf::CondBranchOp>(loc, cond, newTrue, newFalse);
+      Value cond = arith::ConstantIntOp::create(builder, loc, 1, 1);
+      cf::CondBranchOp::create(builder, loc, cond, newTrue, newFalse);
     } else {
       // Non-CondBranch nodes in the decision set (rare)
       // Wire to nearest valid successor or Sink
@@ -1687,7 +1689,7 @@ ftd::buildDecisionGraph(const ftd::LocalCFG &rawGraph,
       Block *newTarget = oldToNew.lookup(oldTarget);
       if (!newTarget)
         newTarget = newL->sinkBB;
-      builder.create<cf::BranchOp>(loc, newTarget);
+      cf::BranchOp::create(builder, loc, newTarget);
     }
   }
 
@@ -1883,15 +1885,16 @@ Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
       Value dpCond =
           expressionToCircuit(builder, fSupDP, rankDP, insertBlock,
                               levelRegistry, bi, pendingMuxOperands, shadow);
-      auto dpBranch = builder.create<handshake::ConditionalBranchOp>(
-          loc, ftd::getListTypes(branchCond.getType()), dpCond, branchCond);
+      auto dpBranch = handshake::ConditionalBranchOp::create(
+          builder, loc, ftd::getListTypes(branchCond.getType()), dpCond,
+          branchCond);
       dpBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
       setBBAttr(dpBranch, insertBlock, builder);
       branchCond = dpBranch.getFalseResult();
     }
 
-    auto branchOp = builder.create<handshake::ConditionalBranchOp>(
-        loc, ftd::getListTypes(currentValue.getType()), branchCond,
+    auto branchOp = handshake::ConditionalBranchOp::create(
+        builder, loc, ftd::getListTypes(currentValue.getType()), branchCond,
         currentValue);
     branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
     setBBAttr(branchOp, insertBlock, builder);
@@ -2351,18 +2354,18 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
     // every execution by holding the suppress branch's select permanently true.
     if (locGraph->newCons == locGraph->sinkBB) {
       builder.setInsertionPointToStart(consumer->getBlock());
-      auto src = builder.create<handshake::SourceOp>(consumer->getLoc());
+      auto src = handshake::SourceOp::create(builder, consumer->getLoc());
       src->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
       src->setAttr("handshake.bb", targetBBAttr);
       auto cstAttr = builder.getIntegerAttr(builder.getIntegerType(1), 1);
-      auto constOp = builder.create<handshake::ConstantOp>(
-          consumer->getLoc(), cstAttr, src.getResult());
+      auto constOp = handshake::ConstantOp::create(builder, consumer->getLoc(),
+                                                   cstAttr, src.getResult());
       constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
       constOp->setAttr("handshake.bb", targetBBAttr);
 
       Value supData = connection;
-      auto branchOp = builder.create<handshake::ConditionalBranchOp>(
-          consumer->getLoc(), ftd::getListTypes(supData.getType()),
+      auto branchOp = handshake::ConditionalBranchOp::create(
+          builder, consumer->getLoc(), ftd::getListTypes(supData.getType()),
           constOp.getResult(), supData);
       branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
       branchOp->setAttr("handshake.bb", targetBBAttr);
@@ -2668,9 +2671,9 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
               Value lfCond = expressionToCircuit(builder, lfSup, lfRank,
                                                  producerIRBlock, registry, bi,
                                                  nullptr, &shadow, prodBBAttr);
-              auto lfBranch = builder.create<handshake::ConditionalBranchOp>(
-                  consumer->getLoc(), ftd::getListTypes(supData.getType()),
-                  lfCond, supData);
+              auto lfBranch = handshake::ConditionalBranchOp::create(
+                  builder, consumer->getLoc(),
+                  ftd::getListTypes(supData.getType()), lfCond, supData);
               lfBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
               lfBranch->setAttr("handshake.bb", prodBBAttr);
               // Pass the token through only when the node is reached.
@@ -2723,8 +2726,8 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
     // result drops those activations, leaving branchCond paired one-to-one with
     // the producer tokens before it drives the suppress branch below.
     if (dpBranchCond) {
-      auto dpBranchOp = builder.create<handshake::ConditionalBranchOp>(
-          consumer->getLoc(), ftd::getListTypes(branchCond.getType()),
+      auto dpBranchOp = handshake::ConditionalBranchOp::create(
+          builder, consumer->getLoc(), ftd::getListTypes(branchCond.getType()),
           dpBranchCond, branchCond);
       dpBranchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
       dpBranchOp->setAttr("handshake.bb", targetBBAttr);
@@ -2733,9 +2736,9 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
 
     // Suppress branch: discard the producer token whenever branchCond holds;
     // the consumer keeps it only via the false result.
-    auto branchOp = builder.create<handshake::ConditionalBranchOp>(
-        consumer->getLoc(), ftd::getListTypes(supData.getType()), branchCond,
-        supData);
+    auto branchOp = handshake::ConditionalBranchOp::create(
+        builder, consumer->getLoc(), ftd::getListTypes(supData.getType()),
+        branchCond, supData);
     branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
     branchOp->setAttr("handshake.bb", targetBBAttr);
     supData = branchOp.getFalseResult();
@@ -2750,14 +2753,15 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
       if (llvm::isa<handshake::MuxOp>(consumer) &&
           consumer->getOperand(0) == connection &&
           use.getOperandNumber() != 0) {
-        auto src = builder.create<handshake::SourceOp>(consumer->getLoc());
+        auto src = handshake::SourceOp::create(builder, consumer->getLoc());
         setBBAttrWithFallback(src, targetBBAttr, producerIRBlock, builder);
         auto innerType =
             cast<handshake::ChannelType>(connection.getType()).getDataType();
         auto attr =
             builder.getIntegerAttr(innerType, (use.getOperandNumber() == 2));
-        auto cst = builder.create<handshake::ConstantOp>(
-            consumer->getLoc(), connection.getType(), attr, src.getResult());
+        auto cst = handshake::ConstantOp::create(builder, consumer->getLoc(),
+                                                 connection.getType(), attr,
+                                                 src.getResult());
         cst->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
         setBBAttrWithFallback(cst, targetBBAttr, producerIRBlock, builder);
         use.set(cst.getResult());

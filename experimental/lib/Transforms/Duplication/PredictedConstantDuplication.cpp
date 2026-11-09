@@ -643,13 +643,15 @@ void PredictedConstantDuplicationPass::runOnOperation() {
       // the type is automatically saved in the attribute
       // it will deduct on its own whether it should use 64bit or 32bit numbers
       if (auto floatAttr = llvm::dyn_cast<mlir::FloatAttr>(attr)) {
-        constantComp = builder.create<mlir::arith::ConstantOp>(loc, floatAttr);
-        branchCond = builder.create<mlir::arith::CmpFOp>(
-            loc, mlir::arith::CmpFPredicate::OEQ, predictInput, constantComp);
+        constantComp = mlir::arith::ConstantOp::create(builder, loc, floatAttr);
+        branchCond = mlir::arith::CmpFOp::create(
+            builder, loc, mlir::arith::CmpFPredicate::OEQ, predictInput,
+            constantComp);
       } else if (auto intAttr = llvm::dyn_cast<mlir::IntegerAttr>(attr)) {
-        constantComp = builder.create<mlir::arith::ConstantOp>(loc, intAttr);
-        branchCond = builder.create<mlir::arith::CmpIOp>(
-            loc, mlir::arith::CmpIPredicate::eq, predictInput, constantComp);
+        constantComp = mlir::arith::ConstantOp::create(builder, loc, intAttr);
+        branchCond = mlir::arith::CmpIOp::create(builder, loc,
+                                                 mlir::arith::CmpIPredicate::eq,
+                                                 predictInput, constantComp);
       } else {
         return signalPassFailure();
       }
@@ -663,8 +665,8 @@ void PredictedConstantDuplicationPass::runOnOperation() {
       trueBlocksSet.insert(trueEntryBlock);
       trueBlocksSet.insert(nextElseBlock);
 
-      builder.create<mlir::cf::CondBranchOp>(loc, branchCond, trueEntryBlock,
-                                             nextElseBlock);
+      mlir::cf::CondBranchOp::create(builder, loc, branchCond, trueEntryBlock,
+                                     nextElseBlock);
 
       // move the new blocks to right after targetBlock
       auto &blockList = funcOp.getBody().getBlocks();
@@ -762,8 +764,8 @@ void PredictedConstantDuplicationPass::runOnOperation() {
 
           // branch back to the original block, passing only its specific
           // exit arguments
-          builder.create<mlir::cf::BranchOp>(loc, origBlock,
-                                             trueBranchOperands);
+          mlir::cf::BranchOp::create(builder, loc, origBlock,
+                                     trueBranchOperands);
         }
       }
 
@@ -833,7 +835,7 @@ void PredictedConstantDuplicationPass::runOnOperation() {
       for (Value origOut : dupRegionOutputs.lookup(origTermBlock)) {
         fallbackOperands.push_back(origOut);
       }
-      builder.create<mlir::cf::BranchOp>(loc, origTermBlock, fallbackOperands);
+      mlir::cf::BranchOp::create(builder, loc, origTermBlock, fallbackOperands);
 
       // Position it neatly right before the remainder block
       auto &blockList = funcOp.getBody().getBlocks();

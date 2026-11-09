@@ -236,7 +236,7 @@ LogicalResult AndInverterOp::canonicalize(AndInverterOp op,
     return failure();
 
   if (!constValue.isAllOnes()) {
-    auto constOp = rewriter.create<hw::ConstantOp>(op.getLoc(), constValue);
+    auto constOp = hw::ConstantOp::create(rewriter, op.getLoc(), constValue);
     uniqueInverts.push_back(false);
     uniqueValues.push_back(constOp);
   }
@@ -279,13 +279,13 @@ static Value lowerVariadicAndInverterOp(AndInverterOp op, OperandRange operands,
     break;
   case 1:
     if (inverts[0])
-      return rewriter.create<synth::AndInverterOp>(op.getLoc(), operands[0],
-                                                   true);
+      return synth::AndInverterOp::create(rewriter, op.getLoc(), operands[0],
+                                          true);
     else
       return operands[0];
   case 2:
-    return rewriter.create<synth::AndInverterOp>(
-        op.getLoc(), operands[0], operands[1], inverts[0], inverts[1]);
+    return synth::AndInverterOp::create(rewriter, op.getLoc(), operands[0],
+                                        operands[1], inverts[0], inverts[1]);
   default:
     auto firstHalf = operands.size() / 2;
     auto lhs =
@@ -294,7 +294,7 @@ static Value lowerVariadicAndInverterOp(AndInverterOp op, OperandRange operands,
     auto rhs =
         lowerVariadicAndInverterOp(op, operands.drop_front(firstHalf),
                                    inverts.drop_front(firstHalf), rewriter);
-    return rewriter.create<synth::AndInverterOp>(op.getLoc(), lhs, rhs);
+    return synth::AndInverterOp::create(rewriter, op.getLoc(), lhs, rhs);
   }
   return Value();
 }

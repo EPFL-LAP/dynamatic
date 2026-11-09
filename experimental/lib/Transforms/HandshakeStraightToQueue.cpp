@@ -312,8 +312,8 @@ ensureLazyForkOutputCount(Block *bb, Value input, unsigned numResults,
   auto it = forksGraph.find(bb);
   if (it == forksGraph.end()) {
     rewriter.setInsertionPointToStart(bb);
-    auto forkOp = rewriter.create<handshake::LazyForkOp>(bb->front().getLoc(),
-                                                         input, numResults);
+    auto forkOp = handshake::LazyForkOp::create(rewriter, bb->front().getLoc(),
+                                                input, numResults);
     forksGraph[bb] = forkOp;
     return forkOp;
   }
@@ -323,8 +323,8 @@ ensureLazyForkOutputCount(Block *bb, Value input, unsigned numResults,
     return oldFork;
 
   rewriter.setInsertionPoint(oldFork);
-  auto newFork = rewriter.create<handshake::LazyForkOp>(
-      oldFork.getLoc(), oldFork.getOperand(), numResults);
+  auto newFork = handshake::LazyForkOp::create(
+      rewriter, oldFork.getLoc(), oldFork.getOperand(), numResults);
   newFork->setAttrs(oldFork->getAttrs());
 
   for (unsigned idx = 0, e = oldFork->getNumResults(); idx < e; ++idx)
@@ -596,7 +596,7 @@ static ftd::ShadowCFG buildShadowFromCapturedTopology(
     builder.setInsertionPointAfter(funcOp);
     auto funcType = builder.getFunctionType({}, {});
     shadow.shadowFunc =
-        builder.create<func::FuncOp>(loc, "__ftd_shadow_cfg__", funcType);
+        func::FuncOp::create(builder, loc, "__ftd_shadow_cfg__", funcType);
 
     Region &R = shadow.shadowFunc.getBody();
     SmallVector<Block *> blocks;
@@ -609,14 +609,14 @@ static ftd::ShadowCFG buildShadowFromCapturedTopology(
 
       if (edge.isConditional) {
         auto dummyCond =
-            builder.create<arith::ConstantOp>(loc, builder.getBoolAttr(true));
-        builder.create<cf::CondBranchOp>(
-            loc, dummyCond, blocks[edge.trueSuccIdx], ValueRange{},
-            blocks[edge.falseSuccIdx], ValueRange{});
+            arith::ConstantOp::create(builder, loc, builder.getBoolAttr(true));
+        cf::CondBranchOp::create(builder, loc, dummyCond,
+                                 blocks[edge.trueSuccIdx], ValueRange{},
+                                 blocks[edge.falseSuccIdx], ValueRange{});
       } else if (edge.hasSuccessors) {
-        builder.create<cf::BranchOp>(loc, blocks[edge.uncondSuccIdx]);
+        cf::BranchOp::create(builder, loc, blocks[edge.uncondSuccIdx]);
       } else {
-        builder.create<func::ReturnOp>(loc);
+        func::ReturnOp::create(builder, loc);
       }
     }
   }

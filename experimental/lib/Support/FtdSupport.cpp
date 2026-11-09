@@ -355,13 +355,13 @@ Value ftd::getOrCreateCondPlaceholder(Block *condBlock, OpBuilder &builder) {
   // both ops carry FTD_OP_TO_SKIP so the FTD passes leave them alone.
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(condBlock);
-  auto sourceOp = builder.create<handshake::SourceOp>(builder.getUnknownLoc());
+  auto sourceOp = handshake::SourceOp::create(builder, builder.getUnknownLoc());
   sourceOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
   setBBAttr(sourceOp, condBlock, builder);
 
   auto cstAttr = builder.getIntegerAttr(builder.getIntegerType(1), 0);
-  auto constOp = builder.create<handshake::ConstantOp>(
-      builder.getUnknownLoc(), cstAttr, sourceOp.getResult());
+  auto constOp = handshake::ConstantOp::create(builder, builder.getUnknownLoc(),
+                                               cstAttr, sourceOp.getResult());
   constOp->setAttr(FTD_COND_VAR, builder.getUnitAttr());
   constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
   setBBAttr(constOp, condBlock, builder);

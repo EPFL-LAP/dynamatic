@@ -73,10 +73,11 @@ xls::SprocOp createSprocSkeleton(ImplicitLocOpBuilder &builder,
 
   OpBuilder::InsertionGuard guard(builder);
 
-  auto sproc = builder.create<xls::SprocOp>(
-      StringRef(name), /*sym_visibility=*/StringAttr(), /*is_top=*/false,
-      /*boundary_channels=*/ArrayAttr(),
-      /*min_pipeline_stages=*/IntegerAttr());
+  auto sproc =
+      xls::SprocOp::create(builder, StringRef(name),
+                           /*sym_visibility=*/StringAttr(), /*is_top=*/false,
+                           /*boundary_channels=*/ArrayAttr(),
+                           /*min_pipeline_stages=*/IntegerAttr());
 
   Block &spawns = sproc.getSpawns().emplaceBlock();
   Block &next = sproc.getNext().emplaceBlock();
@@ -93,15 +94,15 @@ xls::SprocOp createSprocSkeleton(ImplicitLocOpBuilder &builder,
   }
 
   builder.setInsertionPointToEnd(&spawns);
-  builder.create<xls::YieldOp>(builder.getLoc(), spawns.getArguments());
+  xls::YieldOp::create(builder, builder.getLoc(), spawns.getArguments());
   builder.setInsertionPointToEnd(&next);
-  builder.create<xls::YieldOp>(builder.getLoc());
+  xls::YieldOp::create(builder, builder.getLoc());
   return sproc;
 }
 
 xls::AfterAllOp createAfterAll(OpBuilder builder, ValueRange ts) {
-  return builder.create<xls::AfterAllOp>(
-      builder.getUnknownLoc(), xls::TokenType::get(builder.getContext()), ts);
+  return xls::AfterAllOp::create(builder, builder.getUnknownLoc(),
+                                 xls::TokenType::get(builder.getContext()), ts);
 }
 
 xls::AfterAllOp createAfterAll(OpBuilder builder, Value t1, Value t2) {
@@ -168,11 +169,11 @@ void NopProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
-  auto rxOp = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs.front());
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
+  auto rxOp = xls::SBlockingReceiveOp::create(b, tok0, nextArgs.front());
   auto rxVal = rxOp.getResult();
   auto tok1 = rxOp.getTknOut();
-  b.create<xls::SSendOp>(tok1, rxVal, nextArgs.back());
+  xls::SSendOp::create(b, tok1, rxVal, nextArgs.back());
 }
 
 //===----------------------------------------------------------------------===//
@@ -211,13 +212,13 @@ void ForkProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
   auto rxOp =
-      b.create<xls::SBlockingReceiveOp>(tok0, nextArgs.front() /* inp */);
+      xls::SBlockingReceiveOp::create(b, tok0, nextArgs.front() /* inp */);
   auto rxVal = rxOp.getResult();
   auto tok1 = rxOp.getTknOut();
   for (unsigned int i = 0; i < fanout; i++) {
-    b.create<xls::SSendOp>(tok1, rxVal, nextArgs[1 + i] /* i-th output */);
+    xls::SSendOp::create(b, tok1, rxVal, nextArgs[1 + i] /* i-th output */);
   }
 }
 
@@ -265,10 +266,10 @@ void JoinProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
 
-  auto trueLit = b.create<mlir::xls::ConstantScalarOp>(
-      b.getI1Type(), b.getIntegerAttr(b.getI1Type(), 1));
+  auto trueLit = mlir::xls::ConstantScalarOp::create(
+      b, b.getI1Type(), b.getIntegerAttr(b.getI1Type(), 1));
 
   // For each input, we generate a non-blocking receive operation that
   // attempts to grab an input if available, feeding a send operation
@@ -279,24 +280,24 @@ void JoinProc::build(OpBuilder builder) const {
   // invocation.
 
   // Create first non-blocking receive/send pair:
-  auto rxOp = b.create<xls::SNonblockingReceiveOp>(
-      typeToken, typeCtrl, typeBool, tok0, nextArgs[0] /* 0-th input */,
+  auto rxOp = xls::SNonblockingReceiveOp::create(
+      b, typeToken, typeCtrl, typeBool, tok0, nextArgs[0] /* 0-th input */,
       /*predicate=*/trueLit);
-  b.create<xls::SSendOp>(rxOp.getTknOut(), rxOp.getResult(),
-                         nextArgs.back() /* output */, rxOp.getValid());
+  xls::SSendOp::create(b, rxOp.getTknOut(), rxOp.getResult(),
+                       nextArgs.back() /* output */, rxOp.getValid());
 
   for (unsigned int i = 1; i < numDataOperands; i++) {
-    auto prevRxNotValid = b.create<xls::NotOp>(rxOp.getValid()).getResult();
+    auto prevRxNotValid = xls::NotOp::create(b, rxOp.getValid()).getResult();
     auto allPrevRxNotValid =
-        b.create<xls::AndOp>(prevRxNotValid, rxOp.getPredicate()).getResult();
+        xls::AndOp::create(b, prevRxNotValid, rxOp.getPredicate()).getResult();
 
-    rxOp = b.create<xls::SNonblockingReceiveOp>(
-        typeToken, typeCtrl, typeBool, rxOp.getTknOut(),
-        nextArgs[i] /* i-th input */,
-        /*predicate=*/allPrevRxNotValid);
+    rxOp = xls::SNonblockingReceiveOp::create(b, typeToken, typeCtrl, typeBool,
+                                              rxOp.getTknOut(),
+                                              nextArgs[i] /* i-th input */,
+                                              /*predicate=*/allPrevRxNotValid);
 
-    b.create<xls::SSendOp>(rxOp.getTknOut(), rxOp.getResult(),
-                           nextArgs.back() /* output */, rxOp.getValid());
+    xls::SSendOp::create(b, rxOp.getTknOut(), rxOp.getResult(),
+                         nextArgs.back() /* output */, rxOp.getValid());
   }
 }
 
@@ -343,10 +344,10 @@ void SelectProc::build(OpBuilder builder) const {
   // This select implementation always consume tokens from all input channels
   // simultaneously and forwards one of the data inputs to the outputs depending
   // on the value received at the control input
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
-  auto rxSel = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[0]);
-  auto rxTrueVal = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[1]);
-  auto rxFalseVal = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[2]);
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
+  auto rxSel = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[0]);
+  auto rxTrueVal = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[1]);
+  auto rxFalseVal = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[2]);
 
   auto tokResult = createAfterAll(b, rxSel.getTknOut(), rxTrueVal.getTknOut(),
                                   rxFalseVal.getTknOut())
@@ -355,10 +356,10 @@ void SelectProc::build(OpBuilder builder) const {
   // Select the result:
   llvm::SmallVector<Value> operands = {rxFalseVal.getResult(),
                                        rxTrueVal.getResult()};
-  auto selOp = b.create<xls::SelOp>(typeVal, rxSel.getResult(), operands);
+  auto selOp = xls::SelOp::create(b, typeVal, rxSel.getResult(), operands);
 
   // Send the result:
-  b.create<xls::SSendOp>(tokResult, selOp.getResult(), nextArgs[3]);
+  xls::SSendOp::create(b, tokResult, selOp.getResult(), nextArgs[3]);
 }
 
 std::shared_ptr<HandshakeProc> SelectProc::get(SelectOp op) {
@@ -412,24 +413,24 @@ void MuxProc::build(OpBuilder builder) const {
   b.setInsertionPointToStart(next);
 
   // Receive the selector:
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
-  auto rxSel = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[0]);
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
+  auto rxSel = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[0]);
 
   // For each possible input, check if it was selected and perform a conditional
   // receive + send:
   for (unsigned int i = 0; i < numDataOperands; i++) {
-    auto idxLit = b.create<mlir::xls::ConstantScalarOp>(
-        typeSelect, builder.getIntegerAttr(typeSelectUnsigned, i));
+    auto idxLit = mlir::xls::ConstantScalarOp::create(
+        b, typeSelect, builder.getIntegerAttr(typeSelectUnsigned, i));
 
     auto isSelected =
-        b.create<mlir::xls::EqOp>(rxSel.getResult(), idxLit.getResult());
+        mlir::xls::EqOp::create(b, rxSel.getResult(), idxLit.getResult());
 
-    auto rxVal = b.create<xls::SBlockingReceiveOp>(
-        typeToken, typeVal, tok0, nextArgs[i + 1] /* i-th input channel*/,
+    auto rxVal = xls::SBlockingReceiveOp::create(
+        b, typeToken, typeVal, tok0, nextArgs[i + 1] /* i-th input channel*/,
         isSelected);
 
-    b.create<xls::SSendOp>(rxVal.getTknOut(), rxVal.getResult(),
-                           nextArgs.back(), isSelected.getResult());
+    xls::SSendOp::create(b, rxVal.getTknOut(), rxVal.getResult(),
+                         nextArgs.back(), isSelected.getResult());
   }
 }
 
@@ -485,10 +486,10 @@ void CMergeProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
 
-  auto trueLit = b.create<mlir::xls::ConstantScalarOp>(
-      b.getI1Type(), b.getIntegerAttr(b.getI1Type(), 1));
+  auto trueLit = mlir::xls::ConstantScalarOp::create(
+      b, b.getI1Type(), b.getIntegerAttr(b.getI1Type(), 1));
 
   // For each input, we generate a non-blocking receive operation that
   // attempts to grab an input if available. This feeds two send operation
@@ -500,37 +501,36 @@ void CMergeProc::build(OpBuilder builder) const {
   // invocation.
 
   // Create first non-blocking receive/send pair:
-  auto rxOp = b.create<xls::SNonblockingReceiveOp>(
-      typeToken, typeVal, typeBool, tok0, nextArgs[0] /* 0-th input */,
+  auto rxOp = xls::SNonblockingReceiveOp::create(
+      b, typeToken, typeVal, typeBool, tok0, nextArgs[0] /* 0-th input */,
       /*predicate=*/trueLit);
 
-  auto idxLit = b.create<mlir::xls::ConstantScalarOp>(
-      typeIdx, builder.getIntegerAttr(typeIdx, 0));
+  auto idxLit = mlir::xls::ConstantScalarOp::create(
+      b, typeIdx, builder.getIntegerAttr(typeIdx, 0));
 
-  b.create<xls::SSendOp>(rxOp.getTknOut(), rxOp.getResult(),
-                         nextArgs[numDataOperands] /* out */, rxOp.getValid());
-  b.create<xls::SSendOp>(rxOp.getTknOut(), idxLit.getResult(),
-                         nextArgs[numDataOperands + 1] /* out_idx */,
-                         rxOp.getValid());
+  xls::SSendOp::create(b, rxOp.getTknOut(), rxOp.getResult(),
+                       nextArgs[numDataOperands] /* out */, rxOp.getValid());
+  xls::SSendOp::create(b, rxOp.getTknOut(), idxLit.getResult(),
+                       nextArgs[numDataOperands + 1] /* out_idx */,
+                       rxOp.getValid());
 
   for (unsigned int i = 0; i < numDataOperands; i++) {
 
-    auto prevRxNotValid = b.create<xls::NotOp>(rxOp.getValid()).getResult();
+    auto prevRxNotValid = xls::NotOp::create(b, rxOp.getValid()).getResult();
     auto allPrevRxNotValid =
-        b.create<xls::AndOp>(prevRxNotValid, rxOp.getPredicate()).getResult();
+        xls::AndOp::create(b, prevRxNotValid, rxOp.getPredicate()).getResult();
 
-    rxOp = b.create<xls::SNonblockingReceiveOp>(
-        typeToken, typeVal, typeBool, tok0, nextArgs[i], allPrevRxNotValid);
+    rxOp = xls::SNonblockingReceiveOp::create(
+        b, typeToken, typeVal, typeBool, tok0, nextArgs[i], allPrevRxNotValid);
 
-    idxLit = b.create<mlir::xls::ConstantScalarOp>(
-        typeIdx, builder.getIntegerAttr(typeIdx, i));
+    idxLit = mlir::xls::ConstantScalarOp::create(
+        b, typeIdx, builder.getIntegerAttr(typeIdx, i));
 
-    b.create<xls::SSendOp>(rxOp.getTknOut(), rxOp.getResult(),
-                           nextArgs[numDataOperands] /* out */,
-                           rxOp.getValid());
-    b.create<xls::SSendOp>(rxOp.getTknOut(), idxLit.getResult(),
-                           nextArgs[numDataOperands + 1] /* out_idx */,
-                           rxOp.getValid());
+    xls::SSendOp::create(b, rxOp.getTknOut(), rxOp.getResult(),
+                         nextArgs[numDataOperands] /* out */, rxOp.getValid());
+    xls::SSendOp::create(b, rxOp.getTknOut(), idxLit.getResult(),
+                         nextArgs[numDataOperands + 1] /* out_idx */,
+                         rxOp.getValid());
   }
 }
 
@@ -577,20 +577,20 @@ void CBranchProc::build(OpBuilder builder) const {
   b.setInsertionPointToStart(next);
 
   // Receive the selector and input:
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
-  auto rxSel = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[0]);
-  auto rxVal = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[1]);
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
+  auto rxSel = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[0]);
+  auto rxVal = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[1]);
 
   auto tokResult =
       createAfterAll(b, rxSel.getTknOut(), rxVal.getTknOut()).getResult();
 
-  auto notSel = b.create<xls::NotOp>(rxSel.getResult());
+  auto notSel = xls::NotOp::create(b, rxSel.getResult());
 
   // Two conditional sends:
-  b.create<xls::SSendOp>(tokResult, rxVal.getResult(), nextArgs[2],
-                         rxSel.getResult());
-  b.create<xls::SSendOp>(tokResult, rxVal.getResult(), nextArgs[3],
-                         notSel.getResult());
+  xls::SSendOp::create(b, tokResult, rxVal.getResult(), nextArgs[2],
+                       rxSel.getResult());
+  xls::SSendOp::create(b, tokResult, rxVal.getResult(), nextArgs[3],
+                       notSel.getResult());
 }
 
 std::shared_ptr<HandshakeProc> CBranchProc::get(ConditionalBranchOp op) {
@@ -624,11 +624,11 @@ void SourceProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
   // handshake-only (dataless)
   auto lit =
-      b.create<xls::ConstantScalarOp>(b.getIntegerType(0), 0).getResult();
-  b.create<xls::SSendOp>(tok0, lit, nextArgs.front());
+      xls::ConstantScalarOp::create(b, b.getIntegerType(0), 0).getResult();
+  xls::SSendOp::create(b, tok0, lit, nextArgs.front());
 }
 
 std::shared_ptr<HandshakeProc> SourceProc::get(SourceOp op) {
@@ -673,10 +673,10 @@ void ConstantProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
-  auto tok1 = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[0]).getTknOut();
-  auto lit = b.create<xls::ConstantScalarOp>(type, valueAttr).getResult();
-  b.create<xls::SSendOp>(tok1, lit, nextArgs[1]);
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
+  auto tok1 = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[0]).getTknOut();
+  auto lit = xls::ConstantScalarOp::create(b, type, valueAttr).getResult();
+  xls::SSendOp::create(b, tok1, lit, nextArgs[1]);
 }
 
 std::shared_ptr<HandshakeProc> ConstantProc::get(ConstantOp op) {
@@ -724,8 +724,8 @@ void SinkProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
-  b.create<xls::SBlockingReceiveOp>(tok0, nextArgs.front());
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
+  xls::SBlockingReceiveOp::create(b, tok0, nextArgs.front());
 }
 
 std::shared_ptr<HandshakeProc> SinkProc::get(SinkOp op) {
@@ -800,32 +800,32 @@ void BinaryIOpProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
-  auto rx1 = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[0]);
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
+  auto rx1 = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[0]);
   auto lhs = rx1.getResult();
-  auto rx2 = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[1]);
+  auto rx2 = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[1]);
   auto rhs = rx2.getResult();
 
   Value result;
   // clang-format off
   switch (kind) {
-  case BinaryIOpKind::ADDI: { result = b.create<xls::AddOp>(lhs, rhs).getResult(); break; }
-  case BinaryIOpKind::ANDI: { result = b.create<xls::AndOp>(lhs, rhs).getResult(); break; }
-  case BinaryIOpKind::DIVSI: { result = b.create<xls::SdivOp>(lhs, rhs).getResult(); break; }
-  case BinaryIOpKind::DIVUI: { result = b.create<xls::UdivOp>(lhs, rhs).getResult(); break; }
-  case BinaryIOpKind::MULI: { result = b.create<xls::SmulOp>(lhs.getType(), lhs, rhs).getResult(); break; }
-  case BinaryIOpKind::ORI: { result = b.create<xls::OrOp>(lhs, rhs).getResult(); break; }
-  case BinaryIOpKind::XORI: { result = b.create<xls::XorOp>(lhs, rhs).getResult(); break; }
-  case BinaryIOpKind::SHLI: { result = b.create<xls::ShllOp>(lhs, rhs).getResult(); break; }
-  case BinaryIOpKind::SHRSI: { result = b.create<xls::ShraOp>(lhs, rhs).getResult(); break; }
-  case BinaryIOpKind::SHRUI: { result = b.create<xls::ShrlOp>(lhs, rhs).getResult(); break; }
-  case BinaryIOpKind::SUBI: { result = b.create<xls::SubOp>(lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::ADDI: { result = xls::AddOp::create(b, lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::ANDI: { result = xls::AndOp::create(b, lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::DIVSI: { result = xls::SdivOp::create(b, lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::DIVUI: { result = xls::UdivOp::create(b, lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::MULI: { result = xls::SmulOp::create(b, lhs.getType(), lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::ORI: { result = xls::OrOp::create(b, lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::XORI: { result = xls::XorOp::create(b, lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::SHLI: { result = xls::ShllOp::create(b, lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::SHRSI: { result = xls::ShraOp::create(b, lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::SHRUI: { result = xls::ShrlOp::create(b, lhs, rhs).getResult(); break; }
+  case BinaryIOpKind::SUBI: { result = xls::SubOp::create(b, lhs, rhs).getResult(); break; }
   }
   // clang-format on
 
   auto tokJoin =
       createAfterAll(b, rx1.getTknOut(), rx2.getTknOut()).getResult();
-  b.create<xls::SSendOp>(tokJoin, result, nextArgs[2]);
+  xls::SSendOp::create(b, tokJoin, result, nextArgs[2]);
 }
 
 std::shared_ptr<HandshakeProc> BinaryIOpProc::get(Operation *op) {
@@ -885,14 +885,14 @@ void NotOpProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
-  auto rx1 = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[0]);
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
+  auto rx1 = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[0]);
   auto inp = rx1.getResult();
   auto tok1 = rx1.getTknOut();
 
-  Value result = b.create<xls::NotOp>(inp).getResult();
+  Value result = xls::NotOp::create(b, inp).getResult();
 
-  b.create<xls::SSendOp>(tok1, result, nextArgs[1]);
+  xls::SSendOp::create(b, tok1, result, nextArgs[1]);
 }
 
 std::shared_ptr<HandshakeProc> NotOpProc::get(NotIOp op) {
@@ -952,31 +952,31 @@ void CmpIProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
-  auto rx1 = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[0]);
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
+  auto rx1 = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[0]);
   auto lhs = rx1.getResult();
-  auto rx2 = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[1]);
+  auto rx2 = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[1]);
   auto rhs = rx2.getResult();
 
   Value result;
   // clang-format off
   switch (kind) {
-  case CmpIPredicate::eq: { result = b.create<xls::EqOp>(lhs, rhs).getResult(); break; }
-  case CmpIPredicate::ne: { result = b.create<xls::NeOp>(lhs, rhs).getResult(); break; }
-  case CmpIPredicate::slt: { result = b.create<xls::SltOp>(lhs, rhs).getResult(); break; }
-  case CmpIPredicate::sle: { result = b.create<xls::SleOp>(lhs, rhs).getResult(); break; }
-  case CmpIPredicate::sgt: { result = b.create<xls::SgtOp>(lhs, rhs).getResult(); break; }
-  case CmpIPredicate::sge: { result = b.create<xls::SgeOp>(lhs, rhs).getResult(); break; }
-  case CmpIPredicate::ult: { result = b.create<xls::UltOp>(lhs, rhs).getResult(); break; }
-  case CmpIPredicate::ule: { result = b.create<xls::UleOp>(lhs, rhs).getResult(); break; }
-  case CmpIPredicate::ugt: { result = b.create<xls::UgtOp>(lhs, rhs).getResult(); break; }
-  case CmpIPredicate::uge: { result = b.create<xls::UgeOp>(lhs, rhs).getResult(); break; }
+  case CmpIPredicate::eq: { result = xls::EqOp::create(b, lhs, rhs).getResult(); break; }
+  case CmpIPredicate::ne: { result = xls::NeOp::create(b, lhs, rhs).getResult(); break; }
+  case CmpIPredicate::slt: { result = xls::SltOp::create(b, lhs, rhs).getResult(); break; }
+  case CmpIPredicate::sle: { result = xls::SleOp::create(b, lhs, rhs).getResult(); break; }
+  case CmpIPredicate::sgt: { result = xls::SgtOp::create(b, lhs, rhs).getResult(); break; }
+  case CmpIPredicate::sge: { result = xls::SgeOp::create(b, lhs, rhs).getResult(); break; }
+  case CmpIPredicate::ult: { result = xls::UltOp::create(b, lhs, rhs).getResult(); break; }
+  case CmpIPredicate::ule: { result = xls::UleOp::create(b, lhs, rhs).getResult(); break; }
+  case CmpIPredicate::ugt: { result = xls::UgtOp::create(b, lhs, rhs).getResult(); break; }
+  case CmpIPredicate::uge: { result = xls::UgeOp::create(b, lhs, rhs).getResult(); break; }
   }
   // clang-format on
 
   auto tokJoin =
       createAfterAll(b, rx1.getTknOut(), rx2.getTknOut()).getResult();
-  b.create<xls::SSendOp>(tokJoin, result, nextArgs[2]);
+  xls::SSendOp::create(b, tokJoin, result, nextArgs[2]);
 }
 
 std::shared_ptr<HandshakeProc> CmpIProc::get(CmpIOp op) {
@@ -1034,8 +1034,8 @@ void IntCastProc::build(OpBuilder builder) const {
   Block *next = &sproc.getNext().getBlocks().front();
   b.setInsertionPointToStart(next);
 
-  auto tok0 = b.create<xls::AfterAllOp>().getResult();
-  auto rxOp = b.create<xls::SBlockingReceiveOp>(tok0, nextArgs[0]);
+  auto tok0 = xls::AfterAllOp::create(b).getResult();
+  auto rxOp = xls::SBlockingReceiveOp::create(b, tok0, nextArgs[0]);
 
   Value in = rxOp.getResult();
 
@@ -1043,10 +1043,10 @@ void IntCastProc::build(OpBuilder builder) const {
 
   // clang-format off
   switch (kind) {
-    case IntCastOpKind::EXTSI:  { result = b.create<xls::SignExtOp> (typeOut, in).getResult(); break;}
-    case IntCastOpKind::EXTSU:  { result = b.create<xls::ZeroExtOp> (typeOut, in).getResult(); break;}
+    case IntCastOpKind::EXTSI:  { result = xls::SignExtOp::create(b, typeOut, in).getResult(); break;}
+    case IntCastOpKind::EXTSU:  { result = xls::ZeroExtOp::create(b, typeOut, in).getResult(); break;}
     case IntCastOpKind::TRUNCI: { 
-      result = b.create<xls::BitSliceOp>(typeOut,
+      result = xls::BitSliceOp::create(b, typeOut,
                                          in,
                                          /*start=*/builder.getI64IntegerAttr(0),
                                          /*width=*/builder.getI64IntegerAttr(toWidth))
@@ -1055,7 +1055,7 @@ void IntCastProc::build(OpBuilder builder) const {
   }
   // clang-format on
 
-  b.create<xls::SSendOp>(rxOp.getTknOut(), result, nextArgs[1]);
+  xls::SSendOp::create(b, rxOp.getTknOut(), result, nextArgs[1]);
 }
 
 std::shared_ptr<HandshakeProc> IntCastProc::get(Operation *op) {
@@ -1218,7 +1218,8 @@ LogicalResult ConvertToXlsSpawn<T>::matchAndRewrite(
 
     llvm::SmallVector<Type> returnType = {outChanTy, inChanTy};
 
-    xls::SchanOp ch = rewriter.create<xls::SchanOp>( // TODO BROKEN BUILD
+    xls::SchanOp ch = xls::SchanOp::create(
+        rewriter, // TODO BROKEN BUILD
         op.getLoc(), returnType, "ssa", innerType,
         xls::FifoConfig::get(ctx, /*fifo_depth=*/0,
                              /*bypass=*/true,
@@ -1240,9 +1241,9 @@ LogicalResult ConvertToXlsSpawn<T>::matchAndRewrite(
   if (!proc)
     return failure();
 
-  rewriter.create<xls::SpawnOp>(op.getLoc(), ValueRange(channels),
-                                SymbolRefAttr::get(ctx, proc->name()),
-                                /*name_hint=*/nullptr);
+  xls::SpawnOp::create(rewriter, op.getLoc(), ValueRange(channels),
+                       SymbolRefAttr::get(ctx, proc->name()),
+                       /*name_hint=*/nullptr);
 
   rewriter.replaceOp(op, resultChannelReceivers);
   return success();
@@ -1295,17 +1296,17 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   }
 
   auto boundaryChsAttr = rewriter.getArrayAttr(ArrayRef(boundaryChs));
-  auto sproc = rewriter.create<xls::SprocOp>(
-      funcOp->getLoc(), name, /*sym_visibility=*/StringAttr(), /*is_top=*/true,
-      boundaryChsAttr, /*min_pipeline_stages=*/IntegerAttr());
+  auto sproc = xls::SprocOp::create(
+      rewriter, funcOp->getLoc(), name, /*sym_visibility=*/StringAttr(),
+      /*is_top=*/true, boundaryChsAttr, /*min_pipeline_stages=*/IntegerAttr());
 
   Block &spawns = sproc.getSpawns().emplaceBlock();
   Block &next = sproc.getNext().emplaceBlock();
 
   rewriter.setInsertionPointToEnd(&spawns);
-  rewriter.create<xls::YieldOp>(rewriter.getUnknownLoc());
+  xls::YieldOp::create(rewriter, rewriter.getUnknownLoc());
   rewriter.setInsertionPointToEnd(&next);
-  rewriter.create<xls::YieldOp>(rewriter.getUnknownLoc());
+  xls::YieldOp::create(rewriter, rewriter.getUnknownLoc());
 
   SmallVector<Value> inputs = {};
 
@@ -1377,8 +1378,8 @@ ConvertEnd::matchAndRewrite(handshake::EndOp endOp, OpAdaptor adaptor,
       auto ty = cast<xls::SchanType>(endVal.getType());
       auto nop = procMgr.getNopProc(getXlsChannelWidth(ty));
       SmallVector<Value> channels = {endVal, endArg};
-      rewriter.create<xls::SpawnOp>(
-          rewriter.getUnknownLoc(), ValueRange(channels),
+      xls::SpawnOp::create(
+          rewriter, rewriter.getUnknownLoc(), ValueRange(channels),
           SymbolRefAttr::get(rewriter.getContext(), nop->name()),
           /*name_hint=*/nullptr);
     }
