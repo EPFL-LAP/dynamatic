@@ -98,7 +98,7 @@ static void materializeValue(Value val, OpBuilder &builder) {
     return;
   if (val.use_empty()) {
     builder.setInsertionPointAfterValue(val);
-    builder.create<handshake::SinkOp>(val.getLoc(), val);
+    handshake::SinkOp::create(builder, val.getLoc(), val);
     return;
   }
   if (val.hasOneUse())
@@ -112,7 +112,7 @@ static void materializeValue(Value val, OpBuilder &builder) {
 
   // Insert a fork with as many results as the value has uses
   builder.setInsertionPointAfterValue(val);
-  auto forkOp = builder.create<handshake::ForkOp>(val.getLoc(), val, numUses);
+  auto forkOp = handshake::ForkOp::create(builder, val.getLoc(), val, numUses);
   if (Operation *defOp = val.getDefiningOp())
     inheritBB(defOp, forkOp);
 
@@ -174,8 +174,8 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
     }
 
     builder.setInsertionPoint(forkOp);
-    handshake::LazyForkOp lazyForkOp = builder.create<handshake::LazyForkOp>(
-        forkOp->getLoc(), forkOp.getOperand(), numLazyForkOutputs);
+    handshake::LazyForkOp lazyForkOp = handshake::LazyForkOp::create(
+        builder, forkOp->getLoc(), forkOp.getOperand(), numLazyForkOutputs);
     inheritBB(forkOp, lazyForkOp);
 
     // Replace the original fork's outputs that are part of the memory control
@@ -201,8 +201,8 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
           if (!lazyResults.contains(res))
             res.replaceAllUsesWith(lazyForkOp->getResults().back());
       } else {
-        handshake::ForkOp eagerForkOp = builder.create<handshake::ForkOp>(
-            forkOp->getLoc(), lazyForkOp->getResults().back(),
+        handshake::ForkOp eagerForkOp = handshake::ForkOp::create(
+            builder, forkOp->getLoc(), lazyForkOp->getResults().back(),
             numValuesWithoutLazyConstr);
         inheritBB(forkOp, eagerForkOp);
 
@@ -254,8 +254,9 @@ struct MinimizeForkSizes : OpRewritePattern<handshake::ForkOp> {
     if (!usedForkResults.empty()) {
       // Create a new fork operation
       rewriter.setInsertionPoint(forkOp);
-      handshake::ForkOp newForkOp = rewriter.create<handshake::ForkOp>(
-          forkOp.getLoc(), forkOp.getOperand(), usedForkResults.size());
+      handshake::ForkOp newForkOp = handshake::ForkOp::create(
+          rewriter, forkOp.getLoc(), forkOp.getOperand(),
+          usedForkResults.size());
       inheritBB(forkOp, newForkOp);
 
       // Replace results with actual uses of the original fork with results from
@@ -294,8 +295,8 @@ struct EliminateForksToForks : OpRewritePattern<handshake::ForkOp> {
     if (isForkOprdSingleUse)
       --totalNumResults;
     rewriter.setInsertionPoint(defForkOp);
-    handshake::ForkOp newForkOp = rewriter.create<handshake::ForkOp>(
-        defForkOp.getLoc(), defForkOp.getOperand(), totalNumResults);
+    handshake::ForkOp newForkOp = handshake::ForkOp::create(
+        rewriter, defForkOp.getLoc(), defForkOp.getOperand(), totalNumResults);
     inheritBB(defForkOp, newForkOp);
 
     // Replace the defining fork's results with the first results of the new
@@ -381,7 +382,7 @@ struct ReplicateSourceIntoConstant : OpRewritePattern<handshake::ForkOp> {
 
     for (auto res : forkOp.getResults()) {
       // Replicate the source -> constant network:
-      auto srcOp = rewriter.create<handshake::SourceOp>(forkOp.getLoc());
+      auto srcOp = handshake::SourceOp::create(rewriter, forkOp.getLoc());
       inheritBB(forkOp, srcOp);
       Value oprd = srcOp.getResult();
       for (auto *op : llvm::reverse(opsToReplicate)) {

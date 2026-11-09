@@ -94,11 +94,12 @@ void HandshakeSpecPostBufferPass::runOnOperation() {
 
       // place a new 1 slot break none buffer
       // which consumes the control signal
-      auto bufCtrl = builder.create<BufferOp>(
-          /*error message origin=*/commitOp.getLoc(),
-          /*input=*/ctrlInput,
-          /*numSlots=*/1,
-          /*type=*/BufferType::FIFO_BREAK_NONE);
+      auto bufCtrl =
+          BufferOp::create(builder,
+                           /*error message origin=*/commitOp.getLoc(),
+                           /*input=*/ctrlInput,
+                           /*numSlots=*/1,
+                           /*type=*/BufferType::FIFO_BREAK_NONE);
 
       // give it the right bb
       inheritBB(commitOp, bufCtrl);

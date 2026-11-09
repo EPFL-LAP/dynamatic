@@ -326,8 +326,8 @@ LogicalResult BlifImporter::populateHWModuleShell() {
       }
 
       // Create synth register operation
-      auto regOp = builder.create<synth::LatchOp>(
-          loc, builder.getIntegerType(1), inputSignal,
+      auto regOp = synth::LatchOp::create(
+          builder, loc, builder.getIntegerType(1), inputSignal,
           latchType.empty() ? nullptr : builder.getStringAttr(latchType),
           controlSignal,
           initVal.has_value() ? builder.getI64IntegerAttr(*initVal) : nullptr);
@@ -363,8 +363,8 @@ LogicalResult BlifImporter::populateHWModuleShell() {
           return failure();
         }
         // Create hw constant
-        auto constOp = builder.create<hw::ConstantOp>(
-            loc, builder.getIntegerType(1),
+        auto constOp = hw::ConstantOp::create(
+            builder, loc, builder.getIntegerType(1),
             builder.getIntegerAttr(builder.getIntegerType(1),
                                    function == "1" ? 1 : 0));
 
@@ -484,8 +484,8 @@ Value BlifImporter::getInputMappingSynthSignal(std::string nodeName) {
     return tmpValuesMap[nodeName];
   }
   // If not, create a temporary input signal (e.g., hw constant)
-  auto tempInput = builder.create<hw::ConstantOp>(
-      loc, builder.getIntegerType(1),
+  auto tempInput = hw::ConstantOp::create(
+      builder, loc, builder.getIntegerType(1),
       builder.getIntegerAttr(builder.getIntegerType(1), 0));
 
   // Add the temporary input signal to the map
@@ -543,8 +543,8 @@ void BlifImporter::createHWModuleShell() {
   // Module name
   StringAttr moduleNameAttr = builder.getStringAttr(moduleName);
   // Create a new hw module operation
-  hwModuleShell = builder.create<hw::HWModuleOp>(
-      loc, moduleNameAttr, ArrayRef<hw::PortInfo>(portInfos));
+  hwModuleShell = hw::HWModuleOp::create(builder, loc, moduleNameAttr,
+                                         ArrayRef<hw::PortInfo>(portInfos));
 
   // Collect the inputs of the hw module shell
   unsigned inputIndex = 0;
@@ -586,13 +586,13 @@ void BlifImporter::createSynthWire(Value inputValue, std::string outputPortName,
   // If this is not the case, we have to create a new aig node which inverts
   // the value of the input and receives one as another input Create constant
   // node 1
-  auto constOp = builder.create<hw::ConstantOp>(
-      loc, builder.getIntegerType(1),
+  auto constOp = hw::ConstantOp::create(
+      builder, loc, builder.getIntegerType(1),
       builder.getIntegerAttr(builder.getIntegerType(1), 1));
 
   // Create aig node
-  auto aigOp = builder.create<synth::AndInverterOp>(
-      loc, inputValue, constOp.getResult(),
+  auto aigOp = synth::AndInverterOp::create(
+      builder, loc, inputValue, constOp.getResult(),
       /*invertInput0=*/true, /*invertInput1=*/false);
 
   updateOutputSynthSignalMapping(aigOp.getResult(), outputPortName);
@@ -610,8 +610,8 @@ void BlifImporter::createSynthLogicGate(SmallVector<Value> inputValues,
   assert(builder.getInsertionBlock() && "Builder has no insertion block!");
 
   // Create aig node
-  auto aigOp = builder.create<synth::AndInverterOp>(
-      loc, inputValues[0], inputValues[1],
+  auto aigOp = synth::AndInverterOp::create(
+      builder, loc, inputValues[0], inputValues[1],
       /*invertInput0=*/invertInput0, /*invertInput1=*/invertInput1);
 
   Value outputValueAig = aigOp.getResult();
@@ -621,13 +621,13 @@ void BlifImporter::createSynthLogicGate(SmallVector<Value> inputValues,
   // inverting the first input
   if (outputBit == 0) {
     // Create constant node 1
-    auto constOp = builder.create<hw::ConstantOp>(
-        loc, builder.getIntegerType(1),
+    auto constOp = hw::ConstantOp::create(
+        builder, loc, builder.getIntegerType(1),
         builder.getIntegerAttr(builder.getIntegerType(1), 1));
 
     // Create aig node
-    auto aigOpInvertedOutput = builder.create<synth::AndInverterOp>(
-        loc, aigOp.getResult(), constOp.getResult(),
+    auto aigOpInvertedOutput = synth::AndInverterOp::create(
+        builder, loc, aigOp.getResult(), constOp.getResult(),
         /*invertInput0=*/true, /*invertInput1=*/false);
     outputValueAig = aigOpInvertedOutput.getResult();
   }

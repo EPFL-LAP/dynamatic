@@ -1501,7 +1501,7 @@ def RAMOp : Handshake_Op<"ram", [NamedIOInterface]>  {
     Example: Using handshake.RAMOp in the C++ API.
     ```c++
     // Building a new RAMOp
-    builder.create<handshake::RAMOp>(type, elementAttr);
+    handshake::RAMOp::create(builder, type, elementAttr);
 
     // Access its initialValue
     std::optional<ElementsAttr> initialValue = ramOp.getInitialValue();

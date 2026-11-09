@@ -541,8 +541,8 @@ struct RemoveNotCondition
 
     rewriter.setInsertionPointAfter(condBranchOp);
 
-    auto newBranch = rewriter.create<handshake::ConditionalBranchOp>(
-        condOp->getLoc(), drivingNot.getOperand(),
+    auto newBranch = handshake::ConditionalBranchOp::create(
+        rewriter, condOp->getLoc(), drivingNot.getOperand(),
         condBranchOp.getDataOperand());
 
     rewriter.replaceAllUsesWith(condBranchOp.getTrueResult(),
@@ -614,7 +614,7 @@ struct SimplifyKnownConditionBranch
         rewriter.setInsertionPoint(br);
 
         // Create source as trigger
-        auto sourceOp = rewriter.create<handshake::SourceOp>(br.getLoc());
+        auto sourceOp = handshake::SourceOp::create(rewriter, br.getLoc());
         if (auto bbAttr = br->getAttr("handshake.bb"))
           sourceOp->setAttr("handshake.bb", bbAttr);
 
@@ -629,20 +629,21 @@ struct SimplifyKnownConditionBranch
         if (auto channelType = dyn_cast<handshake::ChannelType>(condType)) {
           // Channelified: use 4-arg constructor (loc, resultType, attr, ctrl)
           // matching the pattern from the existing codebase
-          constOp = rewriter.create<handshake::ConstantOp>(
-              br.getLoc(), channelType, cstAttr, sourceOp.getResult());
+          constOp =
+              handshake::ConstantOp::create(rewriter, br.getLoc(), channelType,
+                                            cstAttr, sourceOp.getResult());
         } else {
           // Raw i1: use 3-arg constructor (loc, attr, ctrl)
-          constOp = rewriter.create<handshake::ConstantOp>(
-              br.getLoc(), cstAttr, sourceOp.getResult());
+          constOp = handshake::ConstantOp::create(
+              rewriter, br.getLoc(), cstAttr, sourceOp.getResult());
         }
 
         if (auto bbAttr = br->getAttr("handshake.bb"))
           constOp->setAttr("handshake.bb", bbAttr);
 
         // Replace the downstream branch with one conditioned on the constant
-        auto newBr = rewriter.create<handshake::ConditionalBranchOp>(
-            br.getLoc(), constOp.getResult(), br.getDataOperand());
+        auto newBr = handshake::ConditionalBranchOp::create(
+            rewriter, br.getLoc(), constOp.getResult(), br.getDataOperand());
         newBr->setDiscardableAttrs(br->getDiscardableAttrDictionary());
         refreshBranchAttrsFromCondition(newBr, br);
         rewriter.replaceOp(br, newBr->getResults());
@@ -793,17 +794,17 @@ struct SplitBranchWithMuxCondition
 
     rewriter.setInsertionPoint(condBranchOp);
 
-    auto outerBranch = rewriter.create<handshake::ConditionalBranchOp>(
-        getConditionLocOrFallback(baseCond, condBranchOp), baseCond,
+    auto outerBranch = handshake::ConditionalBranchOp::create(
+        rewriter, getConditionLocOrFallback(baseCond, condBranchOp), baseCond,
         dataOperand);
     inheritConditionBBOrFallback(baseCond, condBranchOp, outerBranch);
 
     Value outerToInner = nonConstIdx == 0 ? outerBranch.getFalseResult()
                                           : outerBranch.getTrueResult();
 
-    auto innerBranch = rewriter.create<handshake::ConditionalBranchOp>(
-        getConditionLocOrFallback(nestedCond, condBranchOp), nestedCond,
-        outerToInner);
+    auto innerBranch = handshake::ConditionalBranchOp::create(
+        rewriter, getConditionLocOrFallback(nestedCond, condBranchOp),
+        nestedCond, outerToInner);
     inheritConditionBBOrFallback(nestedCond, condBranchOp, innerBranch);
 
     rewriter.replaceOp(condBranchOp, {innerBranch.getTrueResult(),

@@ -146,7 +146,7 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
 
       // A MU gate's mux is driven by an init fed by its condition
       if (gate->gsaGateFunction == MuGate) {
-        auto initOp = builder.create<handshake::InitOp>(loc, conditionValue);
+        auto initOp = handshake::InitOp::create(builder, loc, conditionValue);
         initOp->setAttr(ftd::FTD_INIT_MERGE, builder.getUnitAttr());
         conditionValue = initOp->getResult(0);
         conditionValue.setType(ftd::channelifyType(conditionValue.getType()));
@@ -159,14 +159,14 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
         operands[1] = operands[1 - nullOperand];
       }
 
-      auto mux = builder.create<handshake::MuxOp>(
-          loc, ftd::channelifyType(gate->result.getType()), conditionValue,
-          operands);
+      auto mux = handshake::MuxOp::create(
+          builder, loc, ftd::channelifyType(gate->result.getType()),
+          conditionValue, operands);
       if (nullOperand >= 0)
         oneInputGammas.insert(mux);
       if (gate->isRoot) {
-        auto anchor = builder.create<UnrealizedConversionCastOp>(
-            loc, mux.getResult().getType(), mux.getResult());
+        auto anchor = UnrealizedConversionCastOp::create(
+            builder, loc, mux.getResult().getType(), mux.getResult());
         rootAnchors.emplace_back(gate->result, anchor);
       }
       gateMuxes.insert({gate->index, mux});
@@ -333,7 +333,7 @@ LogicalResult FtdCfToHandshakeTranslator::finalizeTranslation() {
     else
       builder.setInsertionPointToStart(funcOp.getBodyBlock());
     auto proxyOp =
-        builder.create<handshake::NotIOp>(condBrOp.getLoc(), condType, cond);
+        handshake::NotIOp::create(builder, condBrOp.getLoc(), condType, cond);
     proxyOp->setAttr(ftd::FTD_COND_VAR, builder.getUnitAttr());
     setBlock(proxyOp, block);
     placeholder.setValue(proxyOp.getResult());

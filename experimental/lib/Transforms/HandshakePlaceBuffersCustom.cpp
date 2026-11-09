@@ -94,8 +94,8 @@ struct HandshakePlaceBuffersCustomPass
     // pull the enum itself from the optional
     auto bufferType = bufferTypeOpt.value();
 
-    auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                     slots, bufferType);
+    auto bufOp = handshake::BufferOp::create(builder, channel.getLoc(), channel,
+                                             slots, bufferType);
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);

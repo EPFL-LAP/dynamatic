@@ -49,8 +49,8 @@ static LogicalResult pushConstants(func::FuncOp funcOp, MLIRContext *ctx) {
     // Create a new constant operation in every block where the constant is used
     for (auto &[block, users] : usingBlocks) {
       builder.setInsertionPointToStart(block);
-      auto newCstOp = builder.create<arith::ConstantOp>(constantOp->getLoc(),
-                                                        constantOp.getValue());
+      auto newCstOp = arith::ConstantOp::create(builder, constantOp->getLoc(),
+                                                constantOp.getValue());
       for (auto *user : users)
         user->replaceUsesOfWith(constantOp.getResult(), newCstOp.getResult());
     }

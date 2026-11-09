@@ -707,7 +707,7 @@ void HWModuleOp::build(OpBuilder &builder, OperationState &odsState,
   modBuilder(builder, accessor);
   // Create output operands.
   llvm::SmallVector<Value> outputOperands = accessor.getOutputOperands();
-  builder.create<hw::OutputOp>(odsState.location, outputOperands);
+  hw::OutputOp::create(builder, odsState.location, outputOperands);
 }
 
 void HWModuleOp::modifyPorts(
@@ -1821,8 +1821,8 @@ LogicalResult ArraySliceOp::canonicalize(ArraySliceOp op,
 
   if (sliceSize == 1) {
     // slice(a, n) -> create(a[n])
-    auto get = rewriter.create<ArrayGetOp>(op.getLoc(), op.getInput(),
-                                           op.getLowIndex());
+    auto get = ArrayGetOp::create(rewriter, op.getLoc(), op.getInput(),
+                                  op.getLowIndex());
     rewriter.replaceOpWithNewOp<ArrayCreateOp>(op, op.getType(),
                                                get.getResult());
     return success();
@@ -1845,7 +1845,7 @@ LogicalResult ArraySliceOp::canonicalize(ArraySliceOp op,
 
     uint64_t offset = *offsetOpt + *inputOffsetOpt;
     auto lowIndex =
-        rewriter.create<ConstantOp>(op.getLoc(), inputIndex.getType(), offset);
+        ConstantOp::create(rewriter, op.getLoc(), inputIndex.getType(), offset);
     rewriter.replaceOpWithNewOp<ArraySliceOp>(op, op.getType(),
                                               inputSlice.getInput(), lowIndex);
     return success();
@@ -1886,10 +1886,11 @@ LogicalResult ArraySliceOp::canonicalize(ArraySliceOp op,
       } else {
         // Slice the required bits from the input.
         unsigned width = inputSize == 1 ? 1 : llvm::Log2_64_Ceil(inputSize);
-        auto lowIndex = rewriter.create<ConstantOp>(
-            op.getLoc(), rewriter.getIntegerType(width), sliceStart);
-        chunks.push_back(rewriter.create<ArraySliceOp>(
-            op.getLoc(), hw::ArrayType::get(elemTy, cutSize), input, lowIndex));
+        auto lowIndex = ConstantOp::create(
+            rewriter, op.getLoc(), rewriter.getIntegerType(width), sliceStart);
+        chunks.push_back(ArraySliceOp::create(
+            rewriter, op.getLoc(), hw::ArrayType::get(elemTy, cutSize), input,
+            lowIndex));
       }
 
       sliceStart = 0;
@@ -2558,8 +2559,8 @@ LogicalResult StructInjectOp::canonicalize(StructInjectOp op,
     auto it = fields.find(elements[fieldIndex].name);
     if (it == fields.end())
       continue;
-    input = rewriter.create<StructInjectOp>(op.getLoc(), ty, input, fieldIndex,
-                                            it->second);
+    input = StructInjectOp::create(rewriter, op.getLoc(), ty, input, fieldIndex,
+                                   it->second);
   }
 
   rewriter.replaceOp(op, input);
@@ -2744,7 +2745,7 @@ LogicalResult ArrayGetOp::canonicalize(ArrayGetOp op,
 
     uint64_t offset = *offsetOpt + *idxOpt;
     auto newOffset =
-        rewriter.create<ConstantOp>(op.getLoc(), offsetOp.getType(), offset);
+        ConstantOp::create(rewriter, op.getLoc(), offsetOp.getType(), offset);
     rewriter.replaceOpWithNewOp<ArrayGetOp>(op, inputSlice.getInput(),
                                             newOffset);
     return success();
@@ -2761,8 +2762,9 @@ LogicalResult ArrayGetOp::canonicalize(ArrayGetOp op,
       }
 
       unsigned indexWidth = size == 1 ? 1 : llvm::Log2_64_Ceil(size);
-      auto newIdxOp = rewriter.create<ConstantOp>(
-          op.getLoc(), rewriter.getIntegerType(indexWidth), elemIndex);
+      auto newIdxOp =
+          ConstantOp::create(rewriter, op.getLoc(),
+                             rewriter.getIntegerType(indexWidth), elemIndex);
 
       rewriter.replaceOpWithNewOp<ArrayGetOp>(op, input, newIdxOp);
       return success();

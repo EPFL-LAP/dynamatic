@@ -113,8 +113,8 @@ public:
     return TypeSwitch<Union, ChannelVal>(repr)
         .Case([](ChannelVal value) { return value; })
         .Case([&](handshake::ConstantOp op) {
-          auto constantOp = rewriter.create<handshake::ConstantOp>(
-              op.getLoc(),
+          auto constantOp = handshake::ConstantOp::create(
+              rewriter, op.getLoc(),
               rewriter.getIntegerAttr(
                   rewriter.getIntegerType(getDataBitWidth()),
                   *getConstantOrNone()),
@@ -300,12 +300,12 @@ static ChannelVal modBitWidth(const MinimalValue &extVal, unsigned targetWidth,
     if (extVal.getExtType() == ExtType::ZEXT ||
         (extVal.getExtType() == ExtType::NONE &&
          val.getType().getDataType().isUnsignedInteger())) {
-      newOp = rewriter.create<handshake::ExtUIOp>(loc, dstChannelType, val);
+      newOp = handshake::ExtUIOp::create(rewriter, loc, dstChannelType, val);
     } else {
-      newOp = rewriter.create<handshake::ExtSIOp>(loc, dstChannelType, val);
+      newOp = handshake::ExtSIOp::create(rewriter, loc, dstChannelType, val);
     }
   } else {
-    newOp = rewriter.create<handshake::TruncIOp>(loc, dstChannelType, val);
+    newOp = handshake::TruncIOp::create(rewriter, loc, dstChannelType, val);
   }
 
   inheritBBFromValue(val, newOp);
@@ -410,7 +410,7 @@ static void modArithOp(Op op, MinimalValue lhs, MinimalValue rhs,
   Value newRhs = modBitWidth(rhs, optWidth, rewriter);
   rewriter.setInsertionPoint(op);
   auto newOp =
-      rewriter.create<Op>(op.getLoc(), newLhs.getType(), newLhs, newRhs);
+      Op::create(rewriter, op.getLoc(), newLhs.getType(), newLhs, newRhs);
   Value newRes = modBitWidth({newOp.getResult(), extRes}, resWidth, rewriter);
   namer.replaceOp(op, newOp);
   inheritBB(op, newOp);
@@ -642,7 +642,7 @@ public:
   /// default implementation of this function.
   virtual Op createOp(ArrayRef<Type> newResTypes, ArrayRef<Value> newOperands,
                       PatternRewriter &rewriter) {
-    return rewriter.create<Op>(op.getLoc(), newResTypes, newOperands);
+    return Op::create(rewriter, op.getLoc(), newResTypes, newOperands);
   }
 
   /// Determines the list of values that the original operation will be replaced
@@ -744,9 +744,9 @@ public:
   handshake::BufferOp createOp(ArrayRef<Type> newResTypes,
                                ArrayRef<Value> newOperands,
                                PatternRewriter &rewriter) override {
-    return rewriter.create<handshake::BufferOp>(
-        op.getLoc(), newOperands[0].getType(), newOperands[0],
-        op->getAttrDictionary().getValue());
+    return handshake::BufferOp::create(rewriter, op.getLoc(),
+                                       newOperands[0].getType(), newOperands[0],
+                                       op->getAttrDictionary().getValue());
   }
 };
 
@@ -929,9 +929,9 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
         modBitWidth({selectOperand, ExtType::ZEXT}, optWidth, rewriter));
     auto dataOprds = muxOp.getDataOperands();
     newOperands.append(dataOprds.begin(), dataOprds.end());
-    auto newMuxOp = rewriter.create<handshake::MuxOp>(
-        muxOp.getLoc(), muxOp->getResultTypes(), newOperands,
-        muxOp->getAttrs());
+    auto newMuxOp = handshake::MuxOp::create(rewriter, muxOp.getLoc(),
+                                             muxOp->getResultTypes(),
+                                             newOperands, muxOp->getAttrs());
     namer.replaceOp(muxOp, newMuxOp);
     rewriter.replaceOp(muxOp, newMuxOp);
     ++bitwidthReduced;
@@ -975,8 +975,8 @@ struct HandshakeCMergeIndex
         cmergeOp->getOperandTypes().front(),
         indexType.withDataType(rewriter.getIntegerType(optWidth))};
     rewriter.setInsertionPoint(cmergeOp);
-    auto newCmergeOp = rewriter.create<handshake::ControlMergeOp>(
-        cmergeOp.getLoc(), newResultTypes, cmergeOp.getDataOperands(),
+    auto newCmergeOp = handshake::ControlMergeOp::create(
+        rewriter, cmergeOp.getLoc(), newResultTypes, cmergeOp.getDataOperands(),
         cmergeOp->getAttrs());
     namer.replaceOp(cmergeOp, newCmergeOp);
     Value modIndex = modBitWidth({newCmergeOp.getIndex(), ExtType::ZEXT},
@@ -1374,8 +1374,8 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
     Value newLhs = modBitWidth(lhsExtValue, optWidth, rewriter);
     Value newRhs = modBitWidth(rhsExtValue, optWidth, rewriter);
     rewriter.setInsertionPoint(selectOp);
-    auto newOp = rewriter.create<handshake::SelectOp>(
-        selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs,
+    auto newOp = handshake::SelectOp::create(
+        rewriter, selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs,
         selectOp.getAntitokenDepthAttr());
     Value newRes = modBitWidth({newOp.getResult(), lhsExtValue.getExtType()},
                                resWidth, rewriter);
@@ -1481,15 +1481,15 @@ struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
       // Perform the shift on the bitwidth of lhs.
       Value newRhs =
           modBitWidth({op.getRhs(), ExtType::NONE}, inputBitwidth, rewriter);
-      result = rewriter.create<handshake::ShRUIOp>(
-          op.getLoc(), lhs.materializeValue(rewriter), newRhs);
+      result = handshake::ShRUIOp::create(
+          rewriter, op.getLoc(), lhs.materializeValue(rewriter), newRhs);
 
       // Now truncate the result to make the sign-bit after shifting the
       // top-bit again.
       // Note that this even works when 'c' is greater than the difference
       // between the input and current bit width.
-      result = rewriter.create<handshake::TruncIOp>(
-          op.getLoc(),
+      result = handshake::TruncIOp::create(
+          rewriter, op.getLoc(),
           result.getType().withDataType(rewriter.getIntegerType(
               inputBitwidth - numOfShiftPositions.getZExtValue())),
           result);
@@ -1498,26 +1498,26 @@ struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
       // bitwidth is sign-extended. The only thing that remains from the input
       // is the sign-bit that was copied to the bits [inputWidth:currentBitWidth
       // - c].
-      Value inputBWM1 = rewriter.create<handshake::ConstantOp>(
-          op.getLoc(),
+      Value inputBWM1 = handshake::ConstantOp::create(
+          rewriter, op.getLoc(),
           rewriter.getIntegerAttr(lhs.getDataType(), inputBitwidth - 1),
           constantControl);
       // Shift away all values of lhs other than the sign-bit.
-      ChannelVal signBit = rewriter.create<handshake::ShRUIOp>(
-          op.getLoc(), lhs.materializeValue(rewriter), inputBWM1);
+      ChannelVal signBit = handshake::ShRUIOp::create(
+          rewriter, op.getLoc(), lhs.materializeValue(rewriter), inputBWM1);
       // Truncate down to just the sign-bit.
       // Note that this even works when 'c' is greater than the difference
       // between the input and current bit width.
-      result = rewriter.create<handshake::TruncIOp>(
-          op.getLoc(), signBit.getType().withDataType(rewriter.getI1Type()),
-          signBit);
+      result = handshake::TruncIOp::create(
+          rewriter, op.getLoc(),
+          signBit.getType().withDataType(rewriter.getI1Type()), signBit);
     }
     // Result pattern is now | s X ... Y |.
 
     // Fill with the sign-bit up until excluding the top 'c' bits.
     // Result now follows the | s ... s | s X ... Y | pattern.
-    result = rewriter.create<handshake::ExtSIOp>(
-        op.getLoc(),
+    result = handshake::ExtSIOp::create(
+        rewriter, op.getLoc(),
         op.getType().withDataType(rewriter.getIntegerType(
             currentBitwidth - numOfShiftPositions.getZExtValue())),
         result);
@@ -1589,13 +1589,13 @@ struct ArithShrSIFW : OpRewritePattern<handshake::ShRSIOp> {
     // Our shift amount is larger than the input bitwidth but the input
     // bitwidth is sign-extended. The only thing that remains from the input
     // is the sign-bit.
-    Value inputBWM1 = rewriter.create<handshake::ConstantOp>(
-        op.getLoc(),
+    Value inputBWM1 = handshake::ConstantOp::create(
+        rewriter, op.getLoc(),
         rewriter.getIntegerAttr(lhs.getDataType(), inputBitwidth - 1),
         constantControl);
     // Shift away all values of lhs other than the sign-bit.
-    ChannelVal signBit = rewriter.create<handshake::ShRSIOp>(
-        op.getLoc(), lhs.materializeValue(rewriter), inputBWM1);
+    ChannelVal signBit = handshake::ShRSIOp::create(
+        rewriter, op.getLoc(), lhs.materializeValue(rewriter), inputBWM1);
     // Fill remaining sign-bit copies.
     rewriter.replaceOpWithNewOp<handshake::ExtSIOp>(op, op.getType(), signBit);
     ++bitwidthReduced;
@@ -1727,8 +1727,8 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     Value newLhs = modBitWidth(lhsExtValue, optWidth, rewriter);
     Value newRhs = modBitWidth(rhsExtValue, optWidth, rewriter);
     rewriter.setInsertionPoint(cmpOp);
-    auto newOp = rewriter.create<handshake::CmpIOp>(
-        cmpOp.getLoc(), cmpOp.getPredicate(), newLhs, newRhs);
+    auto newOp = handshake::CmpIOp::create(
+        rewriter, cmpOp.getLoc(), cmpOp.getPredicate(), newLhs, newRhs);
     namer.replaceOp(cmpOp, newOp);
     inheritBB(cmpOp, newOp);
 
