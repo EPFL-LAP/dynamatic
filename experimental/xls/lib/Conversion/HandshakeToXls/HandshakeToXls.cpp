@@ -146,7 +146,7 @@ public:
 class NopProc : public HandshakeProc {
 public:
   NopProc(unsigned int width) : width(width) {}
-  std ::string name() const override { return "nop_" + std ::to_string(width); }
+  std::string name() const override { return "nop_" + std::to_string(width); }
   void build(OpBuilder builder) const override;
 
 private:
@@ -184,8 +184,8 @@ class ForkProc : public HandshakeProc {
 public:
   ForkProc(unsigned int width, unsigned int fanout)
       : width(width), fanout(fanout) {}
-  std ::string name() const override {
-    return "fork_" + std ::to_string(width) + "_x" + std ::to_string(fanout);
+  std::string name() const override {
+    return "fork_" + std::to_string(width) + "_x" + std::to_string(fanout);
   }
   void build(OpBuilder builder) const override;
   static std::shared_ptr<HandshakeProc> get(ForkOp op);
@@ -235,8 +235,8 @@ std::shared_ptr<HandshakeProc> ForkProc::get(ForkOp op) {
 class JoinProc : public HandshakeProc {
 public:
   JoinProc(unsigned int numDataOperands) : numDataOperands(numDataOperands) {}
-  std ::string name() const override {
-    return "join_x" + std ::to_string(numDataOperands);
+  std::string name() const override {
+    return "join_x" + std::to_string(numDataOperands);
   }
   void build(OpBuilder builder) const override;
   static std::shared_ptr<HandshakeProc> get(JoinOp op);
@@ -313,8 +313,8 @@ std::shared_ptr<HandshakeProc> JoinProc::get(JoinOp op) {
 class SelectProc : public HandshakeProc {
 public:
   SelectProc(unsigned int width) : width(width) {}
-  std ::string name() const override {
-    return "select_" + std ::to_string(width);
+  std::string name() const override {
+    return "select_" + std::to_string(width);
   }
   void build(OpBuilder builder) const override;
   static std::shared_ptr<HandshakeProc> get(SelectOp op);
@@ -377,8 +377,8 @@ public:
           unsigned selectWidth)
       : width(width), numDataOperands(numDataOperands),
         selectWidth(selectWidth) {}
-  std ::string name() const override {
-    return "mux_" + std ::to_string(width) + "_sel" +
+  std::string name() const override {
+    return "mux_" + std::to_string(width) + "_sel" +
            std::to_string(selectWidth) + "_x" + std::to_string(numDataOperands);
   }
   void build(OpBuilder builder) const override;
@@ -451,8 +451,8 @@ public:
   CMergeProc(unsigned int width, unsigned int numDataOperands,
              unsigned idxWidth)
       : width(width), numDataOperands(numDataOperands), idxWidth(idxWidth) {}
-  std ::string name() const override {
-    return "cmerge_" + std ::to_string(width) + "_idx" +
+  std::string name() const override {
+    return "cmerge_" + std::to_string(width) + "_idx" +
            std::to_string(idxWidth) + "_x" + std::to_string(numDataOperands);
   }
   void build(OpBuilder builder) const override;
@@ -549,8 +549,8 @@ std::shared_ptr<HandshakeProc> CMergeProc::get(ControlMergeOp op) {
 class CBranchProc : public HandshakeProc {
 public:
   CBranchProc(unsigned int width) : width(width) {}
-  std ::string name() const override {
-    return "cbranch_" + std ::to_string(width);
+  std::string name() const override {
+    return "cbranch_" + std::to_string(width);
   }
   void build(OpBuilder builder) const override;
   static std::shared_ptr<HandshakeProc> get(ConditionalBranchOp op);
@@ -605,7 +605,7 @@ std::shared_ptr<HandshakeProc> CBranchProc::get(ConditionalBranchOp op) {
 class SourceProc : public HandshakeProc {
 public:
   SourceProc() = default;
-  std ::string name() const override { return "source"; }
+  std::string name() const override { return "source"; }
   void build(OpBuilder builder) const override;
   static std::shared_ptr<HandshakeProc> get(SourceOp op);
 };
@@ -642,7 +642,7 @@ std::shared_ptr<HandshakeProc> SourceProc::get(SourceOp op) {
 class ConstantProc : public HandshakeProc {
 public:
   ConstantProc(APInt &value) : value(value) {}
-  std ::string name() const override {
+  std::string name() const override {
     llvm::SmallString<16> valString;
     value.toString(valString, /*radix=*/16, /*signed=*/false,
                    /*formatAsCLiteral=*/true, /*UpperCase=*/false);
@@ -702,7 +702,7 @@ std::shared_ptr<HandshakeProc> ConstantProc::get(ConstantOp op) {
 class SinkProc : public HandshakeProc {
 public:
   SinkProc(unsigned int width) : width(width) {}
-  std ::string name() const override { return "sink_" + std::to_string(width); }
+  std::string name() const override { return "sink_" + std::to_string(width); }
   void build(OpBuilder builder) const override;
   static std::shared_ptr<HandshakeProc> get(SinkOp op);
 
@@ -756,7 +756,7 @@ public:
   BinaryIOpProc(BinaryIOpKind kind, unsigned int width)
       : kind(kind), width(width) {}
 
-  std ::string name() const override {
+  std::string name() const override {
     std::string_view name;
     // clang-format off
     switch (kind) {
@@ -773,7 +773,7 @@ public:
     case BinaryIOpKind::SUBI: { name = "subi"; break; }
     }
     // clang-format on
-    return std::string(name) + "_" + std ::to_string(width);
+    return std::string(name) + "_" + std::to_string(width);
   }
 
   void build(OpBuilder builder) const override;
@@ -860,7 +860,7 @@ class NotOpProc : public HandshakeProc {
 public:
   NotOpProc(unsigned int width) : width(width) {}
 
-  std ::string name() const override { return "not_" + std ::to_string(width); }
+  std::string name() const override { return "not_" + std::to_string(width); }
 
   void build(OpBuilder builder) const override;
 
@@ -908,7 +908,7 @@ class CmpIProc : public HandshakeProc {
 public:
   CmpIProc(CmpIPredicate kind, unsigned int width) : kind(kind), width(width) {}
 
-  std ::string name() const override {
+  std::string name() const override {
     std::string_view name;
     // clang-format off
     switch (kind) {
@@ -924,7 +924,7 @@ public:
     case CmpIPredicate::uge: { name = "uge"; break; }
     }
     // clang-format on
-    return "cmpi_" + std::string(name) + "_" + std ::to_string(width);
+    return "cmpi_" + std::string(name) + "_" + std::to_string(width);
   }
 
   void build(OpBuilder builder) const override;
@@ -995,7 +995,7 @@ public:
   IntCastProc(unsigned int from, unsigned int to, IntCastOpKind kind)
       : fromWidth(from), toWidth(to), kind(kind) {};
 
-  std ::string name() const override {
+  std::string name() const override {
 
     std::string_view name;
     // clang-format off
