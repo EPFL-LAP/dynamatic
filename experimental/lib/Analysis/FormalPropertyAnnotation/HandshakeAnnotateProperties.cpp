@@ -417,6 +417,10 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       if (coef == 0)
         continue;
       const FlowVariable &var = indices.registry.getVar(indices.nLambdas + i);
+      if (var.isConstant()) {
+        terms.emplace_back(Constant::integer(coef));
+        continue;
+      }
       auto *state = std::get_if<FlowInternalState>(&var.variable);
       assert(state && "annotatable flow variable without internal state");
       // A variable that tracks the tokens of one value only counts the state
