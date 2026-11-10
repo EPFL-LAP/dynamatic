@@ -1,5 +1,6 @@
 #include "FlowExpression.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -97,6 +98,8 @@ std::string FlowVariable::getDebugName() const {
     ret +=
         llvm::formatv("{0}.#{1}", getUniqueName(internal->op), internal->index);
   }
+  if (isConstant())
+    ret += "1";
 
   if (indexTokenTracker) {
     ret += llvm::formatv("({0})", indexTokenTracker->trackedValues.to_string());
@@ -191,6 +194,10 @@ LogicalResult FlowEquationExtractor::extractAll(ModuleOp modOp) {
   // annotating
   LogicalResult res = success();
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (BlockArgument arg : funcOp.getArguments()) {
+      if (failed(extractArgument(arg)))
+        res = failure();
+    }
     for (Operation &op : funcOp.getOps()) {
       if (isa<ArithOpInterface>(op)) {
         if (failed(extractArithmeticJoinOp(op))) {
@@ -246,6 +253,24 @@ LogicalResult FlowEquationExtractor::extractAll(ModuleOp modOp) {
     }
   }
   return res;
+}
+
+// An argument of the function receives a single token per execution, which it
+// holds until it is sent:
+// lambda_arg + arg_valid = 1
+// Memory references are not channels, and are skipped.
+LogicalResult FlowEquationExtractor::extractArgument(BlockArgument arg) {
+  if (!isa<ChannelType, ControlType>(arg.getType()))
+    return success();
+  FlowVariable lambda(indexChannelAnalysis, ChannelLambda(arg));
+  if (lambda.isIndex()) {
+    // The value of the token of the argument is unknown, so its slot cannot be
+    // split by value
+    return success();
+  }
+  FlowVariable pending{FlowInternalState(EntrySlotNamer(arg))};
+  equations.push_back(lambda + pending - FlowVariable(UnitConstant()));
+  return success();
 }
 
 // Extracts the slot equation from the corresponding variables, while preserving
@@ -395,8 +420,17 @@ LogicalResult FlowEquationExtractor::extractBufferOp(BufferOp bufferOp) {
     in = next;
   }
   // `in` now is the last internal channel after all the slots. It is connected
-  // to the output.
-  equations.push_back(in - out);
+  // to the output, for each index value if the buffer holds an index (an
+  // equation over the sums would lose how many tokens of each value passed):
+  // lambda_in(0) = lambda_out(0)
+  // lambda_in(1) = lambda_out(1)
+  // ...
+  if (in.isIndex()) {
+    for (size_t i = 0; i < in.indexTokenTracker->trackedValues.size(); ++i)
+      equations.push_back(in.setTrackedTokens(i) - out.setTrackedTokens(i));
+  } else {
+    equations.push_back(in - out);
+  }
   return success();
 }
 
@@ -480,13 +514,19 @@ FlowEquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
 }
 
 LogicalResult FlowEquationExtractor::extractEndOp(EndOp endOp) {
-  // All inputs of the end op propagate the same number of tokens:
-  // lambda_in_1 = lambda_in_2 = ...
+  // All inputs of the end op propagate the same number of tokens, which the
+  // testbench holds once the function returned:
+  // lambda_in_1 = lambda_in_2 = ... = end_full
   FlowVariable out(InternalLambda(endOp, 0));
   for (auto inChannel : endOp.getInputs()) {
     FlowVariable in(indexChannelAnalysis, ChannelLambda(inChannel));
     equations.push_back(out - in);
   }
+  auto endSlots = getAllSlotsOfOperation(endOp);
+  assert(endSlots.size() == 1 && "the testbench holds one end token");
+  FlowVariable endFull{FlowInternalState(
+      std::shared_ptr<InternalStateNamer>(std::move(endSlots.front())))};
+  equations.push_back(out - endFull);
   return success();
 }
 
@@ -567,8 +607,49 @@ FlowEquationExtractor::extractMemoryControllerOp(MemoryControllerOp memCon) {
       }
     }
   }
-  // For store ports, a next goal could be to transmit a control token
-  // when the store operation has finished.
+  // A store port takes the address and the data of a store together:
+  // lambda_stAddr = lambda_stData
+  MCPorts storePorts = memCon.getPorts();
+  for (const GroupMemoryPorts &group : storePorts.groups) {
+    for (const MemoryPort &accessPort : group.accessPorts) {
+      if (std::optional<StorePort> store = dyn_cast<StorePort>(accessPort)) {
+        FlowVariable addr(
+            indexChannelAnalysis,
+            ChannelLambda(memCon->getOperand(store->getAddrInputIndex())));
+        FlowVariable data(
+            indexChannelAnalysis,
+            ChannelLambda(memCon->getOperand(store->getDataInputIndex())));
+        equations.push_back(addr - data);
+      }
+    }
+  }
+
+  // The control of the memory controller holds the token of memStart while it
+  // is running, and the token of ctrlEnd once the circuit makes no more
+  // requests, until it sends memEnd:
+  // lambda_memStart = lambda_memEnd + running
+  // lambda_ctrlEnd = lambda_memEnd + no_more_request
+  // The control is nested in the controller of the stores when the memory
+  // controller has both loads and stores.
+  MCPorts ports = memCon.getPorts();
+  unsigned lsqPort = ports.getNumPorts<LSQLoadStorePort>();
+  bool hasLoads = ports.getNumPorts<LoadPort>() + lsqPort > 0;
+  bool hasStores = ports.getNumPorts<StorePort>() + lsqPort > 0;
+  std::string control = hasLoads && hasStores
+                            ? "inner_mc_loadless.inner_mc_control"
+                            : "inner_mc_control";
+  std::string name = getUniqueName(memCon).str();
+  FlowVariable memStart(indexChannelAnalysis,
+                        ChannelLambda(memCon.getMemStart()));
+  FlowVariable ctrlEnd(indexChannelAnalysis,
+                       ChannelLambda(memCon.getCtrlEnd()));
+  FlowVariable memEnd(indexChannelAnalysis, ChannelLambda(memCon.getMemEnd()));
+  FlowVariable running(FlowInternalState(
+      BufferSlotFullNamer(name, control + ".fsm_running", "", /*slotSize=*/0)));
+  FlowVariable noMoreRequest(FlowInternalState(BufferSlotFullNamer(
+      name, control + ".no_more_request", "", /*slotSize=*/0)));
+  equations.push_back(memStart - memEnd - running);
+  equations.push_back(ctrlEnd - memEnd - noMoreRequest);
   return success();
 }
 
@@ -673,7 +754,7 @@ FlowSystem::FlowSystem(const std::vector<FlowExpression> &exprs) {
   for (auto &expr : exprs) {
     for (auto &[key, value] : expr.terms) {
       // skip variables that can be annotated in SMV
-      if (key.getAnnotater() != nullptr) {
+      if (key.getAnnotater() != nullptr || key.isConstant()) {
         continue;
       }
       // Variables within the flow system should track exactly one index, as

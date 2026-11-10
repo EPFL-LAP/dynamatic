@@ -78,6 +78,12 @@ struct InternalLambda {
   }
 };
 
+// The constant 1, which gives a constant term to the equations of the units
+// that hold a token initially (e.g., an argument of the function)
+struct UnitConstant {
+  inline bool operator==(const UnitConstant &other) const { return true; }
+};
+
 struct FlowInternalState {
   // FlowInternalState is a wrapper around std::shared_ptr<InternalStateNamer>
   // to represent variables within FlowVariable. It simplifies constructors, as
@@ -115,8 +121,9 @@ struct FlowVariable {
   // except it does not count the tokens of a real channel in the handshake
   // MLIR, but rather a fictional channel within an operation (e.g. a channel
   // between slots of a buffer with multiple slots)
-  using Variants =
-      std::variant<FlowInternalState, ChannelLambda, InternalLambda>;
+  // 4. It can be the constant 1.
+  using Variants = std::variant<FlowInternalState, ChannelLambda,
+                                InternalLambda, UnitConstant>;
   Variants variable;
 
   // When indexTokenConstraint is set, only tokens of a specific value are
@@ -131,6 +138,11 @@ struct FlowVariable {
                ChannelLambda channel);
   FlowVariable(InternalLambda l) : FlowVariable(Variants(l)) {}
   FlowVariable(FlowInternalState state) : FlowVariable(Variants(state)) {}
+  FlowVariable(UnitConstant one) : FlowVariable(Variants(one)) {}
+
+  inline bool isConstant() const {
+    return std::holds_alternative<UnitConstant>(variable);
+  }
 
   // Utility function for generating multiple internal channels for a single
   // operation without collisions of indices
@@ -180,6 +192,8 @@ struct std::hash<FlowVariable::Variants> {
       return chunk ^ hash<Operation *>()(internal->op) ^
              hash<unsigned>()(internal->index);
     }
+    if (std::holds_alternative<UnitConstant>(vars))
+      return chunk;
     llvm::report_fatal_error("non-exhaustive pattern");
   }
 };
@@ -229,6 +243,7 @@ struct FlowEquationExtractor {
       : equations(), indexChannelAnalysis(ica) {}
   LogicalResult extractAll(ModuleOp modOp);
 
+  LogicalResult extractArgument(BlockArgument arg);
   LogicalResult extractSlotEquation(const FlowVariable &in,
                                     const FlowVariable &out,
                                     const FlowVariable &slot);
