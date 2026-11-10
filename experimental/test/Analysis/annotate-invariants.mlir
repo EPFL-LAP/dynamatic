@@ -109,11 +109,13 @@ handshake.func @exitPaths(%n: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
   %iBuf = buffer %iFork#0, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer33"} : <i32>
   %cond = cmpi ne, %iBuf, %c0 {handshake.bb = 1 : ui32, handshake.name = "cmpi30"} : <i32>
   // While the exit decision is on a path to a branch, the ancestors of the
-  // decider are empty. The decider's slot only counts if the fork has not sent
-  // its token to that path. There is one invariant per path, in the order of
-  // the walk to the branches, which does not matter, hence EXIT-DAG
-  // EXIT-DAG: ExitTokenNoAncestors: ((count((buffer34.outs_valid_i & (buffer34.data = FALSE))) > 0) -> (count((buffer30.outs_valid_i & !fork31.outs_0_sent), (buffer33.outs_valid_i & !fork32.outs_0_sent)) = 0))
-  // EXIT-DAG: ExitTokenNoAncestors: ((count((buffer35.outs_valid_i & (buffer35.data = FALSE))) > 0) -> (count((buffer30.outs_valid_i & !fork31.outs_0_sent), (buffer33.outs_valid_i & !fork32.outs_1_sent)) = 0))
+  // decider in its IOG are empty: here, for the IOG of %n, the entry, the slot
+  // before the decider and the back edge. The slot before the decider only
+  // counts until the fork after the decider has sent the decision to that path.
+  // There is one invariant per IOG and path, in the order of the walk to the
+  // branches, which does not matter, hence EXIT-DAG
+  // EXIT-DAG: ExitTokenNoAncestors: ((count((buffer34.outs_valid_i & (buffer34.data = FALSE))) > 0) -> (count((n_valid & !fork31.outs_0_sent), (buffer33.outs_valid_i & !fork32.outs_0_sent), (buffer30.outs_valid_i & !fork31.outs_0_sent)) = 0))
+  // EXIT-DAG: ExitTokenNoAncestors: ((count((buffer35.outs_valid_i & (buffer35.data = FALSE))) > 0) -> (count((n_valid & !fork31.outs_0_sent), (buffer33.outs_valid_i & !fork32.outs_1_sent), (buffer30.outs_valid_i & !fork31.outs_0_sent)) = 0))
   %condFork:2 = fork [2] %cond {handshake.bb = 1 : ui32, handshake.name = "fork32"} : <i1>
   %condBuf0 = buffer %condFork#0, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer34"} : <i1>
   %condBuf1 = buffer %condFork#1, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer35"} : <i1>

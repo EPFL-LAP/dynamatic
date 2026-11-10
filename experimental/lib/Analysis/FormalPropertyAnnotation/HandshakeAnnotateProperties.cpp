@@ -876,7 +876,7 @@ struct UnstartedPath {
   ConditionalBranchOp end;
 };
 
-std::vector<UnstartedPath> findDeciderBranchPaths(Operation *dec) {
+std::vector<UnstartedPath> findDeciderBranchPaths(Operation *decider) {
   struct PartialPath {
     std::vector<EffectiveSlotNamer> slots;
     std::vector<EagerForkSentNamer> startSents;
@@ -885,9 +885,9 @@ std::vector<UnstartedPath> findDeciderBranchPaths(Operation *dec) {
   std::vector<UnstartedPath> ret{};
   std::vector<PartialPath> stack;
   mlir::Value startChannel;
-  if (auto arith = dyn_cast<ArithOpInterface>(dec)) {
+  if (auto arith = dyn_cast<ArithOpInterface>(decider)) {
     startChannel = arith->getResult(0);
-  } else if (auto load = dyn_cast<LoadOp>(dec)) {
+  } else if (auto load = dyn_cast<LoadOp>(decider)) {
     load->emitError("TODO: Handle load decider");
     llvm::report_fatal_error("");
   } else {
@@ -939,114 +939,118 @@ std::vector<UnstartedPath> findDeciderBranchPaths(Operation *dec) {
   return ret;
 }
 
-// This function finds the ancestor slots of the decider as shown in the diagram
-// before the ExitTokenNoAncestors declaration. The reason the exit branch is
-// required for this search is so that the search does not go back past this
-// branch and overlap with the decider-branch path
-std::vector<std::vector<EffectiveSlotNamer>>
-findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
-  struct PartialPath {
-    mlir::Value channel;
-    // `back` means the paths are annotated backwards, meaning the paths flow in
-    // the direction of operands (rather than results)
-    std::vector<EffectiveSlotNamer> backPath;
-    // `backSents` stores eager fork sent states that should be added to the
-    // next fork found along this path, in backwards order in comparison to the
-    // direction tokens flow
-    std::vector<EagerForkSentNamer> backSents;
-    llvm::DenseSet<Operation *> visited;
-  };
-  std::vector<PartialPath> stack;
-  std::vector<EffectiveSlotNamer> startSlots;
-  PartialPath start{
-      .channel = *dec->getOperands().begin(),
-      .backPath = {},
-      .backSents = {},
-      .visited = {},
-  };
-  std::vector<std::vector<EffectiveSlotNamer>> ret;
-  stack.push_back(std::move(start));
-  while (!stack.empty()) {
-    // In this function, the operations are not handled case-by-case, but
-    // instead using their interfaces as any operation is allowed here. The
-    // order cannot be changed without breaking the behaviour:
-    // First, terminate in bad cases (otherwise potentially too many things are
-    // annotated).
-    // Second, if applicable, an eager fork output is added as a
-    // copied sent to the next slot.
-    // Third, slots are annotated.
-    // Lastly, all inputs are followed backwards (regardless of the number of
-    // inputs, can be 1 for buffer or fork, or 2 for arithmetic operations or
-    // loads)
-    auto cur = std::move(stack.back());
-    stack.pop_back();
+// The slots of the IOG from which a token can reach `decider` without
+// going through the branch `exit`, which would overlap with the path from the
+// decider to the branch. A slot holds an ancestor of the decider's token only
+// if that token has not been copied towards the decider, so each slot is
+// effective with the copied sents of all the fork outputs between it and the
+// next slots on the way to the decider. `decSents` are the outputs of the
+// decider's own forks on the path of the exit token, before its first slot;
+// they are also copied sents of the slots right before the decider.
+//
+// For example, in a loop that counts down from n:
+//
+//                n
+//                |
+//                v
+//              mux0 <------------------+
+//                |                     |
+//                v                     |
+//     +-outs_1- fork0                  |
+//     |          |                     |
+//     |        outs_0                  |
+//     |          v                     |
+//     |       buffer1               buffer0
+//     |          |                     ^
+//     |          v                     |
+//     |        cmpi0 (decider)         |
+//     |          |                     |
+//     |          v                     |
+//     |        fork1 --> ...           |
+//     |          |                     |
+//     |        outs_0                  |
+//     |          v                     |
+//     |       buffer2                  |
+//     |          |                     |
+//     |          v                     |
+//     +----> cond_br0 (`exit`) --------+
+//                |
+//                v
+//               ...
+//
+// Apart from the more obvious ancestor slots like buffer1, the ancestors also
+// include the back edge (buffer0), whose token reaches the decider in the next
+// iteration. While the exit token is in buffer2, the effective slots are empty,
+// i.e., each slot can only hold a token once the fork after it has copied that
+// token towards the decider:
+//   (n_valid & !fork0.outs_0_sent)
+//   (buffer0 full & !fork0.outs_0_sent)
+//   (buffer1 full & !fork1.outs_0_sent), from `decSents`: buffer1 keeps its
+//     token until fork1 has sent the decision on every output
+std::vector<EffectiveSlotNamer>
+findAncestorSlots(const IOG &iog, Operation *decider, ConditionalBranchOp exit,
+                  ArrayRef<EagerForkSentNamer> decSents) {
+  llvm::SetVector<Operation *> ancestors = reachBackward(
+      /*starts=*/SmallVector<Value>(decider->getOperands()),
+      /*isBoundary=*/[&](Operation *op) { return op == exit; },
+      /*isFollowed=*/[&](Value channel) { return iog.contains(channel); });
+  ancestors.remove(exit);
 
-    if (!iog.contains(cur.channel)) {
-      assert(false && "should not happen");
-      continue;
-    }
-
-    if (cur.channel == iog.entry) {
-      EffectiveSlotNamer es(std::make_unique<EntrySlotNamer>(iog.entry));
-      while (!cur.backSents.empty()) {
-        es.addCopiedSent(cur.backSents.back());
-        cur.backSents.pop_back();
-      }
-      cur.backPath.push_back(std::move(es));
-    }
-
-    Operation *op = cur.channel.getDefiningOp();
-    // The search for ancestor slots is terminated by any of the following:
-    // 1. No defining op
-    // 2. op is not part of the IOG (ancestors must be part of the IOG)
-    // 3. The operation is the exit branch (Any operation before this is part of
-    // the decider-branch path, and is therefore not an ancestor of those slots)
-    // 4. op has already been visited (to avoid loops)
-    if (!op || !iog.contains(op) || op == exit ||
-        cur.visited.find(op) != cur.visited.end()) {
-      std::vector<EffectiveSlotNamer> forwardPath{};
-      while (!cur.backPath.empty()) {
-        forwardPath.push_back(std::move(cur.backPath.back()));
-        cur.backPath.pop_back();
-      }
-      ret.push_back(std::move(forwardPath));
-      continue;
-    }
-    cur.visited.insert(op);
-
-    if (auto fork = dyn_cast<EagerForkLikeOpInterface>(op)) {
-      // Store the appropriate sent state as a copied sent for the next slot
-      // found
-      auto sents = fork.getInternalSentStateNamers();
-      for (auto [i, chan] : llvm::enumerate(fork->getResults())) {
-        if (chan == cur.channel) {
-          cur.backSents.push_back(sents[i]);
-        }
-      }
-    }
-    auto curSlots = getAllSlotsOfOperation(op);
-    // Annotate the slots backwards, using the stored copied sents to build
-    // effective slots.
-    for (int i = curSlots.size() - 1; i >= 0; --i) {
-      auto &slot = curSlots[i];
-      EffectiveSlotNamer es(std::move(slot));
-      while (!cur.backSents.empty()) {
-        es.addCopiedSent(cur.backSents.back());
-        cur.backSents.pop_back();
-      }
-      cur.backPath.push_back(std::move(es));
-    }
-
-    // Follow the inputs of the operand
-    for (auto back : op->getOperands()) {
-      if (!iog.contains(back)) {
+  // The copied sents of the slots whose tokens leave through `outputs`
+  auto getCopiedSents = [&](ArrayRef<Value> outputs) {
+    std::vector<EagerForkSentNamer> sents;
+    bool reachesDecider = false;
+    llvm::DenseSet<Value> visited;
+    SmallVector<Value> stack(outputs);
+    while (!stack.empty()) {
+      Value channel = stack.pop_back_val();
+      if (!iog.contains(channel) || !visited.insert(channel).second)
         continue;
-      }
-      cur.channel = back;
-      stack.push_back(cur);
+      Operation *next = *channel.getUsers().begin();
+      if (next != decider && !ancestors.contains(next))
+        continue;
+      if (isa_and_nonnull<EagerForkLikeOpInterface>(channel.getDefiningOp()))
+        sents.push_back(getSentNamer(channel));
+      if (next == decider)
+        reachesDecider = true;
+      // Later forks do not copy the token of this slot, but of the next one
+      else if (getAllSlotsOfOperation(next).empty())
+        llvm::append_range(stack, next->getResults());
     }
+    // The decider has no slot, so the decider's own fork outputs have to be
+    // taken into account for the ancestor slot right before the decider: it
+    // keeps its token until those forks have sent the decision on every
+    // output, while the exit token may already be on the path to `exit`
+    if (reachesDecider)
+      llvm::append_range(sents, decSents);
+    return sents;
+  };
+
+  std::vector<EffectiveSlotNamer> slots;
+  // The entry is an ancestor if the token it holds reaches the decider
+  Operation *entryUser = *iog.entry.getUsers().begin();
+  if (entryUser == decider || ancestors.contains(entryUser)) {
+    EffectiveSlotNamer entry(std::make_unique<EntrySlotNamer>(iog.entry));
+    for (EagerForkSentNamer &sent : getCopiedSents({iog.entry}))
+      entry.addCopiedSent(std::move(sent));
+    slots.push_back(std::move(entry));
   }
-  return ret;
+  for (Operation *op : ancestors) {
+    auto opSlots = getAllSlotsOfOperation(op);
+    if (opSlots.empty())
+      continue;
+    // Tokens leave a unit from its last slot
+    std::unique_ptr<InternalStateNamer> lastSlot = std::move(opSlots.back());
+    opSlots.pop_back();
+    for (auto &slot : opSlots)
+      slots.emplace_back(std::move(slot));
+    EffectiveSlotNamer effectiveSlot(std::move(lastSlot));
+    for (EagerForkSentNamer &sent :
+         getCopiedSents(SmallVector<Value>(op->getResults())))
+      effectiveSlot.addCopiedSent(std::move(sent));
+    slots.push_back(std::move(effectiveSlot));
+  }
+  return slots;
 }
 
 } // namespace
@@ -1067,11 +1071,11 @@ HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
   }
   llvm::MapVector<Operation *, int32_t> deciders;
   for (auto [branch, exitValue] : exitBranches) {
-    Operation *dec = *getDecider(branch);
-    deciders.insert({dec, exitValue});
+    Operation *decider = *getDecider(branch);
+    deciders.insert({decider, exitValue});
   }
-  for (auto [dec, exitValue] : deciders) {
-    auto slotPaths = findDeciderBranchPaths(dec);
+  for (auto [decider, exitValue] : deciders) {
+    auto slotPaths = findDeciderBranchPaths(decider);
     // [START Enumerating ExitTokenOrder invariants]
     for (const auto &slots : slotPaths) {
       if (slots.started.size() < 2) {
@@ -1101,7 +1105,7 @@ HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
 
     // [START Enumerating ExitTokenNoAncestors invariants]
     for (const auto &iog : iogs) {
-      if (!iog.contains(dec)) {
+      if (!iog.contains(decider)) {
         continue;
       }
 
@@ -1117,41 +1121,32 @@ HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
         return failure();
       }
 
-      auto ancestorPaths = findAncestorSlots(iog, dec, *iogBranch);
-      for (const auto &ancestorPath : ancestorPaths) {
-        if (ancestorPath.empty())
+      for (const auto &decPath : slotPaths) {
+        if (decPath.started.empty())
           continue;
-        for (const auto &decPath : slotPaths) {
-          if (decPath.started.empty())
-            continue;
-          // Extend the ancestor path using the startSents of this path from
-          // the decider to the branch
-          std::vector<EffectiveSlotNamer> extendedPath = ancestorPath;
-          assert(!extendedPath.empty() &&
-                 "the start sents need a last ancestor slot to copy from");
-          for (const auto &startSent : decPath.startSents) {
-            extendedPath.back().addCopiedSent(startSent);
-          }
-          // If a slot on the path from the decider to the branch holds the
-          // exit token, the ancestors of the decider are empty, e.g.:
-          //   ((count((buffer9.outs_valid_i & (buffer9.data = FALSE)),
-          //           (buffer10.b0.full & (buffer10.b0.reg = FALSE)), ...) > 0)
-          //    -> (count(buffer7.outs_valid_i,
-          //              (buffer8.full & !fork4.outs_1_sent), ...) = 0))
-          std::vector<PropertyExpr> exitTokens;
-          exitTokens.reserve(decPath.started.size());
-          for (const auto &es : decPath.started)
-            exitTokens.emplace_back(State(es.slot, exitValue));
-          PropertyExpr anyExitToken =
-              BinaryExpr(NaryExpr(NaryExpr::Count, exitTokens), BinaryExpr::Gt,
-                         Constant::integer(0));
-          PropertyExpr ancestorsEmpty =
-              BinaryExpr(NaryExpr(NaryExpr::Count, getStates(extendedPath)),
-                         BinaryExpr::Eq, Constant::integer(0));
-          addProperty(FormalProperty::EXIT_TOKEN_NO_ANCESTORS,
-                      FormalProperty::TAG::INVAR,
-                      implies(anyExitToken, ancestorsEmpty));
-        }
+        std::vector<EffectiveSlotNamer> ancestors =
+            findAncestorSlots(iog, decider, *iogBranch, decPath.startSents);
+        if (ancestors.empty())
+          continue;
+        // If a slot on the path from the decider to the branch holds the
+        // exit token, the ancestors of the decider are empty, e.g.:
+        //   ((count((buffer9.outs_valid_i & (buffer9.data = FALSE)),
+        //           (buffer10.b0.full & (buffer10.b0.reg = FALSE)), ...) > 0)
+        //    -> (count(buffer7.outs_valid_i,
+        //              (buffer8.full & !fork4.outs_1_sent), ...) = 0))
+        std::vector<PropertyExpr> exitTokens;
+        exitTokens.reserve(decPath.started.size());
+        for (const auto &es : decPath.started)
+          exitTokens.emplace_back(State(es.slot, exitValue));
+        PropertyExpr anyExitToken =
+            BinaryExpr(NaryExpr(NaryExpr::Count, exitTokens), BinaryExpr::Gt,
+                       Constant::integer(0));
+        PropertyExpr ancestorsEmpty =
+            BinaryExpr(NaryExpr(NaryExpr::Count, getStates(ancestors)),
+                       BinaryExpr::Eq, Constant::integer(0));
+        addProperty(FormalProperty::EXIT_TOKEN_NO_ANCESTORS,
+                    FormalProperty::TAG::INVAR,
+                    implies(anyExitToken, ancestorsEmpty));
       }
     }
     // [END Enumerating ExitTokenNoAncestors invariants]
