@@ -199,6 +199,63 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   markAnalysesPreserved<NameAnalysis>();
 }
 
+/// Applies the chosen select input handling (either we only keep
+/// the most executed edge, or we add two different CFDFCs, one for each edge,
+/// to our set)to every CFDFC.
+static void addSelectCFDFCs(std::vector<CFDFC> &cfdfcs, bool split) {
+
+  std::vector<CFDFC> result;
+  SmallVector<handshake::SelectOp> selects;
+
+  for (CFDFC &cf : cfdfcs) {
+    /// We take all the select units that take at least one data input from
+    /// inside the CFDFC `cf`.
+    for (Operation *unit : cf.units) {
+      auto selOp = dyn_cast<handshake::SelectOp>(unit);
+      if (selOp && (cf.channels.contains(selOp.getTrueValue()) ||
+                    cf.channels.contains(selOp.getFalseValue())))
+        selects.push_back(selOp);
+    }
+
+    if (selects.empty()) {
+      result.push_back(cf);
+      continue;
+    }
+
+    if (split) { // We create additional CFDFCs for every select branch
+      unsigned numCopies = 1u << selects.size();
+      for (unsigned mask = 0; mask < numCopies; ++mask) {
+        CFDFC copy = cf;
+        // Bit i of `mask` says what select i picks in this copy (1 is true,
+        // 0 is false); ignore the input it does NOT pick.
+        for (auto [idx, selOp] : llvm::enumerate(selects)) {
+          bool chooseTrue = mask & (1u << idx);
+          copy.channelsIgnoredFromTP.insert(chooseTrue ? selOp.getFalseValue()
+                                                       : selOp.getTrueValue());
+        }
+        // Share the execution count so the total stays the same.
+        // FIXME: [amos] I am not sure if this impacts other places in the code?
+        //        but I do think we need it because for example
+        //        `getChannelNumExecs` does `numExec += cfdfc->numExecs;`
+        //        _on every CFDFC_, and we're adding some.
+        copy.numExecs =
+            cf.numExecs / numCopies + (mask < cf.numExecs % numCopies ? 1 : 0);
+        if (copy.numExecs == 0)
+          continue;
+        result.push_back(std::move(copy));
+      }
+    } else { // We only take the most executed edge
+      for (handshake::SelectOp selOp : selects)
+        // We assume that the false input is the least executed one
+        cf.channelsIgnoredFromTP.insert(selOp.getFalseValue());
+      result.push_back(std::move(cf));
+    }
+
+    selects.clear();
+  }
+  cfdfcs = std::move(result);
+}
+
 LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   // Make sure that all operations in the IR are named (used to generate
   // variable names in the MILP)
@@ -375,63 +432,6 @@ static void logFuncInfo(FuncInfo &info) {
   }
 
   os.flush();
-}
-
-/// Applies the chosen select input handling (either we only keep
-/// the most executed edge, or we add two different CFDFCs, one for each edge,
-/// to our set)to every CFDFC.
-static void addSelectCFDFCs(std::vector<CFDFC> &cfdfcs, bool split) {
-
-  std::vector<CFDFC> result;
-  SmallVector<handshake::SelectOp> selects;
-
-  for (CFDFC &cf : cfdfcs) {
-    /// We take all the select units that take at least one data input from
-    /// inside the CFDFC `cf`.
-    for (Operation *unit : cf.units) {
-      auto selOp = dyn_cast<handshake::SelectOp>(unit);
-      if (selOp && (cf.channels.contains(selOp.getTrueValue()) ||
-                    cf.channels.contains(selOp.getFalseValue())))
-        selects.push_back(selOp);
-    }
-
-    if (selects.empty()) {
-      result.push_back(cf);
-      continue;
-    }
-
-    if (split) { // We create additional CFDFCs for every select branch
-      unsigned numCopies = 1u << selects.size();
-      for (unsigned mask = 0; mask < numCopies; ++mask) {
-        CFDFC copy = cf;
-        // Bit i of `mask` says what select i picks in this copy (1 is true,
-        // 0 is false); ignore the input it does NOT pick.
-        for (auto [idx, selOp] : llvm::enumerate(selects)) {
-          bool chooseTrue = mask & (1u << idx);
-          copy.channelsIgnoredFromTP.insert(chooseTrue ? selOp.getFalseValue()
-                                                       : selOp.getTrueValue());
-        }
-        // Share the execution count so the total stays the same.
-        // FIXME: [amos] I am not sure if this impacts other places in the code?
-        //        but I do think we need it because for example
-        //        `getChannelNumExecs` does `numExec += cfdfc->numExecs;`
-        //        _on every CFDFC_, and we're adding some.
-        copy.numExecs =
-            cf.numExecs / numCopies + (mask < cf.numExecs % numCopies ? 1 : 0);
-        if (copy.numExecs == 0)
-          continue;
-        result.push_back(std::move(copy));
-      }
-    } else { // We only take the most executed edge
-      for (handshake::SelectOp selOp : selects)
-        // We assume that the false input is the least executed one
-        cf.channelsIgnoredFromTP.insert(selOp.getFalseValue());
-      result.push_back(std::move(cf));
-    }
-
-    selects.clear();
-  }
-  cfdfcs = std::move(result);
 }
 
 namespace {
