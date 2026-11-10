@@ -47,6 +47,11 @@ struct CFDFC {
   /// Number of executions of the CFDFC.
   unsigned numExecs;
 
+  /// Channels that should have no throughput constraints in the buffer MILP.
+  /// This is for example used to decouple a CFDFC with a Select unit
+  /// into two choice-free graphs
+  mlir::DenseSet<Value> channelsIgnoredFromTP;
+
   /// (Available after placement) The achieved throughput after the placement
   double throughput = 0.0;
   /// (Available after placement) The number of tokens held by each placed
