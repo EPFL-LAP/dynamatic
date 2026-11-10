@@ -53,6 +53,8 @@ struct FormalProperty {
       "CopiedSlotsOfActiveForksAreFull";
   static constexpr StringLiteral EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE =
       "EagerForkPathTokenCopiedMaximumOnce";
+  static constexpr StringLiteral DUPLICATED_TOKEN_LOCATION =
+      "DuplicatedTokenLocation";
   static constexpr StringLiteral RECONVERGENT_PATH_FLOW =
       "ReconvergentPathFlow";
   static constexpr StringLiteral IOG_SINGLE_TOKEN = "IOGSingleToken";

@@ -40,7 +40,9 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
@@ -120,6 +122,7 @@ private:
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
   LogicalResult annotateEagerForkPath(ModuleOp modOp);
+  LogicalResult annotateDuplicatedTokenLocation(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
   LogicalResult annotateIOGSingleToken(ModuleOp modOp);
   LogicalResult annotateIOGConsecutiveTokens(ModuleOp modOp);
@@ -141,6 +144,7 @@ const HandshakeAnnotatePropertiesPass::GeneratorEntry
     {FormalProperty::EAGER_FORK_NOT_ALL_OUTPUT_SENT,            &HandshakeAnnotatePropertiesPass::annotateEagerForkNotAllOutputSent, /*isInvariant=*/true},
     {FormalProperty::COPIED_SLOTS_OF_ACTIVE_FORKS_ARE_FULL,     &HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks,     /*isInvariant=*/true},
     {FormalProperty::EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE, &HandshakeAnnotatePropertiesPass::annotateEagerForkPath,             /*isInvariant=*/true},
+    {FormalProperty::DUPLICATED_TOKEN_LOCATION,                 &HandshakeAnnotatePropertiesPass::annotateDuplicatedTokenLocation,   /*isInvariant=*/true},
     {FormalProperty::RECONVERGENT_PATH_FLOW,                    &HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow,      /*isInvariant=*/true},
     {FormalProperty::IOG_SINGLE_TOKEN,                          &HandshakeAnnotatePropertiesPass::annotateIOGSingleToken,            /*isInvariant=*/true},
     {FormalProperty::IOG_CONSECUTIVE_TOKENS,                    &HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens,      /*isInvariant=*/true},
@@ -379,6 +383,417 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkPath(ModuleOp modOp) {
                     FormalProperty::TAG::INVAR,
                     implies(anySent, getOperandSignal(Signal::Valid,
                                                       op.getOpOperand(0))));
+      }
+    }
+  }
+  return success();
+}
+
+namespace {
+
+/// A branch side that the duplicated token took: the branch and the value of
+/// its condition (1 for the true side, 0 for the false side).
+using BranchSide = std::pair<ConditionalBranchOp, int32_t>;
+
+/// Whether the unit of `use`, whenever it consumes the token of the channel of
+/// `use`, puts a token on a channel of `trap`. A token is lost in sinks and
+/// stores, and kept forever in dead buffers and at the end of the function.
+static bool satisfiesTrapCondition(OpOperand &use,
+                                   const llvm::DenseSet<Value> &trap) {
+  Operation *op = use.getOwner();
+  if (isa<DeadBufferOp, EndOp>(op))
+    return true;
+  // The address of a load comes back as the loaded data, through the memory
+  // controller
+  if (auto loadOp = dyn_cast<LoadOp>(op))
+    return trap.contains(loadOp.getDataResult());
+  if (isa<SinkOp, StoreOp, MemoryControllerOp, LSQOp>(op))
+    return false;
+  // A fork puts a copy on every output, so one output in the trap suffices
+  if (isa<EagerForkLikeOpInterface>(op))
+    return llvm::any_of(op->getResults(),
+                        [&](Value res) { return trap.contains(res); });
+  // Any other unit (e.g., a branch, whose token takes either side) passes the
+  // token to one of its outputs
+  return op->getNumResults() > 0 &&
+         llvm::all_of(op->getResults(),
+                      [&](Value res) { return trap.contains(res); });
+}
+
+/// Returns the channels of the maximal trap of `funcOp`. This is the greatest
+/// fixpoint of `satisfiesTrapCondition`: all channels are assumed to be in the
+/// trap, and the ones that violate the condition are removed until nothing
+/// changes, so that a cycle without any sink stays in the trap.
+static llvm::DenseSet<Value>
+findTokenTrappingChannels(handshake::FuncOp funcOp) {
+  std::vector<Value> channels;
+  for (BlockArgument arg : funcOp.getArguments())
+    channels.push_back(arg);
+  for (Operation &op : funcOp.getOps())
+    for (Value res : op.getResults())
+      channels.push_back(res);
+
+  llvm::DenseSet<Value> trap;
+  for (Value channel : channels)
+    if (channel.hasOneUse())
+      trap.insert(channel);
+
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (Value channel : channels) {
+      if (trap.contains(channel) &&
+          !satisfiesTrapCondition(*channel.getUses().begin(), trap)) {
+        trap.erase(channel);
+        changed = true;
+      }
+    }
+  }
+  return trap;
+}
+
+/// Whether `op` holds at least one slot.
+static bool hasSlots(Operation *op) {
+  return !getAllSlotsOfOperation(op).empty();
+}
+
+/// The units whose last slot holds the original token while `fork` has sent a
+/// copy: the units with slots right before `fork`. Merge-like units end the
+/// walk, as the original could be in any of their inputs.
+static llvm::SetVector<Operation *> findOriginalUnits(ForkOp fork) {
+  llvm::SetVector<Operation *> before =
+      reachBackward(SmallVector<Value>(fork->getOperands()), [](Operation *op) {
+        return hasSlots(op) || isa<MergeLikeOpInterface>(op);
+      });
+  return llvm::SetVector<Operation *>(
+      llvm::from_range, llvm::make_filter_range(before, hasSlots));
+}
+
+/// Returns the condition under which the copy that a fork sent on `copied`
+/// went through `side` of a branch, if it can be read from the circuit: the
+/// condition of the branch comes from an eager fork that holds a value
+/// computed from another output of the fork, through units without slots,
+/// e.g., for fork4 -> cmpi0 -> fork5 -> cond_br1:
+///   (fork4.outs_1_sent | (fork5.outs_0_sent & (fork5.ins = FALSE)))
+static std::optional<PropertyExpr> deriveBranchSideExpr(BranchSide side,
+                                                        OpResult copied) {
+  auto fork = cast<ForkOp>(copied.getOwner());
+  // While the other output of the fork is not sent, the computation still holds
+  // the same token, so the condition fork still holds the value with which the
+  // branch routed the copy. The condition may pass through buffers after the
+  // condition fork: the branch consumes the conditions in order, together with
+  // their data, so the condition that routed the copy is the one that the fork
+  // sent
+  auto [branch, sideValue] = side;
+  Value condition = branch.getConditionOperand();
+  while (auto bufferOp = dyn_cast_or_null<BufferOp>(condition.getDefiningOp()))
+    condition = bufferOp.getOperand();
+  auto conditionFork = dyn_cast_or_null<ForkOp>(condition.getDefiningOp());
+  if (!conditionFork || conditionFork == fork)
+    return std::nullopt;
+
+  // The units that compute the condition, back to the slots and the fork. A
+  // slot holds its token until the computation completes
+  llvm::SetVector<Operation *> computation =
+      reachBackward(SmallVector<Value>(conditionFork->getOperands()),
+                    [&](Operation *op) { return op == fork || hasSlots(op); });
+  computation.insert(conditionFork);
+  // The value of a merge-like unit may come from another input
+  if (llvm::any_of(computation, [](Operation *op) {
+        return isa<MergeLikeOpInterface>(op) && !hasSlots(op);
+      }))
+    return std::nullopt;
+
+  // The outputs of the fork from which the condition is computed
+  auto forkSents = fork.getInternalSentStateNamers();
+  std::vector<PropertyExpr> terms;
+  llvm::SmallSet<unsigned, 4> sourceOutputs;
+  for (Operation *op : computation) {
+    if (op == fork || hasSlots(op))
+      continue;
+    for (Value operand : op->getOperands()) {
+      auto output = dyn_cast<OpResult>(operand);
+      if (!output || output.getOwner() != fork || output == copied)
+        continue;
+      auto [outputIt, isNewOutput] =
+          sourceOutputs.insert(output.getResultNumber());
+      if (isNewOutput)
+        terms.emplace_back(State(forkSents[output.getResultNumber()]));
+    }
+  }
+  if (terms.empty())
+    return std::nullopt;
+  unsigned conditionOutput = cast<OpResult>(condition).getResultNumber();
+  terms.emplace_back(State(
+      conditionFork.getInternalSentStateNamers()[conditionOutput], sideValue));
+  return disjunction(terms);
+}
+
+/// Returns the output of `next` (a fork other than the one that sent the copy)
+/// that the copy is followed on, among the outputs in `trap`. A copy on one
+/// output suffices, and following a single output keeps the region small:
+/// while `next` has not sent on it, the copy is still before `next`. The
+/// output that leads back to the fork that sent the copy, i.e., to one of the
+/// `reachingFork` units, is preferred, as the copy is blocked there behind the
+/// original.
+static std::optional<OpResult>
+getFollowedOutput(EagerForkLikeOpInterface next,
+                  const llvm::DenseSet<Value> &trap,
+                  const llvm::SetVector<Operation *> &reachingFork) {
+  std::optional<OpResult> followed;
+  for (OpResult out : next->getResults()) {
+    if (!trap.contains(out))
+      continue;
+    if (reachingFork.contains(out.getUses().begin()->getOwner()))
+      return out;
+    if (!followed)
+      followed = out;
+  }
+  return followed;
+}
+
+/// Intersects `sides` into the sides that `map` holds for `key`, or inserts
+/// them if `key` is new. Returns whether the entry was inserted or shrank.
+template <typename MapT, typename KeyT>
+static bool intersectInto(MapT &map, KeyT key,
+                          const llvm::SetVector<BranchSide> &sides) {
+  auto [it, isNewKey] = map.try_emplace(key, sides);
+  if (isNewKey)
+    return true;
+  auto &[knownKey, knownSides] = *it;
+  // The intersection can only remove sides
+  size_t numKnownSides = knownSides.size();
+  llvm::set_intersect(knownSides, sides);
+  return knownSides.size() != numKnownSides;
+}
+
+/// Returns the units that the copy that `fork` sent on `copied` can reach
+/// along the channels accepted by `isFollowed`, without passing `fork`. Each
+/// unit comes with the branch sides that the copy took on all paths to it,
+/// among those whose condition `deriveBranchSideExpr` can read.
+static llvm::MapVector<Operation *, llvm::SetVector<BranchSide>>
+reachForwardAndCollectFollowedSides(
+    ForkOp fork, OpResult copied, llvm::function_ref<bool(Value)> isFollowed) {
+  // The sides of a channel only shrink when it is reached again, so the walk
+  // terminates
+  llvm::DenseMap<Value, llvm::SetVector<BranchSide>>
+      reachedChannelsWithFollowedSides;
+  llvm::MapVector<Operation *, llvm::SetVector<BranchSide>>
+      reachedUnitsWithFollowedSides;
+  // Each channel comes with the sides that the copy took to reach it. An entry
+  // can be stale (pushed before the sides of its channel shrank): its sides
+  // are then a superset, which the intersections below absorb.
+  SmallVector<std::pair<Value, llvm::SetVector<BranchSide>>> channelStack;
+  reachedChannelsWithFollowedSides[copied] = {};
+  channelStack.push_back({copied, {}});
+  while (!channelStack.empty()) {
+    auto [reachedChannel, channelSides] = channelStack.pop_back_val();
+    Operation *successor = *reachedChannel.getUsers().begin();
+    assert(successor != fork &&
+           "the walk never follows a channel into the fork that holds the "
+           "original");
+
+    // The sides that the copy took on every path to the unit. The
+    // intersection drops a side that only some paths took, so the slots of
+    // the unit count without its condition (sound, but weaker than the
+    // disjunction of the conditions of the paths). The paths differ:
+    // - at a merge after an if-else, or at a loop header (entry and back
+    //   edge), which receives the copy from either side;
+    // - at a join whose inputs come through different control flow;
+    // - after either of these, as the unit inherits the sides of its input.
+    // A stale entry of `channelStack` changes nothing, as its sides are a
+    // superset of the known ones
+    intersectInto(reachedUnitsWithFollowedSides, successor, channelSides);
+
+    for (OpResult res : getFlowSuccessors(*reachedChannel.getUses().begin())) {
+      // The copy cannot pass the fork that holds the original
+      if (!isFollowed(res) || *res.getUsers().begin() == fork)
+        continue;
+      llvm::SetVector<BranchSide> resSides = channelSides;
+      // The copy took this side of the branch. If it entered as the condition,
+      // the side condition can only come from another output of `fork` that
+      // the computation of the condition consumed, so it holds trivially
+      if (auto branch = dyn_cast<ConditionalBranchOp>(successor)) {
+        int32_t value = res == branch.getTrueResult() ? 1 : 0;
+        if (deriveBranchSideExpr({branch, value}, copied))
+          resSides.insert({branch, value});
+      }
+      if (intersectInto(reachedChannelsWithFollowedSides, res, resSides))
+        channelStack.push_back(
+            {res, reachedChannelsWithFollowedSides.lookup(res)});
+    }
+  }
+  return reachedUnitsWithFollowedSides;
+}
+
+} // namespace
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotateDuplicatedTokenLocation(
+    ModuleOp modOp) {
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    // A trap is a set of channels such that every unit that consumes a token
+    // from one of them puts a token on one of them, with a branch passing its
+    // token to either side (as in a Petri net). A token on a channel of the
+    // trap thus always has a descendant in the trap. The maximal trap is the
+    // union of all traps
+    llvm::DenseSet<Value> trap = findTokenTrappingChannels(funcOp);
+    for (ForkOp fork : funcOp.getOps<ForkOp>()) {
+      llvm::SetVector<Operation *> originalUnits = findOriginalUnits(fork);
+      auto forkSents = fork.getInternalSentStateNamers();
+      llvm::SetVector<Operation *> reachingFork =
+          reachBackward(SmallVector<Value>(fork->getOperands()),
+                        [](Operation *) { return false; });
+      // The channels that the copy is followed on: those of the trap, and only
+      // one output of each fork other than `fork`
+      auto isFollowed = [&](Value channel) {
+        auto next =
+            dyn_cast_or_null<EagerForkLikeOpInterface>(channel.getDefiningOp());
+        if (!next || next.getOperation() == fork)
+          return trap.contains(channel);
+        return getFollowedOutput(next, trap, reachingFork) == channel;
+      };
+
+      for (OpResult copied : fork->getResults()) {
+        // A copy outside the trap can disappear, so it has no location
+        if (!trap.contains(copied))
+          continue;
+        unsigned copiedOutput = copied.getResultNumber();
+
+        llvm::MapVector<Operation *, llvm::SetVector<BranchSide>>
+            reachedUnitsWithFollowedSides =
+                reachForwardAndCollectFollowedSides(fork, copied, isFollowed);
+
+        // The slots that the copy can be in, except the last slots of the
+        // units that hold the original
+        size_t numSlots = 0;
+        for (auto &[op, sides] : reachedUnitsWithFollowedSides)
+          numSlots +=
+              getAllSlotsOfOperation(op).size() - originalUnits.contains(op);
+        if (numSlots == 0)
+          continue;
+
+        // The buffers right after the copied output, which hold the copy with
+        // the value of the original. Only 1-bit channels (e.g., decisions) are
+        // constrained by value, which takes one term per value.
+        llvm::SetVector<Operation *> sameValueBuffers;
+        bool isOneBit = false;
+        if (auto channelType = dyn_cast<ChannelType>(copied.getType()))
+          isOneBit = channelType.getDataBitWidth() == 1;
+        for (Value channel = copied; isOneBit && trap.contains(channel);) {
+          auto bufferOp =
+              dyn_cast<BufferOp>(channel.getUses().begin()->getOwner());
+          if (!bufferOp || !sameValueBuffers.insert(bufferOp))
+            break;
+          channel = bufferOp.getResult();
+        }
+
+        // If the fork has sent the copy, a slot that the copy can reach holds
+        // a token that is not an original whose copy has moved on, and that
+        // has the value of the original if the slot is right after the fork,
+        // e.g.:
+        //   (fork4.outs_0_sent -> (buffer0.outs_valid_i
+        //      | (buffer1.full & !fork2.outs_2_sent
+        //         & (fork4.outs_1_sent
+        //            | (fork5.outs_0_sent & (fork5.ins = TRUE))))
+        //      | ...))
+        //   (fork5.outs_0_sent -> (
+        //      ((buffer8.full & (buffer8.reg = FALSE))
+        //       & (fork5.outs_0_sent & (fork5.ins = FALSE)))
+        //      | ((buffer8.full & (buffer8.reg = TRUE))
+        //         & (fork5.outs_0_sent & (fork5.ins = TRUE)))
+        //      | ...))
+        std::vector<PropertyExpr> reachedEffectiveSlots;
+        // The effective slots of the units that the copy reaches, with respect
+        // to the dataflow subgraph of the followed channels: the last slot of
+        // a unit only counts until the forks after it have copied its token on
+        // the followed channels
+        for (auto &[op, sides] : reachedUnitsWithFollowedSides) {
+          // The forks right after the unit, through units without slots, copy
+          // the token of its last slot. An eager fork keeps its input until it
+          // has sent on all outputs, so once one of them has sent on its
+          // followed output, the copy has moved on although the slot is still
+          // full
+          llvm::SetVector<Operation *> after = reachForward(
+              SmallVector<Value>(op->getResults()),
+              [&](Operation *next) { return next == fork || hasSlots(next); },
+              isFollowed);
+          std::vector<EagerForkSentNamer> copiedSents;
+          // A unit with slots that is an eager fork (e.g., a control merge)
+          // sends the token of its last slot itself
+          if (auto unitFork = dyn_cast<EagerForkLikeOpInterface>(op)) {
+            auto unitForkSents = unitFork.getInternalSentStateNamers();
+            for (OpResult out : op->getResults())
+              if (isFollowed(out))
+                copiedSents.push_back(unitForkSents[out.getResultNumber()]);
+          }
+          for (Operation *next : after) {
+            // The slots of a control merge come before its outputs, so its
+            // sent states say nothing about the token of an earlier unit
+            auto nextFork = dyn_cast<ForkOp>(next);
+            if (!nextFork || nextFork == fork)
+              continue;
+            auto nextForkSents = nextFork.getInternalSentStateNamers();
+            for (OpResult out : nextFork->getResults())
+              if (isFollowed(out))
+                copiedSents.push_back(nextForkSents[out.getResultNumber()]);
+          }
+
+          std::vector<PropertyExpr> sideConditions;
+          for (const BranchSide &side : sides)
+            sideConditions.push_back(*deriveBranchSideExpr(side, copied));
+          auto slots = getAllSlotsOfOperation(op);
+          for (auto [i, slot] : llvm::enumerate(slots)) {
+            bool isLast = i + 1 == slots.size();
+            if (isLast && originalUnits.contains(op))
+              continue;
+            // The last slot only counts until the forks after it have copied
+            // its token
+            std::shared_ptr<InternalStateNamer> slotNamer =
+                isLast ? std::make_shared<EffectiveSlotNamer>(std::move(slot),
+                                                              copiedSents)
+                       : std::shared_ptr<InternalStateNamer>(std::move(slot));
+            std::vector<PropertyExpr> terms{State(slotNamer)};
+            if (sameValueBuffers.contains(op)) {
+              std::vector<PropertyExpr> sameValue;
+              for (int32_t value : {0, 1})
+                sameValue.push_back(
+                    conjunction({State(slotNamer, value),
+                                 State(forkSents[copiedOutput], value)}));
+              terms = {disjunction(sameValue)};
+            }
+            llvm::append_range(terms, sideConditions);
+            reachedEffectiveSlots.push_back(conjunction(terms));
+          }
+        }
+        addProperty(FormalProperty::DUPLICATED_TOKEN_LOCATION,
+                    FormalProperty::TAG::INVAR,
+                    implies(State(forkSents[copiedOutput]),
+                            disjunction(reachedEffectiveSlots)));
+
+        // The copy entered the buffers last, and nothing enters behind it
+        // while the fork holds the original, so the newest token in the
+        // buffers is the copy (older tokens can be ahead of it), e.g.:
+        //   ((fork5.outs_0_sent & buffer8.full)
+        //    -> (((buffer8.reg = FALSE) & (fork5.ins = FALSE))
+        //        | ((buffer8.reg = TRUE) & (fork5.ins = TRUE))))
+        std::vector<PropertyExpr> newerSlotsEmpty{
+            State(forkSents[copiedOutput])};
+        for (Operation *bufferOp : sameValueBuffers) {
+          for (auto &slot : getAllSlotsOfOperation(bufferOp)) {
+            std::shared_ptr<InternalStateNamer> slotNamer = std::move(slot);
+            std::vector<PropertyExpr> sameValue;
+            for (int32_t value : {0, 1})
+              sameValue.push_back(
+                  conjunction({State(slotNamer, value),
+                               State(forkSents[copiedOutput], value)}));
+            std::vector<PropertyExpr> isNewest = newerSlotsEmpty;
+            isNewest.push_back(State(slotNamer));
+            addProperty(FormalProperty::DUPLICATED_TOKEN_LOCATION,
+                        FormalProperty::TAG::INVAR,
+                        implies(conjunction(isNewest), disjunction(sameValue)));
+            newerSlotsEmpty.push_back(!State(slotNamer));
+          }
+        }
       }
     }
   }
