@@ -217,39 +217,22 @@ static void addSelectCFDFCs(std::vector<CFDFC> &cfdfcs, bool split) {
         selects.push_back(selOp);
     }
 
-    if (selects.empty()) {
-      result.push_back(cf);
-      continue;
-    }
+    for (handshake::SelectOp selOp : selects)
+      // We assume that the false input is the least executed one
+      cf.channelsIgnoredFromTP.insert(selOp.getFalseValue());
 
-    if (split) { // We create additional CFDFCs for every select branch
-      unsigned numCopies = 1u << selects.size();
-      for (unsigned mask = 0; mask < numCopies; ++mask) {
-        CFDFC copy = cf;
-        // Bit i of `mask` says what select i picks in this copy (1 is true,
-        // 0 is false); ignore the input it does NOT pick.
-        for (auto [idx, selOp] : llvm::enumerate(selects)) {
-          bool chooseTrue = mask & (1u << idx);
-          copy.channelsIgnoredFromTP.insert(chooseTrue ? selOp.getFalseValue()
-                                                       : selOp.getTrueValue());
-        }
-        // Share the execution count so the total stays the same.
-        // FIXME: [amos] I am not sure if this impacts other places in the code?
-        //        but I do think we need it because for example
-        //        `getChannelNumExecs` does `numExec += cfdfc->numExecs;`
-        //        _on every CFDFC_, and we're adding some.
-        copy.numExecs =
-            cf.numExecs / numCopies + (mask < cf.numExecs % numCopies ? 1 : 0);
-        if (copy.numExecs == 0)
-          continue;
-        result.push_back(std::move(copy));
-      }
-    } else { // We only take the most executed edge
-      for (handshake::SelectOp selOp : selects)
-        // We assume that the false input is the least executed one
-        cf.channelsIgnoredFromTP.insert(selOp.getFalseValue());
-      result.push_back(std::move(cf));
+    std::optional<CFDFC> cfCopy;
+    if (split && !selects.empty()) {
+      cfCopy = cf;
+      cfCopy->channelsIgnoredFromTP.clear();
+      cfCopy->numExecs =
+          0; // Set `numExecs` to 0 so the copy has no impact on TP
     }
+    // First we move cf, then the copy, so we know that the "real"
+    // CFDFC (the one with an impact on TP) has a lower index
+    result.push_back(std::move(cf));
+    if (cfCopy)
+      result.push_back(std::move(*cfCopy));
 
     selects.clear();
   }
