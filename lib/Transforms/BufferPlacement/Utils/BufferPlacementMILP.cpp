@@ -831,9 +831,6 @@ void BufferPlacementMILP::
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
-    // Get the ports the channels connect and their retiming MILP variables
-    Operation *dstOp = *channel.getUsers().begin();
-
     /// For each select unit, two CFDFCs ar egenerated: one where we do not add
     /// constraints for the "false" input an done where we do not add them for
     /// the "true" input. `channelsIgnoredFromTP` stores which one should be
@@ -908,9 +905,6 @@ void BufferPlacementMILP::
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
-    // Get the ports the channels connect and their retiming MILP variables
-    Operation *dstOp = *channel.getUsers().begin();
-
     /// For each select unit, two CFDFCs ar egenerated: one where we do not add
     /// constraints for the "false" input an done where we do not add them for
     /// the "true" input. `channelsIgnoredFromTP` stores which one should be

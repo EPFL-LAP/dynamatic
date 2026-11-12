@@ -228,7 +228,18 @@ static void addSelectCFDFCs(std::vector<CFDFC> &cfdfcs, bool split) {
       cfCopy->numExecs =
           0; // Set `numExecs` to 0 so the copy has no impact on TP
     }
-    // First we move cf, then the copy, so we know that the "real"
+
+    // We now exclude in `cf` all nodes following the process outlined in FPGA20
+    // (1) we include into the throughput constraints each Select input channel
+    //      that is on a noncyclic path, as this latency will never compromise
+    //      throughput;
+    // (2) if the Select has a single input on a cyclic path, we
+    //      exclude the corresponding input channel from the throughput
+    //      constraints;
+    // (3) if the Select has both inputs on cyclic paths, we exclude the
+    //      input channel on the cycle with more sequential stages.
+
+    // First we move `cf`, then the copy, so we know that the "real"
     // CFDFC (the one with an impact on TP) has a lower index
     result.push_back(std::move(cf));
     if (cfCopy)

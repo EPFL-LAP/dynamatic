@@ -56,6 +56,3 @@ metals.sbt
 
 # Local Python virtual environment (e.g., for clang-format and autopep8)
 /.venv
-
-select-split-results/
-select_split_bench.py
