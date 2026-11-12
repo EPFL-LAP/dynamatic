@@ -789,13 +789,6 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
         continue;
     }
 
-    /// For each select unit, two CFDFCs ar egenerated: one where we do not add
-    /// constraints for the "false" input an done where we do not add them for
-    /// the "true" input. `channelsIgnoredFromTP` stores which one should be
-    /// ignored when setting TP constraints.
-    if (cfdfc.channelsIgnoredFromTP.contains(channel))
-      continue;
-
     // Retrieve the struct storing MILP variables
     // for the src op and dst op
     UnitVars &srcVars = cfVars.getUnitVarsFor(srcOp);
@@ -831,13 +824,6 @@ void BufferPlacementMILP::
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
-    /// For each select unit, two CFDFCs ar egenerated: one where we do not add
-    /// constraints for the "false" input an done where we do not add them for
-    /// the "true" input. `channelsIgnoredFromTP` stores which one should be
-    /// ignored when setting TP constraints.
-    if (cfdfc.channelsIgnoredFromTP.contains(channel))
-      continue;
-
     // The channel must have variables for the data signal
     ChannelVars &chVars = vars.channelVars[channel];
     auto dataVars = chVars.signalVars.find(SignalType::DATA);
@@ -905,13 +891,6 @@ void BufferPlacementMILP::
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
-    /// For each select unit, two CFDFCs ar egenerated: one where we do not add
-    /// constraints for the "false" input an done where we do not add them for
-    /// the "true" input. `channelsIgnoredFromTP` stores which one should be
-    /// ignored when setting TP constraints.
-    if (cfdfc.channelsIgnoredFromTP.contains(channel))
-      continue;
-
     // The channel must have variables for the data and ready signals
     ChannelVars &chVars = vars.channelVars[channel];
     auto dataVars = chVars.signalVars.find(SignalType::DATA);
