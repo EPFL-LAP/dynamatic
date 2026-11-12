@@ -199,60 +199,6 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   markAnalysesPreserved<NameAnalysis>();
 }
 
-/// Applies the chosen select input handling (either we only keep
-/// the most executed edge, or we add two different CFDFCs, one for each edge,
-/// to our set)to every CFDFC.
-// static void addSelectCFDFCs(std::vector<CFDFC> &cfdfcs, bool split) {
-
-//   std::vector<CFDFC> result;
-//   SmallVector<handshake::SelectOp> selects;
-
-//   for (CFDFC &cf : cfdfcs) {
-//     /// We take all the select units that take at least one data input from
-//     /// inside the CFDFC `cf`.
-//     for (Operation *unit : cf.units) {
-//       auto selOp = dyn_cast<handshake::SelectOp>(unit);
-//       if (selOp && (cf.channels.contains(selOp.getTrueValue()) ||
-//                     cf.channels.contains(selOp.getFalseValue())))
-//         selects.push_back(selOp);
-//     }
-
-//     for (handshake::SelectOp selOp : selects)
-//       // We assume that the false input is the least executed one
-//       cf.channelsIgnoredFromTP.insert(selOp.getFalseValue());
-
-//     std::optional<CFDFC> cfCopy;
-//     if (split && !selects.empty()) {
-//       cfCopy = cf;
-//       cfCopy->channelsIgnoredFromTP.clear();
-//       cfCopy->numExecs =
-//           0; // Set `numExecs` to 0 so the copy has no impact on TP
-//     }
-
-//     // We now exclude in `cf` all nodes following the process outlined in
-//     FPGA20
-//     // (1) we include into the throughput constraints each Select input
-//     channel
-//     //      that is on a noncyclic path, as this latency will never
-//     compromise
-//     //      throughput;
-//     // (2) if the Select has a single input on a cyclic path, we
-//     //      exclude the corresponding input channel from the throughput
-//     //      constraints;
-//     // (3) if the Select has both inputs on cyclic paths, we exclude the
-//     //      input channel on the cycle with more sequential stages.
-
-//     // First we move `cf`, then the copy, so we know that the "real"
-//     // CFDFC (the one with an impact on TP) has a lower index
-//     result.push_back(std::move(cf));
-//     if (cfCopy)
-//       result.push_back(std::move(*cfCopy));
-
-//     selects.clear();
-//   }
-//   cfdfcs = std::move(result);
-// }
-
 LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   // Make sure that all operations in the IR are named (used to generate
   // variable names in the MILP)
