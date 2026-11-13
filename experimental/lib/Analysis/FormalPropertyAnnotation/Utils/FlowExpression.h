@@ -6,6 +6,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <bitset>
 #include <variant>
@@ -213,10 +214,29 @@ struct std::hash<FlowVariable> {
   }
 };
 
+namespace llvm {
+/// Lets FlowVariable key a DenseMap (e.g., the index of a MapVector).
+template <>
+struct DenseMapInfo<dynamatic::handshake::FlowVariable> {
+  using FlowVariable = dynamatic::handshake::FlowVariable;
+
+  static unsigned getHashValue(const FlowVariable &var) {
+    return std::hash<FlowVariable>()(var);
+  }
+  static bool isEqual(const FlowVariable &lhs, const FlowVariable &rhs) {
+    return lhs == rhs;
+  }
+};
+} // namespace llvm
+
 namespace dynamatic {
 namespace handshake {
 struct FlowExpression {
-  std::unordered_map<FlowVariable, int> terms;
+  /// The coefficient of each variable, in the order in which the variables
+  /// were added. The flow system numbers the variables in this order, so it
+  /// must not depend on the hashes, some of which are pointers: with LLVM's
+  /// ABI-breaking checks, the hash seed changes on every run.
+  llvm::MapVector<FlowVariable, int> terms;
   FlowExpression() = default;
   FlowExpression(const FlowVariable &v);
 
