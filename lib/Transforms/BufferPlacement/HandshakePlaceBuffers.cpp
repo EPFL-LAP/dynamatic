@@ -256,8 +256,6 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
     if (cfgHasBackedge && failed(getCFDFCs(info, cfdfcs)))
       return failure();
 
-    // addSelectCFDFCs(cfdfcs, /*split=*/true);
-
     // All extracted CFDFCs must be optimized
     for (CFDFC &cf : cfdfcs)
       info.cfdfcs[&cf] = true;
@@ -574,23 +572,27 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
 
     if (selects.empty()) {
       cfdfcs.push_back(cf);
-    } else { // "Duplicate" this CFDFC in two, leaving one untouched
-             // but with 0 impact on TP (`cfCopy`), the other with one
-             // input edge deleted (`cf`)
-      std::optional<CFDFC> cfCopy;
-      cfCopy = cf;
-      cfCopy->numExecs =
-          0; // Set `numExecs` to 0 so the copy has no impact on TP
+    } else {
+      // "Duplicate" this CFDFC in two, leaving one untouched but with 0 impact
+      // on TP (`cfCopy`), the other with one input edge deleted (`cf`)
+      std::optional<CFDFC> cfNoTP;
+      cfNoTP = cf;
+      // Set `numExecs` to 0 so the copy has no impact on TP
+      cfNoTP->numExecs = 0;
 
       for (handshake::SelectOp selOp : selects)
-        // We assume that the false input is the least executed one
+        /// TODO: The legacy implementation does not add any constraints here
+        /// for the input channel to select operations that is less frequently
+        /// executed. Temporarily, emulate the same behavior obtained from
+        /// passing our DOTs to the old buffer pass by assuming the "false"
+        /// input is always the least executed one
         cf.channels.remove(selOp.getFalseValue());
 
       // First we move `cf`, then the copy, such that the "complete" CFDFC has a
       // lower index
       cfdfcs.push_back(std::move(cf));
-      if (cfCopy)
-        cfdfcs.push_back(std::move(*cfCopy));
+      if (cfNoTP)
+        cfdfcs.push_back(std::move(*cfNoTP));
     }
   } while (!firstCFDFC);
 
