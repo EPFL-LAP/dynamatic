@@ -557,11 +557,43 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
       break;
 
     // Create the CFDFC from the set of selected archs and BBs
-    if (ftd)
-      cfdfcs.push_back(CFDFC::createFTD(info.funcOp, selectedArchs, numExecs,
-                                        backwardChannels));
-    else
-      cfdfcs.push_back(CFDFC::create(info.funcOp, selectedArchs, numExecs));
+    CFDFC cf = ftd ? CFDFC::createFTD(info.funcOp, selectedArchs, numExecs,
+                                      backwardChannels)
+                   : CFDFC::create(info.funcOp, selectedArchs, numExecs);
+
+    // Collect all selects in the CFDFC
+    SmallVector<handshake::SelectOp> selects;
+    for (Operation *unit : cf.units) {
+      auto selOp = dyn_cast<handshake::SelectOp>(unit);
+      if (selOp && (cf.channels.contains(selOp.getTrueValue()) ||
+                    cf.channels.contains(selOp.getFalseValue())))
+        selects.push_back(selOp);
+    }
+
+    if (selects.empty()) {
+      cfdfcs.push_back(cf);
+    } else {
+      // "Duplicate" this CFDFC in two, leaving one untouched but with 0 impact
+      // on TP (`cfCopy`), the other with one input edge deleted (`cf`)
+      std::optional<CFDFC> cfNoTP;
+      cfNoTP = cf;
+      // Set `numExecs` to 0 so the copy has no impact on TP
+      cfNoTP->numExecs = 0;
+
+      for (handshake::SelectOp selOp : selects)
+        /// TODO: The legacy implementation does not add any constraints here
+        /// for the input channel to select operations that is less frequently
+        /// executed. Temporarily, emulate the same behavior obtained from
+        /// passing our DOTs to the old buffer pass by assuming the "false"
+        /// input is always the least executed one
+        cf.channels.remove(selOp.getFalseValue());
+
+      // First we move `cf`, then the copy, such that the "complete" CFDFC has a
+      // lower index
+      cfdfcs.push_back(std::move(cf));
+      if (cfNoTP)
+        cfdfcs.push_back(std::move(*cfNoTP));
+    }
   } while (!firstCFDFC);
 
   return success();
@@ -707,9 +739,9 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
 }
 
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
-  // The only strategy at this point is to place buffers on the output channels
-  // of all merge-like operations. We still want to respect channel-specific
-  // buffering constraints
+  // The only strategy at this point is to place buffers on the output
+  // channels of all merge-like operations. We still want to respect
+  // channel-specific buffering constraints
 
   // Read the operations' timing models from disk
   TimingDatabase timingDB;
@@ -719,14 +751,14 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   auto modOp = llvm::dyn_cast<ModuleOp>(getOperation());
 
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    // Map all channels in the function to their specific buffering properties,
-    // adjusting for internal buffers present inside the units
+    // Map all channels in the function to their specific buffering
+    // properties, adjusting for internal buffers present inside the units
     llvm::MapVector<Value, ChannelBufProps> channelProps;
     if (failed(mapChannelsToProperties(funcOp, timingDB, channelProps)))
       return failure();
 
-    // Make sure that the data output channels of all merge-like operations have
-    // at least one opaque and one transparent slot, unless a constraint
+    // Make sure that the data output channels of all merge-like operations
+    // have at least one opaque and one transparent slot, unless a constraint
     // explicitly prevents us from putting a buffer there
     for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
       ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
@@ -735,7 +767,8 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place transparent buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may "
+               "output due to channel-specific buffering constraints. This "
+               "may "
                "yield an invalid buffering.";
       }
       if (resProps.maxOpaque.value_or(1) >= 1) {
@@ -743,7 +776,8 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place opaque buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may "
+               "output due to channel-specific buffering constraints. This "
+               "may "
                "yield an invalid buffering.";
       }
     }
@@ -755,7 +789,8 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       } else {
         initOp->emitWarning()
             << "Cannot place transparent buffer on init operation's output "
-               "due to channel-specific buffering constraints. This may yield "
+               "due to channel-specific buffering constraints. This may "
+               "yield "
                "an invalid buffering.";
       }
       if (resProps.maxOpaque.value_or(1) >= 1) {
@@ -779,8 +814,8 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       placement[channel] = result;
     }
 
-    // Since we are not using MILP, we do not need to access to CFDFC to get the
-    // throughput information.
+    // Since we are not using MILP, we do not need to access to CFDFC to get
+    // the throughput information.
     //
     // We cannot pass the reference of a temporary object to std::vector<..>&,
     // so we have to create this empty vector.
@@ -818,9 +853,9 @@ static void insertBufferOpAndOccupancyInCFDFC(
   // The MILP solution returns the token occupancy per each channel in the
   // CFDFC.
   //
-  // The tokens in the CFDFC might be smaller than the total number slots of the
-  // channel. Therefore, we need to calculate the number of tokens per different
-  // buffer slots.
+  // The tokens in the CFDFC might be smaller than the total number slots of
+  // the channel. Therefore, we need to calculate the number of tokens per
+  // different buffer slots.
   if (totalChannelOccupancy < (double)totalChannelLatency) {
     // Case "#tokens in the channel" < "Total latency of the channel":
     // Distribute tokens among slots with latency (the tokens
@@ -858,9 +893,9 @@ static void insertBufferOpAndOccupancyInCFDFC(
         // Assign to the slot with DV latency >= 1
         latencyDV +
         // Assign to the slots DV latency = 1. We insert buffers into the
-        // CFDFC starting from the channel that is the closest to the receiver,
-        // so this function does not need to take care of the order between the
-        // slots without DV latency.
+        // CFDFC starting from the channel that is the closest to the
+        // receiver, so this function does not need to take care of the order
+        // between the slots without DV latency.
         fmin(nonLatencyCapacity, remainingTknsToDistribute);
     tokensInBufOp = fmin(tokensInBufOp, static_cast<double>(effectiveCapacity));
 
@@ -930,26 +965,26 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
       totalChannelLatency += bufOp.getLatencyDV();
     }
 
-    // Insert the buffers and their token occupancy into the CFDFCs that contain
-    // them.
+    // Insert the buffers and their token occupancy into the CFDFCs that
+    // contain them.
     for (auto &cfdfc : cfdfcs) {
       // Skipping the CFDFCs that do not contain the channel.
       if (!cfdfc.channels.contains(channel))
         continue;
 
-      // How many tokens are distributed into the buffers placed on the channel?
-      // This variable is updated after every buffer placed.
+      // How many tokens are distributed into the buffers placed on the
+      // channel? This variable is updated after every buffer placed.
       double currNumTokensOfChannelInCFDFC = cfdfc.channelOccupancy.at(channel);
       double totalChannelOccupancy = currNumTokensOfChannelInCFDFC;
       for (auto &bufOp : llvm::reverse(placedBuffers)) {
         // Insert the buffer ops into the CFDFC that contains the original
         // channel, and assign the token occupancy (i.e.,
         // numTokensOfChannelInCFDFC) to each buffer. We start from the end of
-        // the channel (e.g., the one closest to the receiver) to the beginning
-        // of the channel.
+        // the channel (e.g., the one closest to the receiver) to the
+        // beginning of the channel.
         //
-        // reverse(placedBuffers): the first inserted buffer is the one closest
-        // to the sender.
+        // reverse(placedBuffers): the first inserted buffer is the one
+        // closest to the sender.
         insertBufferOpAndOccupancyInCFDFC(bufOp, cfdfc, totalChannelLatency,
                                           totalChannelOccupancy,
                                           currNumTokensOfChannelInCFDFC);
