@@ -11,8 +11,9 @@ handshake.func @store(%mem: memref<100xi32>, %memStart: <>, %start: <>) -> (mem_
   %addr = constant %ctrl#1 {value = 0 : i7, handshake.bb = 0 : ui32, handshake.name = "constant11"} : <>, <i7>
   %data = constant %ctrl#2 {value = 5 : i32, handshake.bb = 0 : ui32, handshake.name = "constant12"} : <>, <i32>
   %stAddr, %stData = store[%addr] %data {handshake.bb = 0 : ui32, handshake.mem_interface = #handshake.mem_interface<MC>, handshake.name = "store10"} : <i7>, <i32>, <i7>, <i32>
-  // The token of %memStart is in the argument, in the controller, or at the end
-  // CHECK: ReconvergentPathFlow: ((1 + (toint(memStart_valid) * -1) + (toint(mem_controller10.inner_mc_control.fsm_running) * -1) + (toint(testbench.end_full) * -1)) = 0)
+  // The token of %memStart is in the argument or in the controller until the
+  // controller has received its end control from %start and has stopped
+  // CHECK: ReconvergentPathFlow: (((toint(memStart_valid) * 1) + (toint(start_valid) * -1) + (toint(fork10.outs_3_sent) * 1) + (toint(mem_controller10.inner_mc_control.fsm_running) * 1) + (toint(mem_controller10.inner_mc_control.no_more_request) * -1)) = 0)
   // The controller holds the token of its end control once the circuit makes
   // no more requests
   // CHECK: ReconvergentPathFlow: (((toint(fork10.outs_3_sent) * 1) + (toint(fork10.outs_4_sent) * -1) + (toint(mem_controller10.inner_mc_control.no_more_request) * -1)) = 0)
