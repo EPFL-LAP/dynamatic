@@ -2,8 +2,6 @@ from generators.support.utils import *
 from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 from generators.support.mc_control import generate_mc_control
 from generators.handshake.ndwire import generate_ndwire
-from generators.handshake.join import generate_join
-from generators.handshake.sink import generate_sink
 import json
 
 
@@ -114,7 +112,7 @@ MODULE {name} ({lsq_in_ports})
 
 {generate_mc_control(f"{name}__mc_control")}
 {_generate_nd_load_access(f"{name}__nd_load_access", fifo_depth, addr_type, data_type)}
-{_generate_nd_store_access(f"{name}__nd_store_access", fifo_depth, addr_type, data_type)}
+{_generate_nd_store_access(f"{name}__nd_store_access", addr_type, data_type)}
 """
 
 
@@ -170,7 +168,7 @@ MODULE {name} ({lsq_in_ports})
   ldDataFromMC_ready := TRUE;
 
 {_generate_nd_load_access(f"{name}__nd_load_access", fifo_depth, addr_type, data_type)}
-{_generate_nd_store_access(f"{name}__nd_store_access", fifo_depth, addr_type, data_type)}
+{_generate_nd_store_access(f"{name}__nd_store_access", addr_type, data_type)}
 """
 
 
@@ -229,28 +227,21 @@ MODULE {name} (ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
 """
 
 
-def _generate_nd_store_access(name, fifo_depth, addr_type, data_type):
-    # generates a non-deterministic store access, that simulates any stall that can happen from a write operation (memory stall or memory dependency)
+def _generate_nd_store_access(name, addr_type, data_type):
+    # generates a non-deterministic store access, that simulates any stall that can happen from a write operation (memory stall or memory dependency).
+    # The address and the data are consumed independently, as the store queue holds them in separate entries, so the address can arrive before the data and
+    # vice versa (this also allows any number of addresses ahead of the data, which over-approximates the store queue)
     return f"""
 MODULE {name} (stAddr, stAddr_valid, stData, stData_valid)
-  VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid, inner_addr_fifo.ins_ready);
-  VAR inner_addr_fifo : {name}__addr_fifo_break_dv(inner_addr_ndw.outs_valid, inner_join.ins_0_ready);
-  VAR inner_data_ndw : {name}__data_ndwire(stData, stData_valid, inner_data_fifo.ins_ready);
-  VAR inner_data_fifo : {name}__data_fifo_break_dv(inner_data_ndw.outs_valid, inner_join.ins_1_ready);
-  VAR inner_join : {name}__join(inner_addr_fifo.outs_valid, inner_data_fifo.outs_valid, inner_sink_ndw.ins_valid);
-  VAR inner_sink_ndw : {name}__data_ndwire(inner_data_ndw.outs, inner_join.outs_valid, inner_sink.ins_ready);
-  VAR inner_sink : {name}__sink(inner_data_ndw.outs, inner_sink_ndw.outs_valid);
+  VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid, TRUE);
+  VAR inner_data_ndw : {name}__data_ndwire(stData, stData_valid, TRUE);
 
   -- output
   DEFINE
   stAddr_ready := inner_addr_ndw.ins_ready;
   stData_ready := inner_data_ndw.ins_ready;
-  memData_valid := inner_sink_ndw.outs_valid;
+  memData_valid := inner_data_ndw.outs_valid;
 
   {generate_ndwire(f"{name}__addr_ndwire", {ATTR_BITWIDTH: addr_type.bitwidth})}
-  {generate_fifo_break_dv(f"{name}__addr_fifo_break_dv", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
   {generate_ndwire(f"{name}__data_ndwire", {ATTR_BITWIDTH: data_type.bitwidth})}
-  {generate_fifo_break_dv(f"{name}__data_fifo_break_dv", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
-  {generate_join(f"{name}__join", {"size": 2})}
-  {generate_sink(f"{name}__sink", {ATTR_BITWIDTH: data_type.bitwidth})}
 """
