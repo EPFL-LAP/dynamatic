@@ -92,7 +92,7 @@ def _generate_lsq_master(
 
     return f"""
 MODULE {name} ({lsq_in_ports})
-  VAR inner_mc_control : {name}__mc_control(memStart_valid, ctrlEnd_valid, memEnd_ready, all_requests_done);
+  VAR inner_mc_control : {name}__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done);
 
   VAR all_requests_done : boolean;
   ASSIGN
