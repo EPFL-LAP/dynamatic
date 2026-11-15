@@ -2,8 +2,6 @@ from generators.support.utils import *
 from generators.handshake.buffers.fifo_break_dv import generate_fifo_break_dv
 from generators.support.mc_control import generate_mc_control
 from generators.handshake.ndwire import generate_ndwire
-from generators.handshake.join import generate_join
-from generators.handshake.sink import generate_sink
 import json
 
 
@@ -16,7 +14,8 @@ def generate_lsq(name, params):
     num_load_ports = config["numLoadPorts"]
     num_store_ports = config["numStorePorts"]
     num_bbs = config["numBBs"]
-    fifo_depth = config["fifoDepth"]
+    # The loads of all the load ports share the load queue
+    load_queue_depth = config["fifoDepth_L"]
     load_groups = config["numLoads"]
     store_groups = config["numStores"]
 
@@ -31,7 +30,7 @@ def generate_lsq(name, params):
             num_bbs,
             load_groups,
             store_groups,
-            fifo_depth,
+            load_queue_depth,
         )
     else:
         return _generate_lsq_slave(
@@ -43,7 +42,7 @@ def generate_lsq(name, params):
             num_bbs,
             load_groups,
             store_groups,
-            fifo_depth,
+            load_queue_depth,
         )
 
 
@@ -64,7 +63,7 @@ def _generate_lsq_master(
     num_bbs,
     load_groups,
     store_groups,
-    fifo_depth,
+    load_queue_depth,
 ):
     # the signal order in the interface is different from HandshakeInterfaces.cpp because export-rtl.cpp
     # groups signals with the same name together
@@ -92,14 +91,14 @@ def _generate_lsq_master(
 
     return f"""
 MODULE {name} ({lsq_in_ports})
-  VAR inner_mc_control : {name}__mc_control(memStart_valid, ctrlEnd_valid, memEnd_ready, all_requests_done);
+  VAR inner_mc_control : {name}__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done);
 
   VAR all_requests_done : boolean;
   ASSIGN
   init(all_requests_done) := FALSE;
   next(all_requests_done) := all_requests_done ? TRUE : {{FALSE, TRUE}};
 
-  {_generate_lsq_core(name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, fifo_depth)}
+  {_generate_lsq_core(name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, load_queue_depth)}
 
   storeData := {data_type.format_constant(0)};
   storeAddr := {addr_type.format_constant(0)};
@@ -113,8 +112,8 @@ MODULE {name} ({lsq_in_ports})
   memEnd_valid := inner_mc_control.memEnd_valid;
 
 {generate_mc_control(f"{name}__mc_control")}
-{_generate_nd_load_access(f"{name}__nd_load_access", fifo_depth, addr_type, data_type)}
-{_generate_nd_store_access(f"{name}__nd_store_access", fifo_depth, addr_type, data_type)}
+{_generate_nd_load_access(f"{name}__nd_load_access", load_queue_depth, addr_type, data_type)}
+{_generate_nd_store_access(f"{name}__nd_store_access", addr_type, data_type)}
 """
 
 
@@ -127,7 +126,7 @@ def _generate_lsq_slave(
     num_bbs,
     load_groups,
     store_groups,
-    fifo_depth,
+    load_queue_depth,
 ):
     # the signal order in the interface is different from HandshakeInterfaces.cpp because export-rtl.cpp
     # groups signals with the same name together
@@ -159,7 +158,7 @@ def _generate_lsq_slave(
 MODULE {name} ({lsq_in_ports})
 
   DEFINE loadData := ldDataFromMC;
-  {_generate_lsq_core(name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, fifo_depth)}
+  {_generate_lsq_core(name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, load_queue_depth)}
 
   stDataToMC := {data_type.format_constant(0)};
   stDataToMC_valid := in_storeEn;
@@ -169,8 +168,8 @@ MODULE {name} ({lsq_in_ports})
   ldAddrToMC_valid := in_loadEn;
   ldDataFromMC_ready := TRUE;
 
-{_generate_nd_load_access(f"{name}__nd_load_access", fifo_depth, addr_type, data_type)}
-{_generate_nd_store_access(f"{name}__nd_store_access", fifo_depth, addr_type, data_type)}
+{_generate_nd_load_access(f"{name}__nd_load_access", load_queue_depth, addr_type, data_type)}
+{_generate_nd_store_access(f"{name}__nd_store_access", addr_type, data_type)}
 """
 
 
@@ -181,7 +180,7 @@ def _generate_lsq_core(
     num_bbs,
     load_groups,
     store_groups,
-    fifo_depth,
+    load_queue_depth,
 ):
     return f"""
   -- Non-deterministic access: entity that models all possible latencies that can occur when accessing memory
@@ -189,6 +188,10 @@ def _generate_lsq_core(
   {"\n  ".join([f"inner_load_access_{n} : {name}__nd_load_access(ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
   {"\n  ".join([f"inner_store_access_{n} : {name}__nd_store_access(stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
 
+
+  -- The queues of the load ports together hold at most the entries of the
+  -- load queue
+  INVAR {" + ".join([f"inner_load_access_{n}.num_tokens" for n in range(num_load_ports)])} <= {load_queue_depth};
 
   -- Checks if at least one access has happened
   DEFINE
@@ -209,7 +212,7 @@ def _generate_lsq_core(
 """
 
 
-def _generate_nd_load_access(name, fifo_depth, addr_type, data_type):
+def _generate_nd_load_access(name, load_queue_depth, addr_type, data_type):
     # generates a non-deterministic load access, that simulates any stall that can happen from a read operation (memory stall or memory dependency)
     return f"""
 MODULE {name} (ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
@@ -222,35 +225,41 @@ MODULE {name} (ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
   ldAddr_ready := inner_input_ndw.ins_ready;
   ldData := inner_output_ndw.outs;
   ldData_valid := inner_output_ndw.outs_valid;
+  -- number of loads held in the queue of the port
+  num_tokens := count({", ".join(_queue_slots("inner_fifo", load_queue_depth))});
 
   {generate_ndwire(f"{name}__in_ndwire", {ATTR_BITWIDTH: addr_type.bitwidth})}
-  {generate_fifo_break_dv(f"{name}__fifo_break_dv", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
+  {generate_fifo_break_dv(f"{name}__fifo_break_dv", {ATTR_SLOTS: load_queue_depth, ATTR_BITWIDTH: 0})}
   {generate_ndwire(f"{name}__out_ndwire", {ATTR_BITWIDTH: data_type.bitwidth})}
 """
 
 
-def _generate_nd_store_access(name, fifo_depth, addr_type, data_type):
-    # generates a non-deterministic store access, that simulates any stall that can happen from a write operation (memory stall or memory dependency)
+def _generate_nd_store_access(name, addr_type, data_type):
+    # generates a non-deterministic store access, that simulates any stall that can happen from a write operation (memory stall or memory dependency).
+    # The address and the data are consumed independently, as the store queue holds them in separate entries, so the address can arrive before the data and
+    # vice versa (this also allows any number of addresses ahead of the data, which over-approximates the store queue)
     return f"""
 MODULE {name} (stAddr, stAddr_valid, stData, stData_valid)
-  VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid, inner_addr_fifo.ins_ready);
-  VAR inner_addr_fifo : {name}__addr_fifo_break_dv(inner_addr_ndw.outs_valid, inner_join.ins_0_ready);
-  VAR inner_data_ndw : {name}__data_ndwire(stData, stData_valid, inner_data_fifo.ins_ready);
-  VAR inner_data_fifo : {name}__data_fifo_break_dv(inner_data_ndw.outs_valid, inner_join.ins_1_ready);
-  VAR inner_join : {name}__join(inner_addr_fifo.outs_valid, inner_data_fifo.outs_valid, inner_sink_ndw.ins_valid);
-  VAR inner_sink_ndw : {name}__data_ndwire(inner_data_ndw.outs, inner_join.outs_valid, inner_sink.ins_ready);
-  VAR inner_sink : {name}__sink(inner_data_ndw.outs, inner_sink_ndw.outs_valid);
+  VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid, TRUE);
+  VAR inner_data_ndw : {name}__data_ndwire(stData, stData_valid, TRUE);
 
   -- output
   DEFINE
   stAddr_ready := inner_addr_ndw.ins_ready;
   stData_ready := inner_data_ndw.ins_ready;
-  memData_valid := inner_sink_ndw.outs_valid;
+  memData_valid := inner_data_ndw.outs_valid;
 
   {generate_ndwire(f"{name}__addr_ndwire", {ATTR_BITWIDTH: addr_type.bitwidth})}
-  {generate_fifo_break_dv(f"{name}__addr_fifo_break_dv", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
   {generate_ndwire(f"{name}__data_ndwire", {ATTR_BITWIDTH: data_type.bitwidth})}
-  {generate_fifo_break_dv(f"{name}__data_fifo_break_dv", {ATTR_SLOTS: fifo_depth, ATTR_BITWIDTH: 0})}
-  {generate_join(f"{name}__join", {"size": 2})}
-  {generate_sink(f"{name}__sink", {ATTR_BITWIDTH: data_type.bitwidth})}
 """
+
+
+def _queue_slots(queue, depth):
+    # The slots of a queue generated by `generate_fifo_break_dv` (dataless, depth >= 2): a chain of depth - 1 transparent slots (generated as a single slot if
+    # depth is 2), then a slot that breaks the data and valid paths
+    assert depth >= 2, "LSQ queues have at least two slots"
+    if depth == 2:
+        chain = [f"{queue}.fifo.full"]
+    else:
+        chain = [f"{queue}.fifo.b{i}.full" for i in range(depth - 1)]
+    return chain + [f"{queue}.break_dv.outs_valid_i"]
