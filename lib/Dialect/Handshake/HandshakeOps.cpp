@@ -1588,6 +1588,47 @@ handshake::MemoryControllerOp LSQOp::getConnectedMC() {
       *stDataToMC.getUsers().begin());
 }
 
+/// Returns the slots of the queue of the load port that `loadOp` is connected
+/// to in the SMV model of `lsqOp`, from its input to its output. The SMV
+/// generator of the LSQ models the queue of each load port as a
+/// `fifo_break_dv` of the depth of the load queue: a chain of depth - 1
+/// transparent slots, then a slot that breaks the data and valid paths.
+std::vector<BufferSlotFullNamer>
+LSQOp::getLoadPortSlotNamers(handshake::LoadOp loadOp) {
+  auto name = (*this)->getAttrOfType<StringAttr>(NameAnalysis::ATTR_NAME);
+  assert(name && "name required for LSQ slot namers");
+  unsigned depth = getLoadQueueDepth();
+  // A depth of 1 gives a single slot of another kind (`one_slot_break_dv`)
+  assert(depth > 1 && "LSQ queues have at least two slots");
+
+  // The SMV model numbers the load ports in the order of the load addresses of
+  // the LSQ
+  ValueRange loadAddresses = getLdAddr();
+  auto loadAddress = llvm::find(loadAddresses, loadOp.getAddressResult());
+  assert(loadAddress != loadAddresses.end() &&
+         "the load is connected to a load port of the LSQ");
+  std::string queuePath =
+      llvm::formatv("inner_load_access_{0}.inner_fifo",
+                    std::distance(loadAddresses.begin(), loadAddress))
+          .str();
+
+  std::vector<BufferSlotFullNamer> slots;
+  // A chain of one transparent slot is generated as the slot itself
+  if (depth == 2) {
+    slots.emplace_back(name.str(), llvm::formatv("{0}.fifo.full", queuePath),
+                       "", /*slotSize=*/0);
+  } else {
+    for (unsigned i = 0; i + 1 < depth; ++i)
+      slots.emplace_back(name.str(),
+                         llvm::formatv("{0}.fifo.b{1}.full", queuePath, i), "",
+                         /*slotSize=*/0);
+  }
+  slots.emplace_back(name.str(),
+                     llvm::formatv("{0}.break_dv.outs_valid_i", queuePath), "",
+                     /*slotSize=*/0);
+  return slots;
+}
+
 SmallVector<Value> LSQOp::getControlPaths(Operation *ctrlOp) {
   // Compute the set of group allocation signals to the LSQ
   DenseSet<Value> lsqGroupAllocs;
