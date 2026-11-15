@@ -6,6 +6,10 @@
 // RUN:   --handshake-annotate-properties="json-path=%t.consec.json annotate-list=IOGConsecutiveTokens" \
 // RUN:   --exp-test-print-formal-properties="json-path=%t.consec.json" -o /dev/null \
 // RUN:   | FileCheck %s --check-prefix=CONSEC
+// RUN: dynamatic-opt %s \
+// RUN:   --handshake-annotate-properties="json-path=%t.dup.json annotate-list=DuplicatedTokenLocation" \
+// RUN:   --exp-test-print-formal-properties="json-path=%t.dup.json" -o /dev/null \
+// RUN:   | FileCheck %s --check-prefix=DUP
 
 // A loop that counts down from n, with a buffer on the index of its control
 // merge and two buffers on its condition
@@ -32,6 +36,10 @@ handshake.func @countLoop(%n: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
   // CHECK: EntryTokenOrder: (((control_merge0.slot_full & (control_merge0.data = FALSE) & !control_merge0.index_sent)) -> (! buffer2.outs_valid_i))
   %indexBuf = buffer %index, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer2"} : <i1>
   %i = mux %indexBuf [%n, %iBack] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, [<i32>, <i32>] to <i32>
+  // While fork1 holds the counter after sending a copy to the decider, the copy
+  // is in a slot that it can reach without passing fork1. The last condition
+  // buffer only counts until fork2 has sent the copy on
+  // DUP: DuplicatedTokenLocation: (fork1.outs_0_sent -> (buffer3.outs_valid_i | (buffer4.outs_valid_i & !fork2.outs_0_sent) | testbench.end_full | buffer0.outs_valid_i))
   %iFork:2 = fork [2] %i {handshake.bb = 1 : ui32, handshake.name = "fork1"} : <i32>
   // No token enters the loop while it holds one
   // CHECK: SingleEntryToken: ((count(control_merge0.slot_full, buffer2.outs_valid_i) > 0) -> (count((start_valid & !fork0.outs_1_sent)) = 0))
@@ -116,6 +124,9 @@ handshake.func @exitPaths(%n: <i32>, %start: <>) -> (out0: <i32>, end: <>) {
   // branches, which does not matter, hence EXIT-DAG
   // EXIT-DAG: ExitTokenNoAncestors: ((count((buffer34.outs_valid_i & (buffer34.data = FALSE))) > 0) -> (count((n_valid & !fork31.outs_0_sent), (buffer33.outs_valid_i & !fork32.outs_0_sent), (buffer30.outs_valid_i & !fork31.outs_0_sent)) = 0))
   // EXIT-DAG: ExitTokenNoAncestors: ((count((buffer35.outs_valid_i & (buffer35.data = FALSE))) > 0) -> (count((n_valid & !fork31.outs_0_sent), (buffer33.outs_valid_i & !fork32.outs_1_sent), (buffer30.outs_valid_i & !fork31.outs_0_sent)) = 0))
+  // While fork32 holds the decision after sending a copy to buffer34, the newest
+  // token in buffer34 is that copy, so it has the value of the decision
+  // DUP: DuplicatedTokenLocation: ((fork32.outs_0_sent & buffer34.outs_valid_i) -> (((buffer34.outs_valid_i & (buffer34.data = FALSE)) & (fork32.outs_0_sent & (fork32.ins = FALSE))) | ((buffer34.outs_valid_i & (buffer34.data = TRUE)) & (fork32.outs_0_sent & (fork32.ins = TRUE)))))
   %condFork:2 = fork [2] %cond {handshake.bb = 1 : ui32, handshake.name = "fork32"} : <i1>
   %condBuf0 = buffer %condFork#0, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer34"} : <i1>
   %condBuf1 = buffer %condFork#1, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1, dvLatency = 1 {handshake.bb = 1 : ui32, handshake.name = "buffer35"} : <i1>
