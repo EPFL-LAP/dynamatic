@@ -315,10 +315,20 @@ getAllSlotsOfOperation(Operation *op) {
   if (auto loadOp = dyn_cast<LoadOp>(op)) {
     auto slots = loadOp.getInternalSlotStateNamers();
     auto *mcOp = loadOp.getAddressResult().getUses().begin()->getOwner();
+    // The round trip through an LSQ holds the token in the queue of the load
+    // port
+    if (auto lsq = dyn_cast<LSQOp>(mcOp)) {
+      ret.push_back(std::make_unique<BufferSlotFullNamer>(slots[0]));
+      for (BufferSlotFullNamer &queueSlot : lsq.getLoadPortSlotNamers(loadOp))
+        ret.push_back(
+            std::make_unique<BufferSlotFullNamer>(std::move(queueSlot)));
+      ret.push_back(std::make_unique<BufferSlotFullNamer>(slots[1]));
+      return ret;
+    }
     auto mc = dyn_cast<MemoryControllerOp>(mcOp);
     if (!mc) {
       op->emitError("Cannot get slot of LoadOp that is not connected to Memory "
-                    "Controller Op");
+                    "Controller Op or LSQ Op");
       llvm::report_fatal_error("Unhandled LoadOp");
     }
     size_t nLoads = mc.getNumLoadPorts();

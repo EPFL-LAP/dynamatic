@@ -148,13 +148,14 @@ static std::optional<IOGPortGroups> getIOGPortGroups(Operation *op) {
         return IOGPortGroups{{{loadOp.getAddress()}},
                              {{loadOp.getDataResult()}}};
       })
-      .Case<StoreOp, SourceOp, MemoryControllerOp>([](Operation *) -> Groups {
-        // A token leaves the circuit through a store and enters it through a
-        // source, so the number of tokens in the IOG would not be fixed. The
-        // memory controllers are only reached by control signals, which give
-        // trivial IOGs that can be skipped
-        return std::nullopt;
-      })
+      .Case<StoreOp, SourceOp, MemoryControllerOp, LSQOp>(
+          [](Operation *) -> Groups {
+            // A token leaves the circuit through a store and enters it through
+            // a source, so the number of tokens in the IOG would not be fixed.
+            // The memory interfaces are only reached by control signals, which
+            // give trivial IOGs that can be skipped
+            return std::nullopt;
+          })
       .Default([](Operation *op) -> Groups {
         // An arithmetic unit joins one token from each operand, so the IOG
         // takes one of them, as the other tokens are not counted by the IOG
