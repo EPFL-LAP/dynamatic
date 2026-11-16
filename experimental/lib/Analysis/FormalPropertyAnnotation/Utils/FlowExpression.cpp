@@ -222,6 +222,10 @@ LogicalResult FlowEquationExtractor::extractAll(ModuleOp modOp) {
         if (failed(extractMuxOp(muxOp))) {
           res = failure();
         }
+      } else if (auto mergeOp = dyn_cast<MergeOp>(op)) {
+        if (failed(extractMergeOp(mergeOp))) {
+          res = failure();
+        }
       } else if (auto bufferOp = dyn_cast<BufferOp>(op)) {
         if (failed(extractBufferOp(bufferOp))) {
           res = failure();
@@ -687,6 +691,42 @@ LogicalResult FlowEquationExtractor::extractMuxOp(MuxOp muxOp) {
   for (auto [i, operand] : llvm::enumerate(dataOperands)) {
     FlowVariable data(indexChannelAnalysis, ChannelLambda(operand));
     equations.push_back(selectVar.setTrackedTokens(i) - data);
+  }
+  return success();
+}
+
+LogicalResult FlowEquationExtractor::extractMergeOp(MergeOp mergeOp) {
+  // A merge passes on a token from one of its inputs, without holding it:
+  // lambda_out = lambda_in_0 + lambda_in_1 + ...
+  // The token keeps its value, so the equation holds for each value if the
+  // output holds a tracked value:
+  // lambda_out(0) = lambda_in_0(0) + lambda_in_1(0) + ...
+  // lambda_out(1) = lambda_in_0(1) + lambda_in_1(1) + ...
+  // ...
+  FlowVariable out(indexChannelAnalysis, ChannelLambda(mergeOp.getResult()));
+  SmallVector<FlowVariable> inputs;
+  for (Value operand : mergeOp->getOperands())
+    inputs.emplace_back(indexChannelAnalysis, ChannelLambda(operand));
+
+  if (!out.isIndex()) {
+    FlowExpression equation = out;
+    for (const FlowVariable &in : inputs)
+      equation -= in;
+    equations.push_back(equation);
+    return success();
+  }
+  // The index channel analysis gives the inputs of a merge the values of its
+  // output
+  assert(llvm::all_of(inputs,
+                      [&](const FlowVariable &in) {
+                        return in.indexTokenTracker == out.indexTokenTracker;
+                      }) &&
+         "the inputs and the output of a merge track different values");
+  for (size_t i = 0; i < out.indexTokenTracker->trackedValues.size(); ++i) {
+    FlowExpression equation = out.setTrackedTokens(i);
+    for (const FlowVariable &in : inputs)
+      equation -= in.setTrackedTokens(i);
+    equations.push_back(equation);
   }
   return success();
 }
