@@ -1248,6 +1248,24 @@ def LSQOp : Handshake_Op<"lsq", [
       return sizes;
     }
 
+    /// Returns the number of accesses of the given kind in each group.
+    mlir::SmallVector<unsigned>
+    getNumAccessesPerGroup(::dynamatic::handshake::MemAccessKind kind);
+
+    /// Returns, for each group, the port indices of its accesses of the given
+    /// kind (their indices among all accesses of that kind), in program order.
+    mlir::SmallVector<mlir::SmallVector<unsigned>>
+    getPortIndicesPerGroup(::dynamatic::handshake::MemAccessKind kind);
+
+    /// Returns, for each group, the position of its first access of the given
+    /// kind in the group, or none if the group has no access of that kind.
+    mlir::SmallVector<std::optional<unsigned>>
+    getFirstAccessPositions(::dynamatic::handshake::MemAccessKind kind);
+
+    /// Returns, for each group, the number of stores of the group that precede
+    /// each of its loads, in program order.
+    mlir::SmallVector<mlir::SmallVector<unsigned>> getNumStoresBeforeLoads();
+
     /// Returns the smallest load queue depth the LSQ generators accept: the
     /// maximum number of loads in a group plus one, and at least two.
     unsigned getMinLoadQueueDepth();
