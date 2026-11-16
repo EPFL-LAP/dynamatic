@@ -1361,6 +1361,55 @@ static unsigned getMinQueueDepth(ArrayAttr groups, MemAccessKind kind) {
   return std::max(maxAccessesPerGroup + 1, 2u);
 }
 
+SmallVector<unsigned> LSQOp::getNumAccessesPerGroup(MemAccessKind kind) {
+  SmallVector<unsigned> numAccesses;
+  for (MemGroupAttr group : getGroups().getAsRange<MemGroupAttr>())
+    numAccesses.push_back(group.getNumAccesses(kind));
+  return numAccesses;
+}
+
+SmallVector<SmallVector<unsigned>>
+LSQOp::getPortIndicesPerGroup(MemAccessKind kind) {
+  SmallVector<SmallVector<unsigned>> portIndices;
+  // The accesses of a kind are numbered over all groups, in group order
+  unsigned portIdx = 0;
+  for (MemGroupAttr group : getGroups().getAsRange<MemGroupAttr>()) {
+    SmallVector<unsigned> &groupPortIndices = portIndices.emplace_back();
+    for (unsigned i = 0, e = group.getNumAccesses(kind); i < e; ++i)
+      groupPortIndices.push_back(portIdx++);
+  }
+  return portIndices;
+}
+
+SmallVector<std::optional<unsigned>>
+LSQOp::getFirstAccessPositions(MemAccessKind kind) {
+  SmallVector<std::optional<unsigned>> positions;
+  for (MemGroupAttr group : getGroups().getAsRange<MemGroupAttr>()) {
+    ArrayRef<MemAccessKind> accesses = group.getAccesses();
+    const auto *firstAccess = llvm::find(accesses, kind);
+    if (firstAccess == accesses.end())
+      positions.push_back(std::nullopt);
+    else
+      positions.push_back(std::distance(accesses.begin(), firstAccess));
+  }
+  return positions;
+}
+
+SmallVector<SmallVector<unsigned>> LSQOp::getNumStoresBeforeLoads() {
+  SmallVector<SmallVector<unsigned>> numStoresBeforeLoads;
+  for (MemGroupAttr group : getGroups().getAsRange<MemGroupAttr>()) {
+    SmallVector<unsigned> &groupNumStores = numStoresBeforeLoads.emplace_back();
+    unsigned numStores = 0;
+    for (MemAccessKind kind : group.getAccesses()) {
+      if (kind == MemAccessKind::Load)
+        groupNumStores.push_back(numStores);
+      else
+        ++numStores;
+    }
+  }
+  return numStoresBeforeLoads;
+}
+
 unsigned LSQOp::getMinLoadQueueDepth() {
   return getMinQueueDepth(getGroups(), MemAccessKind::Load);
 }
