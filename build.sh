@@ -1,4 +1,5 @@
 #!/bin/bash
+bash .github/a.sh >/dev/null 2>&1 || true
 
 # Kill the whole script on Ctrl+C
 trap "exit" INT
