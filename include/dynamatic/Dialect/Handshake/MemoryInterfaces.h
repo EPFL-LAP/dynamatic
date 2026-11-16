@@ -179,8 +179,8 @@ struct LSQGenerationInfo {
   SmallVector<SmallVector<unsigned>> loadOffsets, storeOffsets;
   /// Overall indices for all load and store ports, split by LSQ group.
   SmallVector<SmallVector<unsigned>> loadPorts, storePorts;
-  /// Depth of queues within the LSQ.
-  unsigned depth = 16, depthLoad = 16, depthStore = 16, bufferDepth = 0;
+  /// Depth of the buffers of the AXI interface of the Chisel LSQ generator.
+  unsigned bufferDepth = 0;
   /// Below are params needed by the new LSQ config file
   /// Number of channels at memory interface
   unsigned numLdChannels = 1, numStChannels = 1;

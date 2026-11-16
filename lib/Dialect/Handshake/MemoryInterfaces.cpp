@@ -405,34 +405,9 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
     ldOrder.push_back(ldOrderOfOneGroup);
   }
 
-  unsigned maxLoadsPerGroup =
-      *std::max_element(loadsPerGroup.begin(), loadsPerGroup.end());
-  unsigned maxStoresPerGroup =
-      *std::max_element(storesPerGroup.begin(), storesPerGroup.end());
-
-  /// Determine load and store queue sizes
-  handshake::LSQDepthAttr lsqDepthAttr =
-      getDialectAttr<handshake::LSQDepthAttr>(lsqOp);
-  if (lsqDepthAttr) {
-    depthLoad = lsqDepthAttr.getLoadQueueDepth();
-    depthStore = lsqDepthAttr.getStoreQueueDepth();
-  } else {
-    // Use default depth of 16.
-    depthLoad = 16;
-    depthStore = 16;
-  }
-
-  // If the load/store queues are not large enough to hold a single group at
-  // once, increase their sizes to the minimum valid depth (i.e., the maximum
-  // number of loads/stores in a group + 1)
-  if (maxLoadsPerGroup >= depthLoad)
-    depthLoad = maxLoadsPerGroup + 1;
-  if (maxStoresPerGroup >= depthStore)
-    depthStore = maxStoresPerGroup + 1;
-
-  // "depth" Parameter is theoretically unused, but still needed by the
-  // current LSQGenerator
-  depth = std::max(depthLoad, depthStore);
+  // The verifier of the LSQ guarantees that the queues hold every group
+  unsigned loadQueueDepth = lsqOp.getLoadQueueDepth();
+  unsigned storeQueueDepth = lsqOp.getStoreQueueDepth();
 
   /// Adds as many 0s as necessary to the array so that its size equals the
   /// depth. Asserts if the array size is larger than the depth.
@@ -451,11 +426,11 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   };
 
   // Port offsets and index arrays must have length equal to the depth
-  capBiArray(loadOffsets, depthLoad);
-  capBiArray(storeOffsets, depthStore);
-  capBiArray(loadPorts, depthLoad);
-  capBiArray(storePorts, depthStore);
+  capBiArray(loadOffsets, loadQueueDepth);
+  capBiArray(storeOffsets, storeQueueDepth);
+  capBiArray(loadPorts, loadQueueDepth);
+  capBiArray(storePorts, storeQueueDepth);
 
   // Update the index width
-  indexWidth = llvm::Log2_64_Ceil(depthLoad);
+  indexWidth = llvm::Log2_64_Ceil(loadQueueDepth);
 }

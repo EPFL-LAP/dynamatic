@@ -282,7 +282,7 @@ handshake.func @boundConj(%arg0: <i32>, %arg2: <i1>, %arg1: <i32>, %start: <>) -
 
 // CHECK-LABEL:   handshake.func @test32(
 // CHECK-SAME:     %[[ARG0:.*]]: <i16>, %[[ARG1:.*]]: <i8>, %[[ARG2:.*]]: memref<32xi16>, %[[ARG3:.*]]: <>) -> (out0: <>, out1: <>, out2: <>, out3: <>) {
-// CHECK:           %[[VAL_0:.*]], %[[VAL_1:.*]] = lsq{{\[}}%[[ARG2]] : memref<32xi16>] start(%[[ARG3]]) groups(%[[VAL_2:.*]]: [store(%[[VAL_3:.*]], %[[VAL_4:.*]])], %[[VAL_5:.*]]: [load(%[[VAL_6:.*]])]) end(%[[VAL_7:.*]]) : <i5>, <i16>
+// CHECK:           %[[VAL_0:.*]], %[[VAL_1:.*]] = lsq{{\[}}%[[ARG2]] : memref<32xi16>] start(%[[ARG3]]) groups(%[[VAL_2:.*]]: [store(%[[VAL_3:.*]], %[[VAL_4:.*]])], %[[VAL_5:.*]]: [load(%[[VAL_6:.*]])]) end(%[[VAL_7:.*]]) {loadQueueDepth = 16 : ui32, storeQueueDepth = 16 : ui32} : <i5>, <i16>
 // CHECK:           %[[VAL_8:.*]] = source : <>
 // CHECK:           %[[VAL_9:.*]] = constant %[[VAL_8]] {value = 0 : i8} : <>, <i8>
 // CHECK:           %[[VAL_10:.*]] = cmpi eq, %[[ARG1]], %[[VAL_9]] : <i8>
@@ -314,7 +314,7 @@ handshake.func @boundConj(%arg0: <i32>, %arg2: <i1>, %arg1: <i32>, %start: <>) -
 // CHECK:           end %[[VAL_8]], %[[ARG3]], %[[ARG3]], %[[ARG3]] : <>, <>, <>, <>
 // CHECK:         }
 handshake.func @test32(%arg0: <i16>, %arg2: <i8>, %arg3: memref<32xi16>, %arg6: <>) -> (out0: <>, out1: <>, out2: <>, out3: <>) {
-  %0:2 = lsq[%arg3 : memref<32xi16>] start(%arg6) groups(%result: [store(%addressResult, %dataResult)], %result_12: [load(%addressResult_14)]) end(%falseResult_19) : <i32>, <i16>
+  %0:2 = lsq[%arg3 : memref<32xi16>] start(%arg6) groups(%result: [store(%addressResult, %dataResult)], %result_12: [load(%addressResult_14)]) end(%falseResult_19) {loadQueueDepth = 16 : ui32, storeQueueDepth = 16 : ui32} : <i32>, <i16>
   %1 = source : <>
   %2 = constant %1 {value = 0 : i8} : <>, <i8>
   %3 = cmpi eq, %arg2, %2 : <i8>

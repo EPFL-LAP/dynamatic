@@ -71,7 +71,7 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %mem_start: <>, %start: <>) -
 // CHECK-LABEL:   handshake.func @memAddrOptMasterSlave(
 // CHECK-SAME:     %[[ARG0:.*]]: memref<1000xi32>, %[[ARG1:.*]]: <>, %[[ARG2:.*]]: <>) -> (out0: <i32>, out1: <>) {
 // CHECK:           %[[VAL_0:.*]], %[[VAL_1:.*]] = mem_controller{{\[}}%[[ARG0]] : memref<1000xi32>] start(%[[ARG1]]) groups(bb0 %[[VAL_2:.*]]: [store(%[[VAL_3:.*]], %[[VAL_4:.*]])]) lsq(%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]]) end(%[[ARG2]]) : <i10>, <i32>, <i32>
-// CHECK:           %[[VAL_8:.*]], %[[VAL_5]], %[[VAL_6]], %[[VAL_7]] = lsq[MC] groups(%[[ARG2]]: [load(%[[VAL_9:.*]]), store(%[[VAL_10:.*]], %[[VAL_11:.*]])]) mc(%[[VAL_0]]) : <i10>, <i32>
+// CHECK:           %[[VAL_8:.*]], %[[VAL_5]], %[[VAL_6]], %[[VAL_7]] = lsq[MC] groups(%[[ARG2]]: [load(%[[VAL_9:.*]]), store(%[[VAL_10:.*]], %[[VAL_11:.*]])]) mc(%[[VAL_0]]) {loadQueueDepth = 16 : ui32, storeQueueDepth = 16 : ui32} : <i10>, <i32>
 // CHECK:           %[[VAL_12:.*]] = constant %[[ARG2]] {value = 0 : i10} : <>, <i10>
 // CHECK:           %[[VAL_13:.*]] = constant %[[ARG2]] {value = 500 : i10} : <>, <i10>
 // CHECK:           %[[VAL_14:.*]] = constant %[[ARG2]] {value = 42 : i32} : <>, <i32>
@@ -84,7 +84,7 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %mem_start: <>, %start: <>) -
 // CHECK:         }
 handshake.func @memAddrOptMasterSlave(%mem: memref<1000xi32>, %mem_start: <>, %start: <>) -> (<i32>, <>) {
   %ldDataToLSQ, %done = mem_controller[%mem : memref<1000xi32>] start(%mem_start) groups(bb0 %ctrl1: [store(%stAddr2, %stData2)]) lsq(%ldAddrToMC, %stAddrToMC, %stdDataToMC) end(%start) : <i32>, <i32>, <i32>
-  %ldData1, %ldAddrToMC, %stAddrToMC, %stdDataToMC = lsq[MC] groups(%start: [load(%ldAddr1), store(%stAddr1, %stData1)]) mc(%ldDataToLSQ) : <i32>, <i32>
+  %ldData1, %ldAddrToMC, %stAddrToMC, %stdDataToMC = lsq[MC] groups(%start: [load(%ldAddr1), store(%stAddr1, %stData1)]) mc(%ldDataToLSQ) {loadQueueDepth = 16 : ui32, storeQueueDepth = 16 : ui32} : <i32>, <i32>
   %addr1 = constant %start {value = 0 : i8} : <>, <i8>
   %addr2 = constant %start {value = 500 : i16}: <>, <i16>
   %addr3 = constant %start {value = 999 : i32}: <>, <i32>

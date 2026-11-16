@@ -1350,10 +1350,30 @@ MemoryControllerOp::getLoadPortSlotNamer(size_t index) {
 // LSQOp
 //===----------------------------------------------------------------------===//
 
+/// Returns the smallest queue depth the LSQ generators accept for accesses of
+/// the given kind in the given groups: the maximum number of such accesses in
+/// a group plus one, and at least two.
+static unsigned getMinQueueDepth(ArrayAttr groups, MemAccessKind kind) {
+  unsigned maxAccessesPerGroup = 0;
+  for (MemGroupAttr group : groups.getAsRange<MemGroupAttr>())
+    maxAccessesPerGroup =
+        std::max(maxAccessesPerGroup, group.getNumAccesses(kind));
+  return std::max(maxAccessesPerGroup + 1, 2u);
+}
+
+unsigned LSQOp::getMinLoadQueueDepth() {
+  return getMinQueueDepth(getGroups(), MemAccessKind::Load);
+}
+
+unsigned LSQOp::getMinStoreQueueDepth() {
+  return getMinQueueDepth(getGroups(), MemAccessKind::Store);
+}
+
 void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
                   Value memStart, ValueRange ctrl, ValueRange ldAddr,
                   ValueRange stAddr, ValueRange stData, Value ctrlEnd,
-                  ArrayAttr groups) {
+                  ArrayAttr groups, unsigned loadQueueDepth,
+                  unsigned storeQueueDepth) {
   // The data results have the type of the memory's elements
   Type dataType =
       wrapChannel(cast<MemRefType>(memref.getType()).getElementType());
@@ -1361,14 +1381,15 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
   build(odsBuilder, odsState, ldDataTypes, /*ldAddrToMC=*/Type(),
         /*stAddrToMC=*/Type(), /*stDataToMC=*/Type(),
         handshake::ControlType::get(odsBuilder.getContext()), memref, memStart,
-        ctrl, ldAddr, stAddr, stData, /*ldDataFromMC=*/Value(), ctrlEnd,
-        groups);
+        ctrl, ldAddr, stAddr, stData, /*ldDataFromMC=*/Value(), ctrlEnd, groups,
+        loadQueueDepth, storeQueueDepth);
 }
 
 void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                   handshake::MemoryControllerOp mcOp, ValueRange ctrl,
                   ValueRange ldAddr, ValueRange stAddr, ValueRange stData,
-                  ArrayAttr groups) {
+                  ArrayAttr groups, unsigned loadQueueDepth,
+                  unsigned storeQueueDepth) {
   // The data results have the type of the memory's elements, and the accesses
   // forwarded to the MC have the address and data types. The LSQ is a slave
   // interface in this case (the MC is the master), so it has no memory, start,
@@ -1380,7 +1401,7 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   build(odsBuilder, odsState, ldDataTypes, addrType, addrType, dataType,
         /*ownMemEnd=*/Type(), /*ownMemRef=*/Value(), /*ownMemStart=*/Value(),
         ctrl, ldAddr, stAddr, stData, mcOp.getLsqLdData(),
-        /*ownCtrlEnd=*/Value(), groups);
+        /*ownCtrlEnd=*/Value(), groups, loadQueueDepth, storeQueueDepth);
 }
 
 /// Derives the ports of an LSQ from its operand segments and groups. Fails if
@@ -1488,6 +1509,15 @@ LogicalResult LSQOp::verify() {
   if (!((ownsMemory && !anyToMC) || (forwardsToMC && !anyOwn)))
     return emitError() << "An LSQ must either have its own memory, start, and "
                           "end signals, or all ports to an MC.";
+
+  // The queues hold every access of a group plus one
+  if (getLoadQueueDepth() < getMinLoadQueueDepth())
+    return emitError() << "load queue depth " << getLoadQueueDepth()
+                       << " is below the minimum of " << getMinLoadQueueDepth();
+  if (getStoreQueueDepth() < getMinStoreQueueDepth())
+    return emitError() << "store queue depth " << getStoreQueueDepth()
+                       << " is below the minimum of "
+                       << getMinStoreQueueDepth();
 
   // Checks the bitwidths of the ports
   LSQPorts lsqPorts(*this);

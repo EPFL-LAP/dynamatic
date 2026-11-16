@@ -98,7 +98,8 @@ def HandshakeSizeLSQs : Pass<"handshake-size-lsqs", "mlir::ModuleOp"> {
     as possible. The CFDFCs and their throughputs are taken from the CFDFC
     analysis of the buffer placement pass, which must run (with an MILP-based
     algorithm) before this pass in the same pass pipeline. The resulting depths
-    are stored in the `handshake.lsqDepth` attribute of each LSQ.
+    are stored in the `loadQueueDepth` and `storeQueueDepth` attributes of each
+    LSQ, raised to the smallest depths the LSQ generators accept.
   }];
 
   let options = [Option<"timingModels", "timing-models", "std::string", "",

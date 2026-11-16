@@ -349,20 +349,6 @@ def ChannelBufPropsContainerAttr : OperandContainerAttr<
 }
 
 //===----------------------------------------------------------------------===//
-// LSQ Sizing Results
-//===----------------------------------------------------------------------===//
-def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
-  let summary = "Load-Queue and Store-Queue depths";
-  let description = [{
-    Holds the Load-Queue and Store-Queue depth for a LSQ.
-  }];
-
-  let parameters = (ins "unsigned":$loadQueueDepth, "unsigned":$storeQueueDepth);
-  let assemblyFormat = "`[` $loadQueueDepth `,` $storeQueueDepth `]`";
-}
-
-
-//===----------------------------------------------------------------------===//
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
