@@ -832,7 +832,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addType("DATA_TYPE", ChannelType::get(dataType));
         addType("ADDR_TYPE", ChannelType::get(addrType));
       })
-      .Case<handshake::LSQOp>([&](auto) {
+      .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
         LSQGenerationInfo genInfo(ports, getUniqueName(op).str());
         modName = getOpName() + "_" + genInfo.name;
 
@@ -864,9 +864,11 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
 
         addString("name", *modName);
         addBoolean("master", ports.interfacePorts.empty());
-        addUnsigned("fifoDepth", genInfo.depth);
-        addUnsigned("fifoDepth_L", genInfo.depthLoad);
-        addUnsigned("fifoDepth_S", genInfo.depthStore);
+        // The AXI LSQ of the Chisel generator has one depth for both queues
+        addUnsigned("fifoDepth", std::max(lsqOp.getLoadQueueDepth(),
+                                          lsqOp.getStoreQueueDepth()));
+        addUnsigned("fifoDepth_L", lsqOp.getLoadQueueDepth());
+        addUnsigned("fifoDepth_S", lsqOp.getStoreQueueDepth());
         addUnsigned("bufferDepth", genInfo.bufferDepth);
         addUnsigned("dataWidth", genInfo.dataWidth);
         addUnsigned("addrWidth", genInfo.addrWidth);
