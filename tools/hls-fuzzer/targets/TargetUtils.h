@@ -7,20 +7,46 @@
 
 namespace dynamatic {
 
+/// Options to use when running dynamatic.
+struct DynamaticOptions {
+  enum BufferAlgorithm {
+    OnMerges,
+    FPGA20,
+    FPL22,
+  };
+
+  std::optional<size_t> timeout = std::nullopt;
+  bool instrumentII = false;
+  BufferAlgorithm bufferAlgorithm = OnMerges;
+
+  DynamaticOptions &enableII(bool enable = true) {
+    this->instrumentII = enable;
+    return *this;
+  }
+
+  DynamaticOptions &withTimeout(std::size_t cycles) {
+    timeout = cycles;
+    return *this;
+  }
+
+  DynamaticOptions &withBufferAlgorithm(BufferAlgorithm algorithm) {
+    bufferAlgorithm = algorithm;
+    return *this;
+  }
+};
+
 /// Performs differential testing of a C file called 'sourceFile'.
 /// The C file needs to adhere to the usual integration test workflow used by
 /// dynamatic, i.e., use 'CALL_KERNEL' and pass variables as arguments that are
 /// identical to the corresponding parameter names.
 /// 'dynamaticPath' should refer to where the dynamatic executable.
-/// 'timeout' may optionally contain the number of cycles that the program may
-/// at most require in the simulator iff present.
+/// 'options' contains optional options used when dynamatic is run.
 ///
 /// The directory of 'sourceFile' is assumed to be scratch space used for build
 /// artifacts.
-AbstractWorker::VerificationResult
-performDifferentialTesting(const std::filesystem::path &sourceFile,
-                           llvm::StringRef dynamaticPath,
-                           std::optional<size_t> timeout = std::nullopt);
+AbstractWorker::VerificationResult performDifferentialTesting(
+    const std::filesystem::path &sourceFile, llvm::StringRef dynamaticPath,
+    const DynamaticOptions &options = DynamaticOptions{});
 
 /// Performs non-functional testing on the compilation of a C file called
 /// 'sourceFile'.
