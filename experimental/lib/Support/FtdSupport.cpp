@@ -15,6 +15,9 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include <algorithm>
+#include <cassert>
+#include <iterator>
 #include <unordered_set>
 
 using namespace mlir;
@@ -30,24 +33,31 @@ std::string ftd::BlockIndexing::getBlockCondition(Block *block) const {
 }
 
 ftd::BlockIndexing::BlockIndexing(Region &region) {
-  mlir::DominanceInfo domInfo;
-
-  // Create a vector with all the blocks
-  SmallVector<Block *> allBlocks;
-  for (Block &bb : region.getBlocks())
-    allBlocks.push_back(&bb);
-
-  // Sort the vector according to the dominance information, so that each
-  // block comes after its dominators.
-  llvm::sort(allBlocks.begin(), allBlocks.end(),
-             [&](Block *a, Block *b) { return domInfo.dominates(a, b); });
-
-  // Associate a smaller index in the map to the blocks at higher levels of the
-  // dominance tree
-  for (auto [blockID, bb] : llvm::enumerate(allBlocks)) {
-    indexToBlock.insert({blockID, bb});
-    blockToIndex.insert({bb, blockID});
+  // Index the blocks in region order, which `--sort-blocks-rpo` sets to a
+  // reverse postorder: if Bi dominates Bj, or Bj is reachable from Bi without
+  // going through a backedge, then i < j. Sorting by dominance alone does not
+  // order the blocks that do not dominate each other, while the users of the
+  // indexing rely on that order (e.g., an edge to a block with a smaller index
+  // is a backedge).
+  for (auto [blockID, bb] : llvm::enumerate(region.getBlocks())) {
+    indexToBlock.insert({blockID, &bb});
+    blockToIndex.insert({&bb, blockID});
   }
+
+#ifndef NDEBUG
+  if (region.hasOneBlock())
+    return;
+  mlir::DominanceInfo domInfo;
+  for (Block &bb : llvm::drop_begin(region)) {
+    if (!domInfo.isReachableFromEntry(&bb))
+      continue;
+    auto *node = domInfo.getNode(&bb);
+    assert(node && node->getIDom() &&
+           blockToIndex.lookup(node->getIDom()->getBlock()) <
+               blockToIndex.lookup(&bb) &&
+           "blocks are not sorted in reverse postorder");
+  }
+#endif
 }
 
 std::optional<Block *>
@@ -367,4 +377,30 @@ Value ftd::getOrCreateCondPlaceholder(Block *condBlock, OpBuilder &builder) {
   setBBAttr(constOp, condBlock, builder);
 
   return constOp.getResult();
+}
+
+boolean::BDD *ftd::buildRoutingBDD(boolean::BoolExpression *expression,
+                                   std::vector<std::string> variables) {
+  using namespace boolean;
+  if (expression->type == ExpressionType::Variable ||
+      expression->type == ExpressionType::Zero ||
+      expression->type == ExpressionType::One)
+    return new BDD(expression);
+
+  auto next = std::find_if(variables.begin(), variables.end(),
+                           [&](const std::string &variable) {
+                             return expression->containsMintern(variable);
+                           });
+  assert(next != variables.end() && "missing routing BDD cofactor");
+  auto *negative = expression->deepCopy();
+  boolean::restrict(negative, *next, false);
+  negative = negative->boolMinimize();
+  auto *positive = expression->deepCopy();
+  boolean::restrict(positive, *next, true);
+  positive = positive->boolMinimize();
+  std::vector<std::string> remaining(std::next(next), variables.end());
+  auto *negativeBDD = buildRoutingBDD(negative, remaining);
+  auto *positiveBDD = buildRoutingBDD(positive, remaining);
+  return new BDD(negativeBDD, positiveBDD,
+                 new SingleCond(ExpressionType::Variable, *next));
 }

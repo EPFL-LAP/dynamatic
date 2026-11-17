@@ -17,6 +17,7 @@
 #define DYNAMATIC_HANDSHAKE_EXPERIMENTAL_SUPPORT_FTDSUPPORT_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -101,10 +102,10 @@ struct ShadowCFG {
 // BlockIndexing
 // ===--------------------------------------------------------------------=== //
 
-/// Class to associate an index to each block, so that if block Bi dominates
-/// block Bj then i < j. While this is guaranteed by the MLIR CFG construction,
-/// it cannot really be given for granted, thus it is more convenient to have a
-/// custom indexing.
+/// Class to associate an index to each block, following the order of the
+/// blocks in the region, which must be a reverse postorder (see
+/// `--sort-blocks-rpo`): if block Bi dominates block Bj, or Bj is reachable
+/// from Bi without going through a backedge, then i < j.
 class BlockIndexing {
 
   /// Map to store the connection between indices and blocks.
@@ -176,6 +177,12 @@ getPathExpression(ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
 
 /// A lightweight DFS to check if 'end' is reachable from 'start'.
 bool isReachable(Block *start, Block *end);
+
+/// Build a decision tree for token routing. Unlike a Boolean-only BDD, its
+/// path must omit cofactors absent from the restricted expression: those
+/// conditions may not execute on the selected control-flow path.
+boolean::BDD *buildRoutingBDD(boolean::BoolExpression *expression,
+                              std::vector<std::string> variables);
 
 // ===--------------------------------------------------------------------=== //
 // Type Utilities
