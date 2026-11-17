@@ -51,6 +51,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cstdint>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -124,6 +125,7 @@ private:
   LogicalResult annotateEagerForkPath(ModuleOp modOp);
   LogicalResult annotateDuplicatedTokenLocation(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
+  LogicalResult annotateIndexValueRange(ModuleOp modOp);
   LogicalResult annotateIOGSingleToken(ModuleOp modOp);
   LogicalResult annotateIOGConsecutiveTokens(ModuleOp modOp);
   LogicalResult annotateEntryTokenOrderPaths(ControlMergeOp cmerge,
@@ -146,6 +148,7 @@ const HandshakeAnnotatePropertiesPass::GeneratorEntry
     {FormalProperty::EAGER_FORK_PATH_TOKEN_COPIED_MAXIMUM_ONCE, &HandshakeAnnotatePropertiesPass::annotateEagerForkPath,             /*isInvariant=*/true},
     {FormalProperty::DUPLICATED_TOKEN_LOCATION,                 &HandshakeAnnotatePropertiesPass::annotateDuplicatedTokenLocation,   /*isInvariant=*/true},
     {FormalProperty::RECONVERGENT_PATH_FLOW,                    &HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow,      /*isInvariant=*/true},
+    {FormalProperty::INDEX_VALUE_RANGE,                         &HandshakeAnnotatePropertiesPass::annotateIndexValueRange,           /*isInvariant=*/true},
     {FormalProperty::IOG_SINGLE_TOKEN,                          &HandshakeAnnotatePropertiesPass::annotateIOGSingleToken,            /*isInvariant=*/true},
     {FormalProperty::IOG_CONSECUTIVE_TOKENS,                    &HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens,      /*isInvariant=*/true},
     {FormalProperty::ENTRY_TOKEN_ORDER,                         &HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder,           /*isInvariant=*/true},
@@ -854,6 +857,55 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
     addProperty(FormalProperty::RECONVERGENT_PATH_FLOW,
                 FormalProperty::TAG::INVAR,
                 BinaryExpr(sum(terms), BinaryExpr::Eq, Constant::integer(0)));
+  }
+  return success();
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateIndexValueRange(ModuleOp modOp) {
+  auto &indexChannelAnalysis = getAnalysis<dynamatic::IndexChannelAnalysis>();
+  FlowEquationExtractor extractor(indexChannelAnalysis);
+  // This fails when some operations in the module are not yet handled
+  if (failed(extractor.extractAll(modOp)))
+    return failure();
+  FlowSystem indices(extractor.equations);
+
+  // The flow equations count the tokens of an index channel by value, one
+  // variable per value. Group these variables by state, in registry order, to
+  // get the values that each state can hold. The states are keyed by their SMV
+  // name, in a std::map as DenseMap has no std::string keys
+  llvm::MapVector<
+      std::string,
+      std::pair<std::shared_ptr<InternalStateNamer>, SmallVector<int32_t>>,
+      std::map<std::string, unsigned>>
+      valuesPerState;
+  for (size_t i = indices.nLambdas; i < indices.registry.size(); ++i) {
+    const FlowVariable &var = indices.registry.getVar(i);
+    auto *state = std::get_if<FlowInternalState>(&var.variable);
+    if (!state || !var.indexTokenTracker)
+      continue;
+    auto &[namer, values] = valuesPerState[state->namer->getSMVName()];
+    namer = state->namer;
+    values.push_back(var.indexTokenTracker->getSingleValue());
+  }
+
+  // A state that holds a token holds one of these values:
+  // toint(state) = toint(state & value = 0) + toint(state & value = 1) + ...
+  for (auto &[name, namerAndValues] : valuesPerState) {
+    auto &[namer, values] = namerAndValues;
+    // The value of the token is encoded with the fewest bits, so when the
+    // number of values is a power of two, every encoding is one of the values
+    if (llvm::isPowerOf2_64(values.size()))
+      continue;
+    // The values of pipeline slots and other states are not modeled
+    if (!namer->tryConstrain(values.front()))
+      continue;
+    std::vector<PropertyExpr> terms;
+    for (int32_t value : values)
+      terms.emplace_back(UnaryExpr(UnaryExpr::ToInt, State(namer, value)));
+    addProperty(FormalProperty::INDEX_VALUE_RANGE, FormalProperty::TAG::INVAR,
+                BinaryExpr(UnaryExpr(UnaryExpr::ToInt, State(namer)),
+                           BinaryExpr::Eq, sum(terms)));
   }
   return success();
 }
