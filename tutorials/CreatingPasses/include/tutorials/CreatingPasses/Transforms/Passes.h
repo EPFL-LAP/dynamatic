@@ -15,11 +15,14 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
-#include "tutorials/CreatingPasses/Transforms/GreedySimplifyMergeLike.h"
-#include "tutorials/CreatingPasses/Transforms/SimplifyMergeLike.h"
 
 namespace dynamatic {
 namespace tutorials {
+
+/// Generate the declarations of the passes, in the same namespace as their
+/// definitions.
+#define GEN_PASS_DECL
+#include "tutorials/CreatingPasses/Transforms/Passes.h.inc"
 
 namespace CreatingPasses {
 

@@ -12,10 +12,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "tutorials/CreatingPasses/Transforms/GreedySimplifyMergeLike.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+// [START Boilerplate code for the MLIR pass]
+#include "tutorials/CreatingPasses/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace tutorials {
+#define GEN_PASS_DEF_GREEDYSIMPLIFYMERGELIKE
+#include "tutorials/CreatingPasses/Transforms/Passes.h.inc"
+} // namespace tutorials
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;
@@ -125,16 +134,3 @@ struct GreedySimplifyMergeLikePass
   }
 };
 } // namespace
-
-namespace dynamatic {
-namespace tutorials {
-
-/// Returns a unique pointer to an operation pass that matches MLIR modules.
-/// In our case, this is simply an instance of our unparameterized
-/// GreedySimplifyMergeLikePass driver.
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createGreedySimplifyMergeLikePass() {
-  return std::make_unique<GreedySimplifyMergeLikePass>();
-}
-} // namespace tutorials
-} // namespace dynamatic

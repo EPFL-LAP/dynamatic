@@ -27,7 +27,6 @@ def SimplifyMergeLike : Pass< "tutorial-handshake-simplify-merge-like",
     control merge operations (dynamatic::handshake::ControlMergeOp) whose index
     result is unused into simpler merges with the same operands.
   }];
-  let constructor = "dynamatic::tutorials::createSimplifyMergeLikePass()";
 }
 
 def GreedySimplifyMergeLike : Pass< 
@@ -42,7 +41,6 @@ def GreedySimplifyMergeLike : Pass<
     downgrading pattern, and then, the merge removal pattern on the merge
     operation resulting from the first pattern.  
   }];
-  let constructor = "dynamatic::tutorials::createGreedySimplifyMergeLikePass()";
 }
 
 #endif // TUTORIALS_CREATINGPASSES_TRANSFORMS_PASSES_TD
