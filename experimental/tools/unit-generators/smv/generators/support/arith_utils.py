@@ -42,6 +42,23 @@ MODULE {name}(lhs_valid, rhs_valid, outs_ready)
 """
 
 
+def generate_unary_op_handshake_manager(name, params):
+    # A unary operation has no join: its handshake manager is only the delay
+    # buffer, wrapped like that of a binary operation, so that the delay buffer
+    # of any operation is at `inner_handshake_manager.inner_delay_buffer`
+    latency = params[ATTR_LATENCY]
+    return f"""
+MODULE {name}(ins_valid, outs_ready)
+  VAR inner_delay_buffer : {name}__delay_buffer(ins_valid, outs_ready);
+
+  -- output
+  DEFINE ins_ready := inner_delay_buffer.ins_ready;
+  DEFINE outs_valid := inner_delay_buffer.outs_valid;
+
+  {generate_delay_buffer(f"{name}__delay_buffer", {ATTR_LATENCY: latency})}
+"""
+
+
 def generate_binary_op_header(name):
     return f"""
 MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
@@ -57,11 +74,11 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
 def generate_unanary_op_header(name):
     return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
-  VAR inner_delay_buffer : {name}__delay_buffer(ins_valid, outs_ready);
+  VAR inner_handshake_manager : {name}__handshake_manager(ins_valid, outs_ready);
 
   -- output
-  DEFINE ins_ready := inner_delay_buffer.ins_ready;
-  DEFINE outs_valid := inner_delay_buffer.outs_valid;
+  DEFINE ins_ready := inner_handshake_manager.ins_ready;
+  DEFINE outs_valid := inner_handshake_manager.outs_valid;
 """
 
 
@@ -79,5 +96,5 @@ def generate_abstract_unary_op(name, latency, data_type):
 {generate_unanary_op_header(name)}
   DEFINE outs := {data_type.format_constant(0)};
   
-  {generate_delay_buffer(f"{name}__delay_buffer", {ATTR_LATENCY: latency})}
+  {generate_unary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
