@@ -122,6 +122,12 @@ static std::optional<IOGPortGroups> getIOGPortGroups(Operation *op) {
         inputs.push_back({muxOp.getSelectOperand()});
         return IOGPortGroups{inputs, allOf(muxOp->getResults())};
       })
+      .Case<MergeOp>([](MergeOp merge) -> Groups {
+        // A merge passes on a token from one of its inputs, which can be any,
+        // so the IOG takes all of them
+        return IOGPortGroups{allOf(merge->getOperands()),
+                             allOf(merge->getResults())};
+      })
       .Case<ControlMergeOp>([](ControlMergeOp cmerge) -> Groups {
         // A control merge passes on a token from one of its inputs, which can
         // be any, so the IOG takes all of them, and copies it to its two
