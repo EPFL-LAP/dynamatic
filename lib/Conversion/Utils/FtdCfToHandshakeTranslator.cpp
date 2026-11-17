@@ -88,7 +88,7 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
   // Muxes implementing a GAMMA gate with a single input, which only exist
   // during the gate creation
   DenseSet<Operation *> oneInputGammas;
-  // Mux implementing each gate (nullptr once the mux is erased)
+  // Operation implementing each gate (nullptr once it is erased)
   llvm::MapVector<unsigned, Operation *> gateMuxes;
   // For each gate replacing a block argument, an anchor operation using the
   // gate's mux, so that the block argument can be mapped to the mux's final
@@ -122,6 +122,18 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
           gateOperandPlaceholders.emplace_back(val, placeholder);
           operands.push_back(placeholder);
         }
+      }
+
+      if (gate->gsaGateFunction == PhiGate) {
+        assert(operands.size() == 1 && gate->isRoot &&
+               "only passthrough phis survive GSA conversion");
+        auto merge = builder.create<handshake::MergeOp>(
+            loc, ftd::channelifyType(gate->result.getType()), operands);
+        auto anchor = builder.create<UnrealizedConversionCastOp>(
+            loc, merge.getResult().getType(), merge.getResult());
+        rootAnchors.emplace_back(gate->result, anchor);
+        gateMuxes.insert({gate->index, merge});
+        continue;
       }
 
       Value conditionValue;
@@ -181,7 +193,8 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
     Operation *gateMux = gateMuxes[missing.gateIndex];
     Value operandMuxResult = gateMuxes[missing.operandGateIndex]->getResult(0);
     // The select operand comes first
-    gateMux->setOperand(missing.operandIndex + 1, operandMuxResult);
+    unsigned offset = isa<handshake::MuxOp>(gateMux) ? 1 : 0;
+    gateMux->setOperand(missing.operandIndex + offset, operandMuxResult);
     // Both data operands of a single-input GAMMA gate are its input
     if (oneInputGammas.contains(gateMux))
       gateMux->setOperand(2 - missing.operandIndex, operandMuxResult);
