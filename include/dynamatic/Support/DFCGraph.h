@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_DFCGraph_H
-#define DYNAMATIC_SUPPORT_DFCGraph_H
+#ifndef DYNAMATIC_SUPPORT_DFCGRAPH_H
+#define DYNAMATIC_SUPPORT_DFCGRAPH_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"

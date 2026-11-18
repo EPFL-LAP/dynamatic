@@ -3,6 +3,7 @@ add_dynamatic_library(DynamaticSupport
   Backedge.cpp
   BLIFFileManager.cpp
   CFG.cpp
+  DFCGraph.cpp
   DOT.cpp
   MILP.cpp
   System.cpp
