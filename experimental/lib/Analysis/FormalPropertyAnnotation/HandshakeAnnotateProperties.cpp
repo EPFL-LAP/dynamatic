@@ -111,6 +111,8 @@ private:
   void addProperty(StringRef kind, FormalProperty::TAG tag, PropertyExpr expr);
 
   LogicalResult annotateQueriedProperties();
+  // TODO: Briefly describe the purpose of each invariant above the declaration
+  // of its generator, as for annotateIndexValueRange.
   LogicalResult annotateAbsenceOfBackpressure(ModuleOp modOp);
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
@@ -125,6 +127,14 @@ private:
   LogicalResult annotateEagerForkPath(ModuleOp modOp);
   LogicalResult annotateDuplicatedTokenLocation(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
+  /// Annotates that each state of an index channel holds one of the values of
+  /// the channel, for the channels whose number of values is not a power of
+  /// two. Such a channel has encodings that the circuit never produces, and a
+  /// state holding one of them is counted by none of the per-value equations
+  /// of ReconvergentPathFlow, which then are not inductive. For example, the
+  /// index of a control merge with three inputs has the values 0 to 2 in two
+  /// bits: the invariant states that its slot, when full, holds 0, 1, or 2,
+  /// and never 3.
   LogicalResult annotateIndexValueRange(ModuleOp modOp);
   LogicalResult annotateIOGSingleToken(ModuleOp modOp);
   LogicalResult annotateIOGConsecutiveTokens(ModuleOp modOp);
@@ -871,14 +881,16 @@ HandshakeAnnotatePropertiesPass::annotateIndexValueRange(ModuleOp modOp) {
   FlowSystem indices(extractor.equations);
 
   // The flow equations count the tokens of an index channel by value, one
-  // variable per value. Group these variables by state, in registry order, to
-  // get the values that each state can hold. The states are keyed by their SMV
-  // name, in a std::map as DenseMap has no std::string keys
-  llvm::MapVector<
-      std::string,
-      std::pair<std::shared_ptr<InternalStateNamer>, SmallVector<int32_t>>,
-      std::map<std::string, unsigned>>
-      valuesPerState;
+  // variable per value. Group these variables by state to get the values that
+  // each state can hold
+  struct StateValues {
+    std::shared_ptr<InternalStateNamer> namer;
+    SmallVector<int32_t> values;
+  };
+  // The states are keyed by their SMV name rather than by namer object, as the
+  // same state could have several namer objects. The order by name also emits
+  // the invariants in the same order in every run
+  std::map<std::string, StateValues> valuesPerState;
   for (size_t i = indices.nLambdas; i < indices.registry.size(); ++i) {
     const FlowVariable &var = indices.registry.getVar(i);
     auto *state = std::get_if<FlowInternalState>(&var.variable);
@@ -891,8 +903,8 @@ HandshakeAnnotatePropertiesPass::annotateIndexValueRange(ModuleOp modOp) {
 
   // A state that holds a token holds one of these values:
   // toint(state) = toint(state & value = 0) + toint(state & value = 1) + ...
-  for (auto &[name, namerAndValues] : valuesPerState) {
-    auto &[namer, values] = namerAndValues;
+  for (auto &[name, stateValues] : valuesPerState) {
+    auto &[namer, values] = stateValues;
     // The value of the token is encoded with the fewest bits, so when the
     // number of values is a power of two, every encoding is one of the values
     if (llvm::isPowerOf2_64(values.size()))
