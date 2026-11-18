@@ -1,4 +1,3 @@
-from generators.support.delay_buffer import generate_delay_buffer
 from generators.support.arith_utils import *
 from generators.support.utils import *
 
@@ -20,5 +19,5 @@ def _generate_trunci(name, latency, input_type, output_type):
 {generate_unanary_op_header(name)}
   DEFINE outs := ins[{output_type.bitwidth}:0];
   
-  {generate_delay_buffer(f"{name}__delay_buffer", {ATTR_LATENCY: latency})}
+  {generate_unary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """

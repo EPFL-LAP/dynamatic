@@ -18,5 +18,5 @@ def _generate_noti(name, latency, data_type):
 {generate_unanary_op_header(name)}
   DEFINE outs := !ins;
   
-  {generate_delay_buffer(f"{name}__delay_buffer", {ATTR_LATENCY: latency})}
+  {generate_unary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
