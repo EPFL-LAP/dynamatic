@@ -35,7 +35,9 @@ import generators.arith.extsi as extsi
 import generators.arith.extui as extui
 import generators.arith.fptosi as fptosi
 import generators.arith.maximumf as maximumf
+import generators.arith.maxsi as maxsi
 import generators.arith.minimumf as minimumf
+import generators.arith.minsi as minsi
 import generators.arith.muli as muli
 import generators.arith.mulf as mulf
 import generators.arith.negf as negf
@@ -49,6 +51,7 @@ import generators.arith.subf as subf
 import generators.arith.subi as subi
 import generators.arith.truncf as truncf
 import generators.arith.trunci as trunci
+import generators.arith.uitofp as uitofp
 import generators.arith.xori as xori
 
 import generators.memory.memory_controller as memory_controller
@@ -117,8 +120,12 @@ def generate_code(name, mod_type, parameters):
             return fptosi.generate_fptosi(name, parameters)
         case "maximumf":
             return maximumf.generate_maximumf(name, parameters)
+        case "maxsi":
+            return maxsi.generate_maxsi(name, parameters)
         case "minimumf":
             return minimumf.generate_minimumf(name, parameters)
+        case "minsi":
+            return minsi.generate_minsi(name, parameters)
         case "mulf":
             return mulf.generate_mulf(name, parameters)
         case "muli":
@@ -145,6 +152,8 @@ def generate_code(name, mod_type, parameters):
             return truncf.generate_truncf(name, parameters)
         case "trunci":
             return trunci.generate_trunci(name, parameters)
+        case "uitofp":
+            return uitofp.generate_uitofp(name, parameters)
         case "xori":
             return xori.generate_xori(name, parameters)
         case "memory_controller":
