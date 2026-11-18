@@ -34,6 +34,11 @@ void IndexChannelAnalysis::annotateIndexChannels(mlir::Value index,
     return;
   }
 
+  if (auto lazyForkOp = dyn_cast<LazyForkOp>(op)) {
+    annotateIndexChannels(lazyForkOp.getOperand(), numValues);
+    return;
+  }
+
   if (auto muxOp = dyn_cast<MuxOp>(op)) {
     for (auto prevOp : muxOp.getDataOperands()) {
       annotateIndexChannels(prevOp, numValues);

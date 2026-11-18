@@ -218,6 +218,10 @@ LogicalResult FlowEquationExtractor::extractAll(ModuleOp modOp) {
         if (failed(extractForkOp(forkOp))) {
           res = failure();
         }
+      } else if (auto lazyForkOp = dyn_cast<LazyForkOp>(op)) {
+        if (failed(extractLazyForkOp(lazyForkOp))) {
+          res = failure();
+        }
       } else if (auto muxOp = dyn_cast<MuxOp>(op)) {
         if (failed(extractMuxOp(muxOp))) {
           res = failure();
@@ -554,6 +558,34 @@ LogicalResult FlowEquationExtractor::extractForkOp(ForkOp forkOp) {
     sent.indexTokenTracker = in.indexTokenTracker;
     if (failed(extractEagerSentEquation(in, out, sent))) {
       return failure();
+    }
+  }
+  return success();
+}
+
+LogicalResult FlowEquationExtractor::extractLazyForkOp(LazyForkOp lazyForkOp) {
+  // A lazy fork has no internal state: it sends the token to all its outputs
+  // in the cycle in which it takes it from its input, so each output carries
+  // as many tokens as the input, for each index value if the input holds an
+  // index:
+  // lambda_in(0) = lambda_out(0)
+  // lambda_in(1) = lambda_out(1)
+  // ...
+  FlowVariable in(indexChannelAnalysis, ChannelLambda(lazyForkOp.getOperand()));
+  for (Value outChannel : lazyForkOp.getResult()) {
+    FlowVariable out(indexChannelAnalysis, ChannelLambda(outChannel));
+    // The index channel analysis only marks the outputs that lead to an index
+    // (e.g., the select of a mux), so another output can track no values
+    if (in.indexTokenTracker != out.indexTokenTracker) {
+      lazyForkOp.emitError(
+          "the input and an output of the lazy fork track different values");
+      return failure();
+    }
+    if (in.isIndex()) {
+      for (size_t i = 0; i < in.indexTokenTracker->trackedValues.size(); ++i)
+        equations.push_back(in.setTrackedTokens(i) - out.setTrackedTokens(i));
+    } else {
+      equations.push_back(in - out);
     }
   }
   return success();

@@ -108,9 +108,11 @@ static std::optional<IOGPortGroups> getIOGPortGroups(Operation *op) {
             {{condBr.getDataOperand()}, {condBr.getConditionOperand()}},
             allOf(condBr->getResults())};
       })
-      .Case<ForkOp>([](ForkOp forkOp) -> Groups {
+      .Case<ForkOp, LazyForkOp>([](Operation *forkOp) -> Groups {
         // A fork copies the token to all its outputs, so the IOG takes one of
-        // them, as the other copies leave the IOG
+        // them, as the other copies leave the IOG. A lazy fork sends all the
+        // copies in the cycle in which it takes the token, so that, unlike an
+        // eager fork, it never holds a part of the token of the IOG
         return IOGPortGroups{allOf(forkOp->getOperands()),
                              eachOf(forkOp->getResults())};
       })
