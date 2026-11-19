@@ -1,4 +1,3 @@
-from generators.support.delay_buffer import generate_delay_buffer
 from generators.support.arith_utils import *
 from generators.support.utils import *
 
@@ -22,7 +21,7 @@ def _generate_extsi(name, latency, input_type, output_type):
 {generate_unanary_op_header(name)}
   DEFINE outs := extend(ins, {output_type.bitwidth - input_type.bitwidth});
   
-  {generate_delay_buffer(f"{name}__delay_buffer", {ATTR_LATENCY: latency})}
+  {generate_unary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
 
 
@@ -31,5 +30,5 @@ def _generate_extsi_bool(name, latency, input_type, output_type):
 {generate_unanary_op_header(name)}
   DEFINE outs := extend(word1(ins), {output_type.bitwidth - input_type.bitwidth});
   
-  {generate_delay_buffer(f"{name}__delay_buffer", {ATTR_LATENCY: latency})}
+  {generate_unary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """

@@ -129,7 +129,7 @@
   },
   {
     "name": "handshake.absf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t absf --abstract-data -p latency=0 is_double=$IS_DOUBLE",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t absf --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -227,8 +227,18 @@
     "hdl": "smv"
   },
   {
+    "name": "handshake.maxsi",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t maxsi --abstract-data -p latency=0 bitwidth=$BITWIDTH",
+    "hdl": "smv"
+  },
+  {
     "name": "handshake.minimumf",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t minimumf --abstract-data -p latency=0 is_double=$IS_DOUBLE",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.minsi",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t minsi --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -249,8 +259,8 @@
     "hdl": "smv"
   },
   {
-    "name": "handshake.not",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t not --abstract-data -p latency=0 is_double=$IS_DOUBLE",
+    "name": "handshake.noti",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t noti --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -307,6 +317,12 @@
   {
     "name": "handshake.trunci",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t trunci --abstract-data -p latency=0 input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.uitofp",
+    "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t uitofp --abstract-data -p latency=$LATENCY bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
