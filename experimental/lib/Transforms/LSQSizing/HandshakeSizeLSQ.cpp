@@ -82,7 +82,8 @@ private:
   /// Finds the Start Node in a CFDFC
   /// The start node, is the node with the longest non-cyclic path to any other
   /// node
-  std::tuple<mlir::Operation *, StartTimes> findStartTimes(CFDFCGraph graph);
+  std::tuple<mlir::Operation *, StartTimes>
+  findStartTimes(lsqsizing::CFDFCGraph graph);
 
   /// Inserts edges to handle an edge case where the start node is not connected
   /// to other "potential start nodes", which do not start at the same time, but
@@ -91,7 +92,7 @@ private:
   /// anlysis. By adding an edge which has a aritificial node with a latency,
   /// that models the difference of this other "potential start node" in start
   /// time to the chosen start node, the timing analysis can be done correctly
-  void insertStartnodeShiftingEdges(CFDFCGraph &graph,
+  void insertStartnodeShiftingEdges(lsqsizing::CFDFCGraph &graph,
                                     mlir::Operation *startNode,
                                     StartTimes startTimes);
 
@@ -99,7 +100,7 @@ private:
   /// Checks all operations which get their input from a different BB and
   /// chooses the one with the lowest latency from the start node
   std::unordered_map<unsigned, mlir::Operation *>
-  getPhiNodes(CFDFCGraph graph, mlir::Operation *startNode);
+  getPhiNodes(lsqsizing::CFDFCGraph graph, mlir::Operation *startNode);
 
   /// Inserts edges to make sure that sizing is done correctly
   /// These edges make sure that in the timing analysis, the allocation precedes
@@ -107,20 +108,20 @@ private:
   /// operations in the BB Therefore the LSQ operations will be allocated at the
   /// start of the BB
   void insertAllocPrecedesMemoryAccessEdges(
-      CFDFCGraph &graph, const std::vector<mlir::Operation *> &ops,
+      lsqsizing::CFDFCGraph &graph, const std::vector<mlir::Operation *> &ops,
       std::unordered_map<unsigned, mlir::Operation *> phiNodes);
 
   /// Finds the allocation time of each operation, which is the earliest start
   /// time of the Phi Node of the BB plus a fixed additional latency
   TimePerOpMap
-  getAllocTimes(CFDFCGraph graph, mlir::Operation *startNode,
+  getAllocTimes(lsqsizing::CFDFCGraph graph, mlir::Operation *startNode,
                 const std::vector<mlir::Operation *> &ops,
                 std::unordered_map<unsigned, mlir::Operation *> phiNodes);
 
   /// Finds the deallocation time of each store operation, which is the the
   /// latency of the last argument arriving plus a fixed additional latency
   TimePerOpMap
-  getStoreDeallocTimes(CFDFCGraph graph, mlir::Operation *startNode,
+  getStoreDeallocTimes(lsqsizing::CFDFCGraph graph, mlir::Operation *startNode,
                        const std::vector<mlir::Operation *> &storeOps);
 
   /// Finds the deallocation time of each load operation, which is the latest
@@ -129,7 +130,7 @@ private:
   /// operation frees the queue entry as soon as the load result is passed on to
   /// the succeeding operation
   TimePerOpMap
-  getLoadDeallocTimes(CFDFCGraph graph, mlir::Operation *startNode,
+  getLoadDeallocTimes(lsqsizing::CFDFCGraph graph, mlir::Operation *startNode,
                       const std::vector<mlir::Operation *> &loadOps);
 
   /// Given the alloc and dealloc times of each operation, calculates the
@@ -239,7 +240,7 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
     const CFDFC &cfdfc, const TimingDatabase &timingDB, unsigned initialII,
     const std::string &collisions, double targetCP) {
 
-  CFDFCGraph graph(cfdfc, timingDB, initialII, targetCP);
+  lsqsizing::CFDFCGraph graph(cfdfc, timingDB, initialII, targetCP);
 
   // We only want LSQ loads and stores (not MC loads and stores), therefore we
   // need to check if they are connected to an LSQ
@@ -352,7 +353,7 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
 }
 
 std::tuple<mlir::Operation *, StartTimes>
-HandshakeSizeLSQsPass::findStartTimes(CFDFCGraph graph) {
+HandshakeSizeLSQsPass::findStartTimes(lsqsizing::CFDFCGraph graph) {
   StartTimes startTimes;
 
   std::vector<mlir::Operation *> startNodeCandidates =
@@ -393,7 +394,8 @@ HandshakeSizeLSQsPass::findStartTimes(CFDFCGraph graph) {
 }
 
 void HandshakeSizeLSQsPass::insertStartnodeShiftingEdges(
-    CFDFCGraph &graph, mlir::Operation *startNode, StartTimes startTimes) {
+    lsqsizing::CFDFCGraph &graph, mlir::Operation *startNode,
+    StartTimes startTimes) {
   for (auto &entry : startTimes) {
     // Ignore if it is the startNode itself
     if (get<0>(entry) != startNode) {
@@ -409,7 +411,7 @@ void HandshakeSizeLSQsPass::insertStartnodeShiftingEdges(
 }
 
 std::unordered_map<unsigned, mlir::Operation *>
-HandshakeSizeLSQsPass::getPhiNodes(CFDFCGraph graph,
+HandshakeSizeLSQsPass::getPhiNodes(lsqsizing::CFDFCGraph graph,
                                    mlir::Operation *startNode) {
   std::unordered_map<unsigned, std::vector<mlir::Operation *>>
       phiNodeCandidates;
@@ -459,7 +461,7 @@ HandshakeSizeLSQsPass::getPhiNodes(CFDFCGraph graph,
 }
 
 std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
-    CFDFCGraph graph, mlir::Operation *startNode,
+    lsqsizing::CFDFCGraph graph, mlir::Operation *startNode,
     const std::vector<mlir::Operation *> &ops,
     std::unordered_map<unsigned, mlir::Operation *> phiNodes) {
   std::unordered_map<mlir::Operation *, int> allocTimes;
@@ -482,7 +484,7 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
 // data and address are known and therefore can issue the memory operation.
 std::unordered_map<mlir::Operation *, int>
 HandshakeSizeLSQsPass::getStoreDeallocTimes(
-    CFDFCGraph graph, mlir::Operation *startNode,
+    lsqsizing::CFDFCGraph graph, mlir::Operation *startNode,
     const std::vector<mlir::Operation *> &ops) {
   std::unordered_map<mlir::Operation *, int> deallocTimes;
 
@@ -505,7 +507,7 @@ HandshakeSizeLSQsPass::getStoreDeallocTimes(
 // deallocation time.
 std::unordered_map<mlir::Operation *, int>
 HandshakeSizeLSQsPass::getLoadDeallocTimes(
-    CFDFCGraph graph, mlir::Operation *startNode,
+    lsqsizing::CFDFCGraph graph, mlir::Operation *startNode,
     const std::vector<mlir::Operation *> &ops) {
   std::unordered_map<mlir::Operation *, int> deallocTimes;
 
@@ -656,7 +658,7 @@ HandshakeSizeLSQsPass::calcQueueSize(
 }
 
 void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(
-    CFDFCGraph &graph, const std::vector<mlir::Operation *> &ops,
+    lsqsizing::CFDFCGraph &graph, const std::vector<mlir::Operation *> &ops,
     std::unordered_map<unsigned, mlir::Operation *> phiNodes) {
   // Iterate over all provided ops and add an edge from the phi node of the
   // ops BB to the op
