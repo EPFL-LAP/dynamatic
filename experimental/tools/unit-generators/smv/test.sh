@@ -30,14 +30,14 @@ test_generator -t br -p bitwidth=0
 test_generator -t br -p bitwidth=16
 
 echo -e "\nTesting buffer..."
-test_generator -t buffer -p num_slots=1 bitwidth=0 transparent=0
-test_generator -t buffer -p num_slots=1 bitwidth=16 transparent=0
-test_generator -t buffer -p num_slots=5 bitwidth=0 transparent=0
-test_generator -t buffer -p num_slots=5 bitwidth=16 transparent=0
-test_generator -t buffer -p num_slots=1 bitwidth=0 transparent=1
-test_generator -t buffer -p num_slots=1 bitwidth=16 transparent=1
-test_generator -t buffer -p num_slots=5 bitwidth=0 transparent=1
-test_generator -t buffer -p num_slots=5 bitwidth=16 transparent=1
+test_generator -t buffer -p buffer_type='"ONE_SLOT_BREAK_DV"' num_slots=1 bitwidth=0 dv_latency=1
+test_generator -t buffer -p buffer_type='"ONE_SLOT_BREAK_DV"' num_slots=1 bitwidth=16 dv_latency=1
+test_generator -t buffer -p buffer_type='"ONE_SLOT_BREAK_R"' num_slots=1 bitwidth=0 dv_latency=0
+test_generator -t buffer -p buffer_type='"ONE_SLOT_BREAK_R"' num_slots=1 bitwidth=16 dv_latency=0
+test_generator -t buffer -p buffer_type='"FIFO_BREAK_NONE"' num_slots=5 bitwidth=0 dv_latency=0
+test_generator -t buffer -p buffer_type='"FIFO_BREAK_NONE"' num_slots=5 bitwidth=16 dv_latency=0
+test_generator -t buffer -p buffer_type='"FIFO_BREAK_DV"' num_slots=5 bitwidth=0 dv_latency=1
+test_generator -t buffer -p buffer_type='"FIFO_BREAK_DV"' num_slots=5 bitwidth=16 dv_latency=1
 
 echo -e "\nTesting cond_br..."
 test_generator -t cond_br -p bitwidth=0
@@ -89,7 +89,7 @@ echo -e "\nTesting store..."
 test_generator -t store -p data_bitwidth=16 addr_bitwidth=16
 
 echo -e "\nTesting absf..."
-test_generator -t absf --abstract-data -p is_double=0 latency=0
+test_generator -t absf --abstract-data -p bitwidth=32 latency=0
 
 echo -e "\nTesting addf..."
 test_generator -t addf --abstract-data -p is_double=0 latency=9
@@ -140,8 +140,16 @@ test_generator -t fptosi --abstract-data -p bitwidth=32 latency=5
 echo -e "\nTesting maximumf..."
 test_generator -t maximumf --abstract-data -p is_double=0 latency=0
 
+echo -e "\nTesting maxsi..."
+test_generator -t maxsi -p bitwidth=32 latency=0
+test_generator -t maxsi --abstract-data -p bitwidth=32 latency=0
+
 echo -e "\nTesting minimumf..."
 test_generator -t minimumf --abstract-data -p is_double=0 latency=0
+
+echo -e "\nTesting minsi..."
+test_generator -t minsi -p bitwidth=32 latency=0
+test_generator -t minsi --abstract-data -p bitwidth=32 latency=0
 
 echo -e "\nTesting mulf..."
 test_generator -t mulf --abstract-data -p is_double=0 latency=4
@@ -151,11 +159,11 @@ test_generator -t muli -p bitwidth=32 latency=4
 test_generator -t muli --abstract-data -p bitwidth=32 latency=4
 
 echo -e "\nTesting negf..."
-test_generator -t negf --abstract-data -p is_double=0 latency=0
+test_generator -t negf --abstract-data -p bitwidth=32 latency=0
 
-echo -e "\nTesting not..."
-test_generator -t not -p bitwidth=32 latency=0
-test_generator -t not --abstract-data -p bitwidth=32 latency=0
+echo -e "\nTesting noti..."
+test_generator -t noti -p bitwidth=32 latency=0
+test_generator -t noti --abstract-data -p bitwidth=32 latency=0
 
 echo -e "\nTesting ori..."
 test_generator -t ori -p bitwidth=32 latency=0
@@ -190,6 +198,9 @@ test_generator -t truncf --abstract-data -p latency=0
 echo -e "\nTesting trunci..."
 test_generator -t trunci -p input_bitwidth=64 output_bitwidth=32 latency=0
 test_generator -t trunci --abstract-data -p input_bitwidth=64 output_bitwidth=32 latency=0
+
+echo -e "\nTesting uitofp..."
+test_generator -t uitofp --abstract-data -p bitwidth=32 latency=5
 
 echo -e "\nTesting xori..."
 test_generator -t xori -p bitwidth=32 latency=0

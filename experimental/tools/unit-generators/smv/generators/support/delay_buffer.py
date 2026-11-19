@@ -32,6 +32,9 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE ins_ready := inner_one_slot_break_dv.ins_ready;
   DEFINE outs_valid := inner_one_slot_break_dv.outs_valid;
 
+  -- the only stage, named like the last stage of a longer delay buffer
+  DEFINE v0 := inner_one_slot_break_dv.outs_valid_i;
+
 {generate_one_slot_break_dv(f"{name}__one_slot_break_dv_dataless", {ATTR_BITWIDTH: 0})}
 """
 
