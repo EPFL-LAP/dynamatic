@@ -159,6 +159,7 @@ CFDFC CFDFC::create(handshake::FuncOp funcOp, ArchSet &archs,
                     unsigned numExec) {
   CFDFC cfdfc(funcOp, archs, numExec);
   cfdfc.collectChannels();
+  cfdfc.rebuildGraph();
   return cfdfc;
 }
 
@@ -167,6 +168,7 @@ CFDFC CFDFC::createFTD(handshake::FuncOp funcOp, ArchSet &archs,
                        const DenseSet<Value> &backwardChannels) {
   CFDFC cfdfc(funcOp, archs, numExec);
   cfdfc.collectChannelsFTD(backwardChannels);
+  cfdfc.rebuildGraph();
   return cfdfc;
 }
 

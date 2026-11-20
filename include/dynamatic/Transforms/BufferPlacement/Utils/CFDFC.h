@@ -25,6 +25,8 @@
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/StdProfiler.h"
 #include "llvm/ADT/GraphTraits.h"
+#include "llvm/ADT/iterator.h"
+#include <deque>
 
 namespace dynamatic {
 namespace buffer {
@@ -34,9 +36,45 @@ using ArchSet = mlir::SetVector<dynamatic::experimental::ArchBB *>;
 /// A set of basic block IDs with a deterministic iteration order.
 using BBSet = mlir::SetVector<unsigned>;
 
+struct CFDFC;
+
+/// Vertex of a CFDFC's graph: one per unit, plus a single virtual entry node
+/// (standing for no unit) with an edge to every unit, so that walks starting
+/// from the entry reach all the units of the CFDFC. The entry node does not
+/// appear in any node's predecessors.
+///
+/// Nodes are owned by the CFDFC they belong to and only ever inserted by it.
+class CFDFCNode {
+public:
+  /// Returns the unit this node stands for, or nullptr for the virtual entry
+  /// node.
+  Operation *getUnit() const { return unit; }
+
+  /// Returns the nodes this one has a channel to.
+  ArrayRef<CFDFCNode *> getSuccessors() const { return succs; }
+
+  /// Returns the nodes that have a channel to this one.
+  ArrayRef<CFDFCNode *> getPredecessors() const { return preds; }
+
+private:
+  /// The CFDFC is the only builder of nodes and edges.
+  friend struct CFDFC;
+
+  Operation *unit = nullptr;
+  SmallVector<CFDFCNode *> succs;
+  SmallVector<CFDFCNode *> preds;
+};
+
 /// Represents a CFDFC i.e., a set of control-free units and channels from a
 /// dataflow circuit accompanied by the number of times it was executed.
+///
+/// A CFDFC also contains a graph of its units and channels (see `CFDFCNode`),
+/// which must be rebuilt with `rebuildGraph` whenever its units, its channels,
+/// or the IR around them change.
 struct CFDFC {
+  // NOTE: any new data field must also be copied in the copy constructor
+  // (CFDFC.cpp), which lists the fields explicitly.
+
   /// The list of basic blocks that make up the CFDFC.
   mlir::SetVector<unsigned> cycle;
   /// Units (i.e., MLIR operations) in the CFDFC.
@@ -80,6 +118,37 @@ struct CFDFC {
   // uses backedges to determine where to insert "tokens" in the circuit.
   static bool isCFDFCBackedge(Value val);
 
+  // Iterator used to iterate ove rall nodes of the CFDFC
+  using node_iterator = llvm::pointer_iterator<std::deque<CFDFCNode>::iterator>;
+
+  /// Copies rebuild the graph instead of copying it, since copied nodes would
+  /// keep pointing at the original's nodes.
+  CFDFC(const CFDFC &other);
+  CFDFC &operator=(const CFDFC &other);
+  CFDFC(CFDFC &&) = default;
+  CFDFC &operator=(CFDFC &&) = default;
+
+  /// Rebuilds the graph from `units`, `channels`, and the current IR. Must be
+  /// called after any change to `units` or `channels`, or to the IR around
+  /// them (e.g., buffer insertion), since the graph is not updated otherwise.
+  void rebuildGraph();
+
+  /// Returns the "ghost root" node, which has an edge to every other node.
+  CFDFCNode *getEntryNode() {
+    assert(nodes.size() == units.size() + 1 &&
+           "graph is out of date, call rebuildGraph()");
+    return &nodes.front();
+  }
+
+  /// Returns the node standing for `unit`, or nullptr if the unit is not part
+  /// of the CFDFC.
+  CFDFCNode *getNode(Operation *unit) const { return nodeOf.lookup(unit); }
+
+  /// The graph's nodes, the first entry is the "ghost root"  (its `unit` is
+  /// null, so skip it when iterating over units).
+  node_iterator nodes_begin() { return node_iterator(nodes.begin()); }
+  node_iterator nodes_end() { return node_iterator(nodes.end()); }
+
 private:
   /// Builds the block cycle from the selected archs and collects the units
   /// belonging to it. Channels are collected afterwards by one of the
@@ -93,6 +162,14 @@ private:
   /// Collects the channels and backedges of the units using the FTD-specific
   /// channel selection.
   void collectChannelsFTD(const DenseSet<Value> &backwardChannels);
+
+  /// A deque for stable node addresses, as the nodes point to each other.
+  /// It is important that we only add nodes at the ends: inserting in the
+  /// middle or erasing would invalidate the pointers in `succs`/`preds` and
+  /// `nodeFor`.
+  std::deque<CFDFCNode> nodes;
+  /// Maps each unit to its node.
+  DenseMap<Operation *, CFDFCNode *> nodeOf;
 };
 
 /// Represents a union of CFDFCs. Its blocks, units, channels, and backedges are
@@ -138,116 +215,36 @@ LogicalResult extractCFDFC(handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
                            CPSolver::SolverKind solverKind,
                            const std::string &logPath = "",
                            int *milpStat = nullptr);
-
-/// A read-only directed graph view of a CFDFC: nodes are the CFDFC's units and
-/// edges are the CFDFC's channels. SCCs are computed once on construction.
-///
-/// Not every unit of a CFDFC lies on a cycle (e.g., sources, sinks, or units
-/// whose results leave the CFDFC), so the graph is in general not strongly
-/// connected. A ghost root with an edge to every node makes the whole graph
-/// reachable from a single entry node and allows us to use LLVMs SCC
-/// infrastructure.
-class CFDFCGraph {
-public:
-  using NodeId = unsigned;
-  using EdgeId = unsigned;
-
-  /// A vertex of the graph (unit of the cfdfc). Successor pointers are
-  /// stored so that llvm::GraphTraits can walk the graph from a node alone.
-  struct Node {
-    Operation *unit;
-    NodeId id;
-    mlir::SmallVector<EdgeId, 4> outEdges;
-    mlir::SmallVector<EdgeId, 4> inEdges;
-    mlir::SmallVector<const Node *, 4> succs;
-  };
-
-  /// An edge (channel) from vertex (unit) `src` to vertex (unit) `dst`.
-  struct Edge {
-    NodeId src;
-    NodeId dst;
-    Value channel;
-  };
-
-  /// Builds the graph from the units and channels of the CFDFC. The graph does
-  /// not reference the CFDFC after construction.
-  explicit CFDFCGraph(const CFDFC &cfdfc);
-
-  CFDFCGraph(const CFDFCGraph &) = delete;
-  CFDFCGraph &operator=(const CFDFCGraph &) = delete;
-  CFDFCGraph(CFDFCGraph &&) = default;
-  CFDFCGraph &operator=(CFDFCGraph &&) = default;
-
-  unsigned numNodes() const { return nodes.size(); }
-  unsigned numEdges() const { return edges.size(); }
-  const Node &getNode(NodeId id) const { return nodes[id]; }
-  const Edge &getEdge(EdgeId id) const { return edges[id]; }
-  mlir::ArrayRef<Node> getNodes() const { return nodes; }
-  mlir::ArrayRef<Edge> getEdges() const { return edges; }
-
-  /// Returns the node of a unit, if the unit is in the graph.
-  std::optional<NodeId> lookup(Operation *unit) const;
-  /// Returns the edge of a channel, if the channel is in the graph.
-  std::optional<EdgeId> lookup(Value channel) const;
-
-  /// Ghost entry node with an edge to every node, so that algorithms starting
-  /// from a single entry (e.g., the DFS in llvm::scc_iterator) reach the whole
-  /// graph. It is not part of getNodes()/getEdges() and has no incoming edges,
-  /// so it is never on a cycle.
-  const Node *getRoot() const { return &root; }
-
-  /// Returns the SCC ID of a node.
-  unsigned getSCC(NodeId node) const { return sccOf[node]; }
-
-  /// A channel lies on some cycle iff its producer and consumer are in the
-  /// same SCC.
-  bool isOnCycle(EdgeId edge) const {
-    const Edge &e = edges[edge];
-    return sccOf[e.src] == sccOf[e.dst];
-  }
-
-  /// A channel lies on some cycle iff its producer and consumer are in the
-  /// same SCC.
-  bool isOnCycle(Value channel) const {
-    std::optional<EdgeId> edge = lookup(channel);
-    assert(edge && "channel is not in the graph");
-    return isOnCycle(*edge);
-  }
-
-private:
-  void addUnits(mlir::ArrayRef<Operation *> units);
-  void addChannels(mlir::ArrayRef<Value> channels);
-  void addEdge(NodeId src, NodeId dst, Value channel);
-  /// Links the ghost root to every node and computes SCCs. Must be called once
-  /// all units and channels are added.
-  void finalize();
-  void computeSCCs();
-
-  std::vector<Node> nodes;
-  std::vector<Edge> edges;
-  mlir::DenseMap<Operation *, NodeId> unitToNode;
-  mlir::DenseMap<Value, EdgeId> channelToEdge;
-  /// SCC ID of each node, indexed by NodeId.
-  mlir::SmallVector<unsigned> sccOf;
-  Node root{/*unit=*/nullptr, /*id=*/~0u, {}, {}, {}};
-};
-
 } // namespace buffer
 } // namespace dynamatic
 
 namespace llvm {
 template <>
-struct GraphTraits<const dynamatic::buffer::CFDFCGraph *> {
-  using NodeRef = const dynamatic::buffer::CFDFCGraph::Node *;
-  using ChildIteratorType = SmallVectorImpl<NodeRef>::const_iterator;
-
-  static NodeRef getEntryNode(const dynamatic::buffer::CFDFCGraph *graph) {
-    return graph->getRoot();
-  }
+struct GraphTraits<dynamatic::buffer::CFDFCNode *> {
+  using NodeRef = dynamatic::buffer::CFDFCNode *;
+  using ChildIteratorType = ArrayRef<NodeRef>::iterator;
+  static NodeRef getEntryNode(NodeRef node) { return node; }
   static ChildIteratorType child_begin(NodeRef node) {
-    return node->succs.begin();
+    return node->getSuccessors().begin();
   }
-  static ChildIteratorType child_end(NodeRef node) { return node->succs.end(); }
+  static ChildIteratorType child_end(NodeRef node) {
+    return node->getSuccessors().end();
+  }
+};
+
+template <>
+struct GraphTraits<dynamatic::buffer::CFDFC *>
+    : public GraphTraits<dynamatic::buffer::CFDFCNode *> {
+  using nodes_iterator = dynamatic::buffer::CFDFC::node_iterator;
+  static NodeRef getEntryNode(dynamatic::buffer::CFDFC *cf) {
+    return cf->getEntryNode();
+  }
+  static nodes_iterator nodes_begin(dynamatic::buffer::CFDFC *cf) {
+    return cf->nodes_begin();
+  }
+  static nodes_iterator nodes_end(dynamatic::buffer::CFDFC *cf) {
+    return cf->nodes_end();
+  }
 };
 } // namespace llvm
 
