@@ -57,6 +57,7 @@ struct FormalProperty {
       "DuplicatedTokenLocation";
   static constexpr StringLiteral RECONVERGENT_PATH_FLOW =
       "ReconvergentPathFlow";
+  static constexpr StringLiteral INDEX_VALUE_RANGE = "IndexValueRange";
   static constexpr StringLiteral IOG_SINGLE_TOKEN = "IOGSingleToken";
   static constexpr StringLiteral IOG_CONSECUTIVE_TOKENS =
       "IOGConsecutiveTokens";
