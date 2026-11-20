@@ -24,6 +24,10 @@
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/StdProfiler.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/iterator.h"
+#include <optional>
+#include <vector>
 
 namespace dynamatic {
 namespace buffer {
@@ -32,6 +36,81 @@ namespace buffer {
 using ArchSet = mlir::SetVector<dynamatic::experimental::ArchBB *>;
 /// A set of basic block IDs with a deterministic iteration order.
 using BBSet = mlir::SetVector<unsigned>;
+/// Index of a node (unit) in a CFDFC.
+using CFDFCNodeId = unsigned;
+/// Index of an edge (channel) in a CFDFC.
+using CFDFCEdgeId = unsigned;
+
+/// A unit of a CFDFC together with the CFDFC channels that enter and leave it.
+/// Nodes are owned by their CFDFC and only ever built by it.
+class CFDFCNode {
+public:
+  /// Returns the unit this node stands for, or nullptr for the CFDFC's ghost
+  /// entry node.
+  Operation *getUnit() const { return unit; }
+
+  /// Returns the index of the node in its CFDFC. The ghost entry node's index
+  /// is the number of nodes of the CFDFC.
+  CFDFCNodeId getId() const { return id; }
+
+  /// Returns the CFDFC edges entering the node.
+  ArrayRef<CFDFCEdgeId> getInEdges() const { return inEdges; }
+
+  /// Returns the CFDFC edges leaving the node.
+  ArrayRef<CFDFCEdgeId> getOutEdges() const { return outEdges; }
+
+  /// Returns the nodes this one has a CFDFC edge to.
+  ArrayRef<const CFDFCNode *> getSuccessors() const { return succs; }
+
+  /// Returns the nodes that have a CFDFC edge to this one.
+  ArrayRef<const CFDFCNode *> getPredecessors() const { return preds; }
+
+private:
+  /// The CFDFC is the only builder of nodes and edges.
+  friend struct CFDFC;
+
+  Operation *unit = nullptr;
+  CFDFCNodeId id = 0;
+  SmallVector<CFDFCEdgeId, 4> inEdges;
+  SmallVector<CFDFCEdgeId, 4> outEdges;
+  /// Derived from the edges by the owning CFDFC, which rebuilds them whenever
+  /// the nodes may have moved in memory.
+  SmallVector<const CFDFCNode *, 4> succs;
+  SmallVector<const CFDFCNode *, 4> preds;
+};
+
+/// A channel of a CFDFC, from the node of its producer to the node of its
+/// consumer. Edges are owned by their CFDFC and only ever built and modified by
+/// it.
+class CFDFCEdge {
+public:
+  /// Returns the channel this edge stands for.
+  Value getChannel() const { return channel; }
+
+  /// Returns the node of the edge's producer.
+  CFDFCNodeId getSrc() const { return src; }
+
+  /// Returns the node of the edge's consumer.
+  CFDFCNodeId getDst() const { return dst; }
+
+  /// Returns whether the channel is a "CFDFC backedge" (see
+  /// CFDFC::isCFDFCBackedge).
+  bool isBackedge() const { return backedge; }
+
+private:
+  /// The CFDFC is the only builder of nodes and edges.
+  friend struct CFDFC;
+
+  CFDFCEdge(Value channel, CFDFCNodeId src, CFDFCNodeId dst, bool backedge)
+      : channel(channel), src(src), dst(dst), backedge(backedge) {}
+
+  Value channel;
+  CFDFCNodeId src;
+  CFDFCNodeId dst;
+  bool backedge;
+  bool ignoredForThroughput = false;
+};
+
 
 /// Represents a CFDFC i.e., a set of control-free units and channels from a
 /// dataflow circuit accompanied by the number of times it was executed.
