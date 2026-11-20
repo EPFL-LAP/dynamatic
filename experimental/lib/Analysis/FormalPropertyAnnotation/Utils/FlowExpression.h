@@ -278,6 +278,7 @@ struct FlowEquationExtractor {
   LogicalResult extractEndOp(EndOp endOp);
   LogicalResult extractDeadBufferOp(DeadBufferOp deadBufferOp);
   LogicalResult extractForkOp(ForkOp forkOp);
+  LogicalResult extractLazyForkOp(LazyForkOp lazyForkOp);
   LogicalResult extractLoadOp(LoadOp loadOp);
   LogicalResult extractMemoryControllerOp(MemoryControllerOp memCon);
   LogicalResult extractMuxOp(MuxOp muxOp);
