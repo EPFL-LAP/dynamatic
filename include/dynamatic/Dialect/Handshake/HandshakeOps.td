@@ -1284,6 +1284,12 @@ def LSQOp : Handshake_Op<"lsq", [
     /// Returns the MC connected to the LSQ, if it exists.
     handshake::MemoryControllerOp getConnectedMC();
 
+    /// Returns the slots of the queue of the load port that `loadOp` is
+    /// connected to in the SMV model of the LSQ, from the address input to the
+    /// data output.
+    std::vector<BufferSlotFullNamer>
+    getLoadPortSlotNamers(handshake::LoadOp loadOp);
+
     /// Identifies the subset of the control operation's results that are part
     /// of the control path to the LSQ interface. The control operations'
     /// results that are not of type `handshake::ControlType` are ignored and
