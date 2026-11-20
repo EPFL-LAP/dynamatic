@@ -20,9 +20,9 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallVector.h"
 #include <fstream>
 
 using namespace mlir;
@@ -159,6 +159,7 @@ CFDFC CFDFC::create(handshake::FuncOp funcOp, ArchSet &archs,
                     unsigned numExec) {
   CFDFC cfdfc(funcOp, archs, numExec);
   cfdfc.collectChannels();
+  cfdfc.rebuildGraph();
   return cfdfc;
 }
 
@@ -167,6 +168,7 @@ CFDFC CFDFC::createFTD(handshake::FuncOp funcOp, ArchSet &archs,
                        const DenseSet<Value> &backwardChannels) {
   CFDFC cfdfc(funcOp, archs, numExec);
   cfdfc.collectChannelsFTD(backwardChannels);
+  cfdfc.rebuildGraph();
   return cfdfc;
 }
 
@@ -500,4 +502,84 @@ LogicalResult dynamatic::buffer::extractCFDFC(
   }
 
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// CFDFCGraph
+//===----------------------------------------------------------------------===//
+
+CFDFCGraph::CFDFCGraph(const CFDFC &cfdfc) {
+  addUnits(cfdfc.units.getArrayRef());
+  addChannels(cfdfc.channels.getArrayRef());
+  finalize();
+}
+
+std::optional<CFDFCGraph::NodeId> CFDFCGraph::lookup(Operation *unit) const {
+  auto it = unitToNode.find(unit);
+  if (it == unitToNode.end())
+    return std::nullopt;
+  return it->second;
+}
+
+std::optional<CFDFCGraph::EdgeId> CFDFCGraph::lookup(Value channel) const {
+  auto it = channelToEdge.find(channel);
+  if (it == channelToEdge.end())
+    return std::nullopt;
+  return it->second;
+}
+
+void CFDFCGraph::addUnits(ArrayRef<Operation *> units) {
+  nodes.reserve(units.size());
+  for (Operation *unit : units) {
+    auto [it, inserted] = unitToNode.try_emplace(unit, nodes.size());
+    if (inserted)
+      nodes.push_back(Node{unit, it->second, {}, {}, {}});
+  }
+}
+
+void CFDFCGraph::addChannels(ArrayRef<Value> channels) {
+  for (Value channel : channels) {
+    if (channelToEdge.contains(channel))
+      continue;
+    std::optional<NodeId> src = lookup(channel.getDefiningOp());
+    if (!src)
+      continue;
+    for (Operation *consumer : channel.getUsers()) {
+      if (std::optional<NodeId> dst = lookup(consumer))
+        addEdge(*src, *dst, channel);
+    }
+  }
+}
+
+void CFDFCGraph::addEdge(NodeId src, NodeId dst, Value channel) {
+  EdgeId id = edges.size();
+  [[maybe_unused]] bool inserted =
+      channelToEdge.try_emplace(channel, id).second;
+  assert(inserted && "channel added twice");
+  edges.push_back(Edge{src, dst, channel});
+  nodes[src].outEdges.push_back(id);
+  nodes[dst].inEdges.push_back(id);
+  nodes[src].succs.push_back(&nodes[dst]);
+}
+
+void CFDFCGraph::finalize() {
+  root.succs.reserve(nodes.size());
+  for (const Node &node : nodes)
+    root.succs.push_back(&node);
+  computeSCCs();
+}
+
+void CFDFCGraph::computeSCCs() {
+  sccOf.assign(nodes.size(), 0);
+  unsigned sccId = 0;
+  for (auto it = llvm::scc_begin(static_cast<const CFDFCGraph *>(this));
+       !it.isAtEnd(); ++it) {
+    const std::vector<const Node *> &scc = *it;
+    // Skip the ghost root
+    if (scc.size() == 1 && scc.front() == &root)
+      continue;
+    for (const Node *node : scc)
+      sccOf[node->id] = sccId;
+    ++sccId;
+  }
 }
