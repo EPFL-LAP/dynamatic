@@ -42,7 +42,7 @@ Dynamatic depends on [LLVM/MLIR](https://github.com/llvm/llvm-project) and [CIRC
 git clone https://github.com/EPFL-LAP/dynamatic.git
 git -C dynamatic submodule update --init --depth 1
 ```
-This creates a `dynamatic` folder in your current working directory.
+This creates a `dynamatic` folder in your current working directory. `--depth 1` makes git download only the commit of each submodule that Dynamatic uses, without its history.
 
 > [!NOTE]
 > Do not clone with `--recurse-submodules`. It would also download an additional copy of LLVM, inside CIRCT, which Dynamatic does not use.
