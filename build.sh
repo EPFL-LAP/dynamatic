@@ -405,8 +405,10 @@ prepare_to_build_project "Dynamatic" "build"
 # The location of the cmake configurations of polly is different after installed
 if [[ $PREBUILT_LLVM -eq 0 ]]; then
   POLLY_CMAKE_DIR="$LLVM_DIR/tools/polly/lib/cmake/polly"
-else 
+  CIRCT_CMAKE_DIR="$SCRIPT_CWD/build/circt/lib/cmake/circt"
+else
   POLLY_CMAKE_DIR="$LLVM_DIR/lib/cmake/polly"
+  CIRCT_CMAKE_DIR="$LLVM_DIR/lib/cmake/circt"
 fi
 
 # CMake
@@ -416,6 +418,7 @@ if should_run_cmake ; then
       -DLLVM_DIR="$LLVM_DIR/lib/cmake/llvm" \
       -DCLANG_DIR="$LLVM_DIR/lib/cmake/clang" \
       -DPolly_DIR="$POLLY_CMAKE_DIR" \
+      -DCIRCT_DIR="$CIRCT_CMAKE_DIR" \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
@@ -517,6 +520,7 @@ create_symlink ../build/bin/import-blif
 create_symlink ../build/bin/log2csv
 create_symlink ../build/bin/source-rewriter
 create_symlink "../build/bin/rigidification-testbench"
+create_generator_symlink build/bin/lsq-generator-banba
 create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
 create_generator_symlink build/bin/rtl-text-generator
