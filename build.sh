@@ -162,12 +162,12 @@ CMAKE_DYNAMATIC_ENABLE_CBC=""
 CMAKE_DYNAMATIC_ENABLE_ABC=""
 CMAKE_LLVM_ENABLE_ASSERTIONS=""
 LLVM_DIR="$PWD/build/llvm-project"
-# Version of the prebuilt LLVM (release tag llvm-$PREBUILT_LLVM_VERSION in
-# ETHZ-DYNAMO/dynamatic-prebuilt-dependencies), which must match the
-# llvm-project submodule
-PREBUILT_LLVM_VERSION="e974cfe"
+# Version of the prebuilt LLVM and CIRCT (release tag
+# llvm-$PREBUILT_LLVM_VERSION in ETHZ-DYNAMO/dynamatic-prebuilt-dependencies).
+# Its LLVM commit must match the llvm-project submodule
+PREBUILT_LLVM_VERSION="a17069f-circt-1.164.0"
 PREBUILT_LLVM_URL="https://github.com/ETHZ-DYNAMO/dynamatic-prebuilt-dependencies/releases/download/llvm-$PREBUILT_LLVM_VERSION"
-PREBUILT_LLVM_SHA256="06b8766e58c1d6dee2dbddab9f025a729fe9d380c18c0845ed8076a03f1db3ed"
+PREBUILT_LLVM_SHA256="0b5abbbdcea84e07a9dbc8214c7f7e5fda406837d918a4476820c5e0a01229fd"
 
 
 # Loop over command line arguments and update script variables
