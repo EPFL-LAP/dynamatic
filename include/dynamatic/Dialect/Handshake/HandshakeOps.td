@@ -1192,7 +1192,8 @@ def LSQOp : Handshake_Op<"lsq", [
                        Variadic<ChannelType>:$stData,
                        Optional<ChannelType>:$ldDataFromMC,
                        Optional<ControlType>:$ownCtrlEnd,
-                       MemGroupArrayAttr:$groups);
+                       MemGroupArrayAttr:$groups,
+                       UnitAttr:$banba);
   let results = (outs Variadic<ChannelType>:$ldData,
                       Optional<ChannelType>:$ldAddrToMC,
                       Optional<ChannelType>:$stAddrToMC,
