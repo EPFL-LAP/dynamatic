@@ -363,8 +363,8 @@ public:
              "found by buffer placement (requires an MILP-based buffer "
              "placement algorithm); otherwise LSQs use the default depth"});
     addFlag({USE_BANBA_LSQS,
-             "Generate the LSQs with Banba instead of the default LSQ "
-             "generator"});
+             "Generate the LSQs with Banba instead of the pre-existing LSQ "
+             "generators"});
   }
 
   CommandResult execute(CommandArguments &args) override;
