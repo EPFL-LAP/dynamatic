@@ -2,6 +2,7 @@
 #include "LsqConfig.h"
 #include "circt/Dialect/Comb/CombDialect.h"
 #include "circt/Dialect/HW/HWDialect.h"
+#include "circt/Dialect/Seq/SeqDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -47,6 +48,7 @@ int main(int argc, char **argv) {
   mlir::MLIRContext context;
   context.loadDialect<circt::hw::HWDialect>();
   context.loadDialect<circt::comb::CombDialect>();
+  context.loadDialect<circt::seq::SeqDialect>();
   context.loadDialect<banba::BanbaDialect>();
 
   // Read the config file
@@ -84,14 +86,9 @@ int main(int argc, char **argv) {
   builder.setInsertionPointToEnd(module->getBody());
   mlir::Location loc = builder.getUnknownLoc();
 
-  // Create and construct each sub-component of the shared group allocator
-  using namespace banba::shared::ga;
-  createWithPlaceholders<FreeEntryCalcOp>(builder, loc, configAttr);
-  createWithPlaceholders<ReadyGenOp>(builder, loc, configAttr);
-  createWithPlaceholders<PortIdxGenOp>(builder, loc, configAttr);
-  createWithPlaceholders<OrderMatrixGenOp>(builder, loc, configAttr);
-  createWithPlaceholders<CountExtractOp>(builder, loc, configAttr);
-  createWithPlaceholders<AllocatingGenOp>(builder, loc, configAttr);
+  // Create and construct the shared group allocator
+  createWithPlaceholders<banba::shared::GroupAllocatorOp>(builder, loc,
+                                                          configAttr);
 
   // Print the module
   module->print(llvm::outs());
