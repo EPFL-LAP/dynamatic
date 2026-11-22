@@ -6,19 +6,21 @@ namespace banba {
 void OrReduceOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
 
+  // Sanity assert
+  assert(!getInputs().empty() && "cannot reduce an empty list");
+
+  // If nothing to OR, return the single input as it is
+  if (getInputs().size() == 1) {
+    driveReduced(getInputs().front());
+    return;
+  }
+
   // The list of values to build a set of ORs for.
   // That set of ORs will then produce a list of values
   // which is half as long
-  SmallVector<Value> inputs(getInputs().begin(), getInputs().end());
-
-  // Sanity assert
-  assert(!inputs.empty() && "cannot reduce an empty list");
-
-  // If nothing to OR, return
-  if (inputs.size() == 1) {
-    driveReduced(inputs.front());
-    return;
-  }
+  SmallVector<Value> inputs;
+  for (Value input : getInputs())
+    inputs.push_back(BanbaSugar::castToInt(input));
 
   // The first layer of the OR tree has a number of outputs
   // equal to the largest power-of-two value that is strictly smaller
@@ -52,7 +54,7 @@ void OrReduceOp::constructRegion() {
     // If this was the final round,
     // drive the result with the output
     if (numOutputs == 1) {
-      driveReduced(outputs.front());
+      driveReduced(BanbaSugar::castTo(outputs.front(), getReduced().getType()));
       return;
     }
 
@@ -164,6 +166,90 @@ void WrapSubOp::constructRegion() {
     // Mux based on the predicate
     driveDifference(BanbaSugar::select(pred, diff, borrowed));
   }
+}
+
+// Verify amount is clog2(element count of data) bits
+LogicalResult CyclicLeftShiftOp::verify() {
+  // Gets the binary width of the amount to shift by
+  unsigned amountWidth = cast<IntegerType>(getAmount().getType()).getWidth();
+
+  // Get the number of elements in the array
+  // also asserts the input type is an array
+  unsigned numElements =
+      cast<circt::hw::ArrayType>(getData().getType()).getNumElements();
+
+  // Should only be called on the load and store queue
+  // so we should never be shifting a 1-element queue
+  if (numElements < 2)
+    return emitOpError() << "data must have at least 2 elements, got "
+                         << numElements;
+
+  // Get the binary width required to fully shift a queue of numElements
+  unsigned expected = Log2_32_Ceil(numElements);
+
+  // Verify that the widths match
+  if (amountWidth != expected)
+    return emitOpError() << "amount is " << amountWidth
+                         << " bits, expected clog2(" << numElements
+                         << " elements) = " << expected;
+
+  // Verify that the shifted output type is the same
+  // as the to-shift input type
+  if (getShifted().getType() != getData().getType())
+    return emitOpError() << "shifted type must match data type";
+
+  return success();
+}
+
+// Cyclic left rotate
+void CyclicLeftShiftOp::constructRegion() {
+  BanbaSugarScope scope(getOperation());
+  OpBuilder &builder = BanbaSugarScope::getBuilder();
+  Location loc = BanbaSugarScope::getLoc();
+
+  // Get inputs
+  BanbaValue amount = getAmount();
+
+  // Get the array info
+  auto arrayType = cast<circt::hw::ArrayType>(getData().getType());
+  Type elementType = arrayType.getElementType();
+  unsigned numElements = arrayType.getNumElements();
+  unsigned amountWidth = cast<IntegerType>(getAmount().getType()).getWidth();
+
+  // The array as shifted so far, which starts as the input
+  Value shifted = getData();
+
+  // For each bit starting with the MSB
+  // build a shift
+  for (int bit = amountWidth - 1; bit >= 0; --bit) {
+    // Potentially shift by 2^n
+    unsigned shift = (1u << bit);
+
+    // Shifting left by 2^n moves element i to position i + 2^n,
+    // so cut the array in two at 2^n elements from its top
+    unsigned cut = numElements - shift;
+    BanbaValue zeroIndex(0, Log2_32_Ceil(numElements));
+    BanbaValue cutIndex(cut, Log2_32_Ceil(numElements));
+    Value lower = circt::hw::ArraySliceOp::create(
+        builder, loc, circt::hw::ArrayType::get(elementType, cut), shifted,
+        zeroIndex);
+    Value upper = circt::hw::ArraySliceOp::create(
+        builder, loc, circt::hw::ArrayType::get(elementType, shift), shifted,
+        cutIndex);
+
+    // And put the two pieces back in the other order.
+    // hw.array_concat expects the highest-indexed piece first,
+    // which is now the lower one
+    Value rotated = circt::hw::ArrayConcatOp::create(
+        builder, loc, ArrayRef<Value>{lower, upper});
+
+    // Use a multiplexer to select the shifted array or the unshifted array
+    // based on whether bit n of amount is 1
+    shifted = BanbaSugar::select(amount[bit], rotated, shifted);
+  }
+
+  // Results
+  driveShifted(shifted);
 }
 
 } // namespace banba
