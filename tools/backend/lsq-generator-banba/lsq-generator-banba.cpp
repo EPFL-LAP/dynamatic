@@ -1,3 +1,4 @@
+#include "BanbaDialect.h"
 #include "LsqConfig.h"
 #include "circt/Dialect/HW/HWDialect.h"
 #include "mlir/IR/MLIRContext.h"
@@ -21,6 +22,7 @@ int main(int argc, char **argv) {
   // libraries, which checks that Dynamatic's build finds both
   mlir::MLIRContext context;
   context.loadDialect<circt::hw::HWDialect>();
+  context.loadDialect<banba::BanbaDialect>();
 
   // Read the config file
   auto buffer = llvm::MemoryBuffer::getFile(configFile);
@@ -44,7 +46,8 @@ int main(int argc, char **argv) {
   if (!hasRequiredValues(*config))
     return 1;
 
-  llvm::outs() << "Successfully parsed the config of LSQ '" << config->name
-               << "'\n";
+  // Store the LSQ's parameters in the Banba dialect's attribute, and print it
+  banba::ConfigAttr configAttr = banba::ConfigAttr::get(&context, *config);
+  llvm::outs() << configAttr << "\n";
   return 0;
 }

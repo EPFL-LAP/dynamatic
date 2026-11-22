@@ -67,6 +67,7 @@ bool hasRequiredValues(const LsqConfig &config) {
          hasRequiredValue("pipe1En", config.pipe1En, 0) &&
          hasRequiredValue("pipeCompEn", config.pipeCompEn, 0) &&
          hasRequiredValue("headLagEn", config.headLagEn, 0) &&
-         hasRequiredValue("bypassEn", config.bypassEn, 1);
+         hasRequiredValue("bypassEn", config.bypassEn, 1) &&
+         hasRequiredValue("BANBA", config.BANBA, true);
   // clang-format on
 }
