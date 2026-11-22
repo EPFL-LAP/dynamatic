@@ -10,6 +10,8 @@ void GroupAllocatorOp::constructRegion() {
   // Emit the group allocator into group_allocator.sv
   setOutputFile(getOperation(), "group_allocator.sv");
 
+  BanbaSugar::moduleComment(getOperation(), ModComment);
+
   ////////////////////////////////////////////////////////////////
   // Declare the sub-components, without specifying inputs
   ////////////////////////////////////////////////////////////////
@@ -79,6 +81,8 @@ void FreeEntryCalcOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
 
+  BanbaSugar::moduleComment(getOperation(), ModComment);
+
   unsigned ldQSize = config.getFifoDepth_L();
   unsigned stQSize = config.getFifoDepth_S();
 
@@ -121,6 +125,8 @@ void ReadyGenOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
 
+  BanbaSugar::moduleComment(getOperation(), ModComment);
+
   // For each group, make a ready calculation and save it in a vector
   SmallVector<Value> gaReadyVec;
   for (unsigned group = 0; group < config.getNumBBs(); ++group) {
@@ -152,6 +158,8 @@ void ReadyGenOp::constructRegion() {
 void PortIdxGenOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
+
+  BanbaSugar::moduleComment(getOperation(), ModComment);
 
   // Convert the one-hot group_allocate from one hw.array value
   // to a C++ list holding each group's allocate bit,
@@ -262,6 +270,8 @@ void OrderMatrixGenOp::constructRegion() {
 
   // If so we need the real logic
   if (nonzeroEncoding) {
+    BanbaSugar::moduleComment(getOperation(), ModComment);
+
     // A row of zeros, one bit per store queue entry
     BanbaValue zero(0, numStqEntries);
 
@@ -360,6 +370,8 @@ void OrderMatrixGenOp::constructRegion() {
     // Results
     driveGaLsOrder(gaLsOrder.getShifted());
   } else {
+    BanbaSugar::moduleComment(getOperation(), ZeroModComment);
+
     // In this kernel,
     // there is never a store before a load inside a basic block,
     // so return a constant zero matrix
@@ -370,6 +382,13 @@ void OrderMatrixGenOp::constructRegion() {
 void CountExtractOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
+
+  // The comment describes the version that is built below
+  if (config.getNumBBs() > 1) {
+    BanbaSugar::moduleComment(getOperation(), ModComment);
+  } else {
+    BanbaSugar::moduleComment(getOperation(), SingleGroupModComment);
+  }
 
   Value numLoads;
   if (config.getNumBBs() > 1) {
@@ -418,6 +437,8 @@ void CountExtractOp::constructRegion() {
 void AllocatingGenOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
+
+  BanbaSugar::moduleComment(getOperation(), ModComment);
 
   // The largest number of loads in any group,
   // which num_loads can never exceed

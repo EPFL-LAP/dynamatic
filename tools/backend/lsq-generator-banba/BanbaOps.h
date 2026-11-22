@@ -52,6 +52,9 @@ void driveResult(Operation *op, unsigned index, Value value);
 /// Attribute name for specifying the output file in SystemVerilog
 inline constexpr StringLiteral outputFileAttrName = "banba.output_file";
 
+/// Attribute name for the comment printed above an op's module
+inline constexpr StringLiteral modCommentAttrName = "banba.mod_comment";
+
 /// Store the specified output name (prefixed with the lsq name)
 /// as an attribute on the op
 inline void setOutputFile(Operation *op, StringRef file) {

@@ -9,19 +9,6 @@ class SharedComponent<string mnemonic, list<Trait> traits = []>
   let cppNamespace = "::banba::shared";
 }
 
-// Group Allocator:
-// manages entry allocation for the Load-Store Queue (LSQ).
-//
-// Dynamatic's circuits have no encoding of program order,
-// and so the group allocator unit of the LSQ has the
-// program order of memory accesses in each basic block
-// stored in Read-Only Memory (ROM).
-//
-// Each group corresponds to a basic block,
-// and so the allocation of a group is the allocation
-// of one queue entry per memory access in that basic block,
-// and the updating of the order matrix to contain
-// the order of those accesses, based on the order stored in ROM.
 def Shared_GroupAllocatorOp : SharedComponent<"group_allocator"> {
   let arguments = (ins
       ClockType:$clk,
@@ -42,6 +29,56 @@ def Shared_GroupAllocatorOp : SharedComponent<"group_allocator"> {
       ArrayInt:$ga_ls_order,
       ArrayInt:$ld_q_port_idx,
       ArrayInt:$st_q_port_idx);
+
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog
+    static constexpr StringRef ModComment[] = {
+        "Group Allocator:",
+        "manages entry allocation for the Load-Store Queue (LSQ).",
+        "",
+        "Dynamatic's circuits have no encoding of program order,",
+        "and so the group allocator unit of the LSQ has the",
+        "program order of memory accesses in each basic block",
+        "stored in Read-Only Memory (ROM).",
+        "",
+        "Each group corresponds to a basic block,",
+        "and so the allocation of a group is the allocation",
+        "of one queue entry per memory access",
+        "in that basic block,",
+        "and the updating of the order matrix to contain",
+        "the order of those accesses,",
+        "based on the order stored in ROM.",
+        "",
+        "Sub-components:",
+        "",
+        "1. Free Entry Calculation:",
+        "   the number of free entries in each queue,",
+        "   from its head and tail pointers,",
+        "",
+        "2. Ready Generation:",
+        "   checks if there is sufficient space in the queues",
+        "   to allocate a group",
+        "",
+        "3. Port Index Generation:",
+        "   drives the port index inputs of both queues",
+        "   so that the newly allocated queue entries",
+        "   know which port they belong to",
+        "",
+        "4. Order Matrix Generation:",
+        "   Generates a partial order matrix",
+        "   representing only the newly allocated group,",
+        "   already shifted based on the queue pointers",
+        "   so it can be easily combined",
+        "   with the current order matrix",
+        "",
+        "5. Load/Store Count Extraction:",
+        "   Shallow wrapper that reads the number",
+        "   of loads and stores of the group being allocated",
+        "   from ROM",
+        "",
+        "6. Allocating Generation:",
+        "   Drives the per-entry allocating input of each queue"};
+  }];
 
   let extraClassDefinition = [{
     SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
@@ -84,13 +121,6 @@ class SharedGaComponent<string mnemonic, list<Trait> traits = []>
   let cppNamespace = "::banba::shared::ga";
 }
 
-// Free Entry Calculation:
-// Calculates the number of free entries in each queue,
-// by cyclic subtraction (WrapSub) of the head and tail pointers.
-// The subtraction is ambiguous when head == tail (empty or full).
-// We use a mux on the queue's empty flag to resolve it,
-// outputting the maximum queue size when empty
-// and the WrapSub result otherwise.
 def SharedGa_FreeEntryCalcOp : SharedGaComponent<"free_entry_calc"> {
   let arguments = (ins
       Int:$ld_q_head,
@@ -102,6 +132,18 @@ def SharedGa_FreeEntryCalcOp : SharedGaComponent<"free_entry_calc"> {
   let results = (outs
       Int:$ld_num_free_entries,
       Int:$st_num_free_entries);
+
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog
+    static constexpr StringRef ModComment[] = {
+        "Free Entry Calculation:",
+        "Calculates the number of free entries in each queue,",
+        "by cyclic subtraction (WrapSub) of the head and tail pointers.",
+        "The subtraction is ambiguous when head == tail (empty or full).",
+        "We use a mux on the queue's empty flag to resolve it,",
+        "outputting the maximum queue size when empty",
+        "and the WrapSub result otherwise."};
+  }];
 
   let extraClassDefinition = [{
     SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
@@ -123,16 +165,21 @@ def SharedGa_FreeEntryCalcOp : SharedGaComponent<"free_entry_calc"> {
   }];
 }
 
-// Ready Signal Generation:
-// for each group, compare available space in each queue
-// with the required space to allocate that group.
-// A group is ready only if there is enough space
-// for both its loads and its stores.
 def SharedGa_ReadyGenOp : SharedGaComponent<"ready_gen"> {
   let arguments = (ins
       Int:$ld_num_free_entries,
       Int:$st_num_free_entries);
   let results = (outs ArrayI1:$ga_ready);
+
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog
+    static constexpr StringRef ModComment[] = {
+        "Ready Signal Generation:",
+        "for each group, compare available space in each queue",
+        "with the required space to allocate that group.",
+        "A group is ready only if there is enough space",
+        "for both its loads and its stores."};
+  }];
 
   let extraClassDefinition = [{
     SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
@@ -147,10 +194,6 @@ def SharedGa_ReadyGenOp : SharedGaComponent<"ready_gen"> {
   }];
 }
 
-// Port Index Generation:
-// ROM-lookup the source port of each entry
-// for the allocated group,
-// then CyclicLeftShift by each queue's tail to align it.
 def SharedGa_PortIdxGenOp : SharedGaComponent<"port_idx_gen"> {
   let arguments = (ins
       ArrayI1:$group_allocate,
@@ -159,6 +202,15 @@ def SharedGa_PortIdxGenOp : SharedGaComponent<"port_idx_gen"> {
   let results = (outs
       ArrayInt:$ld_q_port_idx,
       ArrayInt:$st_q_port_idx);
+
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog
+    static constexpr StringRef ModComment[] = {
+        "Port Index Generation:",
+        "ROM-lookup the source port of each entry",
+        "for the allocated group,",
+        "then CyclicLeftShift by each queue's tail to align it."};
+  }];
 
   let extraClassDefinition = [{
     SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
@@ -177,19 +229,31 @@ def SharedGa_PortIdxGenOp : SharedGaComponent<"port_idx_gen"> {
   }];
 }
 
-// Order Matrix Generation:
-// ROM lookup of the order inside
-// the allocated group,
-// first builds an un-shifted partial load-store order matrix,
-// then left shifts it twice, by st_q_tail and ld_q_tail,
-// to match the partial order matrix
-// with the LSQ's main order matrix.
 def SharedGa_OrderMatrixGenOp : SharedGaComponent<"order_matrix_gen"> {
   let arguments = (ins
       ArrayI1:$group_allocate,
       Int:$ld_q_tail,
       Int:$st_q_tail);
   let results = (outs ArrayInt:$ga_ls_order);
+
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog
+    static constexpr StringRef ModComment[] = {
+        "Order Matrix Generation:",
+        "ROM lookup of the order inside",
+        "the allocated group,",
+        "first builds an un-shifted partial load-store order matrix,",
+        "then left shifts it twice, by st_q_tail and ld_q_tail,",
+        "to match the partial order matrix",
+        "with the LSQ's main order matrix."};
+
+    /// The comment printed in its place
+    /// when no group has a store before a load
+    static constexpr StringRef ZeroModComment[] = {
+        "Order Matrix Generation:",
+        "In this kernel,",
+        "There is never a store before a load inside a basic block"};
+  }];
 
   let extraClassDefinition = [{
     SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
@@ -206,14 +270,26 @@ def SharedGa_OrderMatrixGenOp : SharedGaComponent<"order_matrix_gen"> {
   }];
 }
 
-// Load/Store Count Extraction:
-// the number of loads and stores in the allocated group,
-// from a ROM lookup by the one-hot group_allocate.
 def SharedGa_CountExtractOp : SharedGaComponent<"count_extract"> {
   let arguments = (ins ArrayI1:$group_allocate);
   let results = (outs
       Int:$num_loads,
       Int:$num_stores);
+
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog
+    static constexpr StringRef ModComment[] = {
+        "Load/Store Count Extraction:",
+        "the number of loads and stores in the allocated group,",
+        "from a ROM lookup by the one-hot group_allocate."};
+
+    /// The comment printed in its place when there is a single group
+    static constexpr StringRef SingleGroupModComment[] = {
+        "Load/Store Count Extraction:",
+        "the number of loads and stores in the allocated group.",
+        "There is a single group, so each count is that group's",
+        "when it allocates, and zero otherwise."};
+  }];
 
   let extraClassDefinition = [{
     SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
@@ -228,11 +304,6 @@ def SharedGa_CountExtractOp : SharedGaComponent<"count_extract"> {
   }];
 }
 
-// Allocating:
-// the per-entry allocation masks for both queues.
-// For each queue, create an unshifted bitmask,
-// then CyclicLeftShift it by the queue tail pointer
-// to rotate the block of 1s to start at the tail position.
 def SharedGa_AllocatingGenOp : SharedGaComponent<"allocating_gen"> {
   let arguments = (ins
       Int:$num_loads,
@@ -242,6 +313,16 @@ def SharedGa_AllocatingGenOp : SharedGaComponent<"allocating_gen"> {
   let results = (outs
       ArrayI1:$ld_q_allocating,
       ArrayI1:$st_q_allocating);
+
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog
+    static constexpr StringRef ModComment[] = {
+        "Allocating:",
+        "the per-entry allocation masks for both queues.",
+        "For each queue, create an unshifted bitmask,",
+        "then CyclicLeftShift it by the queue tail pointer",
+        "to rotate the block of 1s to start at the tail position."};
+  }];
 
   let extraClassDefinition = [{
     SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {

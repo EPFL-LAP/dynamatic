@@ -6,6 +6,8 @@ namespace banba {
 void OrReduceOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
 
+  BanbaSugar::moduleComment(getOperation(), ModComment);
+
   // Sanity assert
   assert(!getInputs().empty() && "cannot reduce an empty list");
 
@@ -82,6 +84,8 @@ LogicalResult OneHotMuxOp::verify() {
 void OneHotMuxOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
 
+  BanbaSugar::moduleComment(getOperation(), ModComment);
+
   BanbaValue oneHotSel = getOneHotSel();
   BanbaValue inputs = getInputs();
   auto inputsType = cast<circt::hw::ArrayType>(getInputs().getType());
@@ -142,6 +146,8 @@ void WrapSubOp::constructRegion() {
   // Get inputs and the modulo
   BanbaValue a = getA(), b = getB();
   unsigned modulo = getModulo();
+
+  BanbaSugar::moduleComment(getOperation(), modComment(modulo));
 
   // RTL subtraction
   BanbaValue diff = a - b;
@@ -206,6 +212,8 @@ void CyclicLeftShiftOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   OpBuilder &builder = BanbaSugarScope::getBuilder();
   Location loc = BanbaSugarScope::getLoc();
+
+  BanbaSugar::moduleComment(getOperation(), ModComment);
 
   // Get inputs
   BanbaValue amount = getAmount();

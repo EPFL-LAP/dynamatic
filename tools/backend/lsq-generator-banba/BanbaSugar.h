@@ -5,6 +5,7 @@
 #include "circt/Dialect/Comb/CombOps.h"
 #include "circt/Dialect/HW/HWOps.h"
 #include "mlir/IR/Builders.h"
+#include "llvm/ADT/StringExtras.h"
 
 namespace banba {
 
@@ -424,6 +425,18 @@ OpT createOpFromConfig() {
   // Construct the inside of the operation
   op.constructRegion();
   return op;
+}
+
+/// Set the op's module comment, printed above its hw.module in the SV,
+/// one comment line per element
+inline void moduleComment(Operation *op, ArrayRef<StringRef> lines) {
+  op->setAttr(modCommentAttrName, BanbaSugarScope::getBuilder().getStringAttr(
+                                      llvm::join(lines, "\n")));
+}
+
+/// Single-line overload
+inline void moduleComment(Operation *op, StringRef text) {
+  moduleComment(op, ArrayRef<StringRef>(text));
 }
 
 } // namespace BanbaSugar
