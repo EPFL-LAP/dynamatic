@@ -282,6 +282,13 @@ def SharedGa_CountExtractOp : SharedGaComponent<"count_extract"> {
         "Load/Store Count Extraction:",
         "the number of loads and stores in the allocated group,",
         "from a ROM lookup by the one-hot group_allocate."};
+
+    /// The comment printed in its place when there is a single group
+    static constexpr StringRef SingleGroupModComment[] = {
+        "Load/Store Count Extraction:",
+        "the number of loads and stores in the allocated group.",
+        "There is a single group, so each count is that group's",
+        "when it allocates, and zero otherwise."};
   }];
 
   let extraClassDefinition = [{

@@ -383,7 +383,12 @@ void CountExtractOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
 
-  BanbaSugar::moduleComment(getOperation(), ModComment);
+  // The comment describes the version that is built below
+  if (config.getNumBBs() > 1) {
+    BanbaSugar::moduleComment(getOperation(), ModComment);
+  } else {
+    BanbaSugar::moduleComment(getOperation(), SingleGroupModComment);
+  }
 
   Value numLoads;
   if (config.getNumBBs() > 1) {
