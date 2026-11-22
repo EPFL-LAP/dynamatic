@@ -51,14 +51,21 @@ static circt::hw::ModulePortInfo makePortInfo(Operation *op) {
 }
 
 /// The uniqued module name for an op: the base name is the op's mnemonic,
-/// with its dots as underscores; the first of a kind keeps the base name,
-/// repeats get a counter suffix.
+/// without the queue arrangement it starts with (`shared` or `per_port`),
+/// and with its dots as underscores; the first of a kind keeps the base
+/// name, repeats get a counter suffix.
 ///
 /// Every name is prefixed with the LSQ's name, so several LSQs compiled into
 /// one design do not collide on shared module names.
 static std::string nameHWModule(Operation *op, StringRef lsqName,
                                 llvm::StringMap<unsigned> &counts) {
-  std::string baseName = op->getName().stripDialect().str();
+  // Get the op's mnemonic, and drop the queue arrangement from its start:
+  // an LSQ has only one of the two, so it tells no two modules apart
+  StringRef mnemonic = op->getName().stripDialect();
+  mnemonic.consume_front("shared.");
+  mnemonic.consume_front("per_port.");
+
+  std::string baseName = mnemonic.str();
   std::replace(baseName.begin(), baseName.end(), '.', '_');
   baseName = (lsqName + "_" + baseName).str();
 
