@@ -98,11 +98,15 @@ void OneHotMuxOp::constructRegion() {
                                                selBit, element, zero));
   }
 
-  // OR-reduce the terms, with an OR reduction operation
-  OrReduceOp orReduce = BanbaSugar::createOp<OrReduceOp>(terms);
-
-  // Results
-  driveSelected(orReduce.getReduced());
+  // It's safe to OR reduce on a 1-element vector
+  // but it gives a cleaner output to avoid it
+  if (terms.size() > 1) {
+    // OR-reduce the terms, with an OR reduction operation
+    OrReduceOp orReduce = BanbaSugar::createOp<OrReduceOp>(terms);
+    driveSelected(orReduce.getReduced());
+  } else {
+    driveSelected(terms[0]);
+  }
 }
 
 } // namespace banba
