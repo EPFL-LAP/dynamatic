@@ -125,3 +125,20 @@ SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
           ...};
 }
 ```
+
+## Region Construction
+
+Banba operations correspond to sub-modules. Each operation is responsible for adding its own internal sub-operations and wiring them together, as well as possibly adding some direct RTL logic.
+
+An operation declares that it does so using the `ConstructsRegion` interface. To meet the contract specified, it must then provide a definition of the `constructRegion` function.
+
+```tablegen
+def LsqOp : Op<Banba_Dialect, "lsq",
+    [DeclareOpInterfaceMethods<ConstructsRegion>]> {
+```
+
+```cpp
+void LsqOp::constructRegion() {
+  ...
+}
+```

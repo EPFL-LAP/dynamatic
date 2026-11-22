@@ -20,6 +20,7 @@ set(LLVM_LINK_COMPONENTS
 add_llvm_tool(lsq-generator-banba
   lsq-generator-banba.cpp
   BanbaDialect.cpp
+  ConstructLsq.cpp
   LsqConfig.cpp
 
   DEPENDS
