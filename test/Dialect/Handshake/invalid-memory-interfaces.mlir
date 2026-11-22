@@ -61,7 +61,7 @@ handshake.func @mcStoreWithoutControl(%mem: memref<4xi32>, %memStart: <>, %a: <i
 
 handshake.func @lsqGroupWithoutControl(%mem: memref<4xi32>, %memStart: <>, %a: <i2>, %ctrlEnd: <>) {
   // expected-error @below {{Every LSQ group must have a control port.}}
-  %ldData, %memEnd = lsq[%mem : memref<4xi32>] start(%memStart) groups(: [load(%a)]) end(%ctrlEnd) : <i2>, <i32>
+  %ldData, %memEnd = lsq[%mem : memref<4xi32>] start(%memStart) groups(: [load(%a)]) end(%ctrlEnd) {loadQueueDepth = 16 : ui32, storeQueueDepth = 16 : ui32} : <i2>, <i32>
   end
 }
 
@@ -69,7 +69,7 @@ handshake.func @lsqGroupWithoutControl(%mem: memref<4xi32>, %memStart: <>, %a: <
 
 handshake.func @lsqEmptyGroup(%mem: memref<4xi32>, %memStart: <>, %a: <i2>, %g0: <>, %g1: <>, %ctrlEnd: <>) {
   // expected-error @below {{Every LSQ group must have at least one access.}}
-  %ldData, %memEnd = lsq[%mem : memref<4xi32>] start(%memStart) groups(%g0: [load(%a)], %g1: []) end(%ctrlEnd) : <i2>, <i32>
+  %ldData, %memEnd = lsq[%mem : memref<4xi32>] start(%memStart) groups(%g0: [load(%a)], %g1: []) end(%ctrlEnd) {loadQueueDepth = 16 : ui32, storeQueueDepth = 16 : ui32} : <i2>, <i32>
   end
 }
 

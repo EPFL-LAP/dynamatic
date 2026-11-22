@@ -1175,11 +1175,17 @@ def LSQOp : Handshake_Op<"lsq", [
     the `ldData` results), and the `groups` attribute describes the groups:
     their accesses in program order. The n-th load over all groups is the n-th
     operand of `ldAddr` (and the n-th result of `ldData`), the n-th store the
-    n-th operand of `stAddr` and `stData`. For example:
+    n-th operand of `stAddr` and `stData`.
+
+    The `loadQueueDepth` and `storeQueueDepth` attributes are the numbers of
+    entries of the load and store queues. A queue must hold every access of a
+    group plus one, and at least two entries (the LSQ generators reject smaller
+    queues). For example:
 
     ```mlir
     %ldData, %memEnd = lsq[%mem : memref<4xi32>] start(%memStart)
         groups(%g0: [store(%sa0, %sd0), load(%la0)]) end(%ctrlEnd)
+        {loadQueueDepth = 16 : ui32, storeQueueDepth = 16 : ui32}
         : <i2>, <i32>
     ```
   }];
@@ -1192,7 +1198,9 @@ def LSQOp : Handshake_Op<"lsq", [
                        Variadic<ChannelType>:$stData,
                        Optional<ChannelType>:$ldDataFromMC,
                        Optional<ControlType>:$ownCtrlEnd,
-                       MemGroupArrayAttr:$groups);
+                       MemGroupArrayAttr:$groups,
+                       UI32Attr:$loadQueueDepth,
+                       UI32Attr:$storeQueueDepth);
   let results = (outs Variadic<ChannelType>:$ldData,
                       Optional<ChannelType>:$ldAddrToMC,
                       Optional<ChannelType>:$stAddrToMC,
@@ -1201,16 +1209,20 @@ def LSQOp : Handshake_Op<"lsq", [
 
   // The first builder creates an LSQ that talks to the memory, the second one
   // an LSQ that forwards its accesses to an MC. Both derive the result types
-  // from the memref and the groups.
+  // from the memref and the groups, and default the queue depths to 16.
   let builders = [
     OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$ctrl,
                    "ValueRange":$ldAddr, "ValueRange":$stAddr,
                    "ValueRange":$stData, "Value":$ctrlEnd,
-                   "ArrayAttr":$groups)>,
+                   "ArrayAttr":$groups,
+                   CArg<"unsigned", "16">:$loadQueueDepth,
+                   CArg<"unsigned", "16">:$storeQueueDepth)>,
     OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp,
                    "ValueRange":$ctrl, "ValueRange":$ldAddr,
                    "ValueRange":$stAddr, "ValueRange":$stData,
-                   "ArrayAttr":$groups)>,
+                   "ArrayAttr":$groups,
+                   CArg<"unsigned", "16">:$loadQueueDepth,
+                   CArg<"unsigned", "16">:$storeQueueDepth)>,
   ];
   let hasVerifier = 1;
 
@@ -1235,6 +1247,32 @@ def LSQOp : Handshake_Op<"lsq", [
         sizes.push_back(group.getAccesses().size());
       return sizes;
     }
+
+    /// Returns the number of accesses of the given kind in each group.
+    mlir::SmallVector<unsigned>
+    getNumAccessesPerGroup(::dynamatic::handshake::MemAccessKind kind);
+
+    /// Returns, for each group, the port indices of its accesses of the given
+    /// kind (their indices among all accesses of that kind), in program order.
+    mlir::SmallVector<mlir::SmallVector<unsigned>>
+    getPortIndicesPerGroup(::dynamatic::handshake::MemAccessKind kind);
+
+    /// Returns, for each group, the position of its first access of the given
+    /// kind in the group, or none if the group has no access of that kind.
+    mlir::SmallVector<std::optional<unsigned>>
+    getFirstAccessPositions(::dynamatic::handshake::MemAccessKind kind);
+
+    /// Returns, for each group, the number of stores of the group that precede
+    /// each of its loads, in program order.
+    mlir::SmallVector<mlir::SmallVector<unsigned>> getNumStoresBeforeLoads();
+
+    /// Returns the smallest load queue depth the LSQ generators accept: the
+    /// maximum number of loads in a group plus one, and at least two.
+    unsigned getMinLoadQueueDepth();
+
+    /// Returns the smallest store queue depth the LSQ generators accept: the
+    /// maximum number of stores in a group plus one, and at least two.
+    unsigned getMinStoreQueueDepth();
 
     /// Returns a convenient data-structure to go over the controls and memory
     /// accesses that are connected to the LSQ.

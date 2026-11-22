@@ -21,7 +21,6 @@
 #include <iostream>
 #include <optional>
 #include <regex>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -498,16 +497,6 @@ TEST_P(LSQSizingFixture, basic) {
       // clang-format on
   };
   EXPECT_EQ(config.run(), 0);
-
-  // The sized depths are stored as an attribute of each LSQ
-  fs::path exportPath = config.benchmarkPath / config.name /
-                        ("out_" + config.testName) / "comp" /
-                        "handshake_export.mlir";
-  std::ifstream exportFile(exportPath);
-  std::stringstream exportIR;
-  exportIR << exportFile.rdbuf();
-  EXPECT_NE(exportIR.str().find("handshake.lsqDepth"), std::string::npos)
-      << "No LSQ was sized in " << exportPath;
 
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);

@@ -2,8 +2,8 @@
 
 // CHECK-LABEL:   handshake.func @test0(
 handshake.func @test0(%var1: <i32>, %var0: memref<8xi32>, %var2: memref<8xi8>, %var0_start: <>, %var2_start: <>, %start: <>) -> (var0_end: <>, var2_end: <>, end: <>) {
-  %0 = lsq[%var2 : memref<8xi8>] start(%var2_start) groups(%start: [store(%addressResult_12, %dataResult_13)]) end(%start) {handshake.name = "lsq0"} : <i32>, <i8>
-  %1:2 = lsq[%var0 : memref<8xi32>] start(%var0_start) groups(%start: [load(%addressResult_10), store(%addressResult_14, %dataResult_15)]) end(%start) {handshake.name = "lsq1"} : <i32>, <i32>
+  %0 = lsq[%var2 : memref<8xi8>] start(%var2_start) groups(%start: [store(%addressResult_12, %dataResult_13)]) end(%start) {handshake.name = "lsq0", loadQueueDepth = 16 : ui32, storeQueueDepth = 16 : ui32} : <i32>, <i8>
+  %1:2 = lsq[%var0 : memref<8xi32>] start(%var0_start) groups(%start: [load(%addressResult_10), store(%addressResult_14, %dataResult_15)]) end(%start) {handshake.name = "lsq1", loadQueueDepth = 16 : ui32, storeQueueDepth = 16 : ui32} : <i32>, <i32>
   %22 = constant %start {handshake.bb = 0 : ui32, handshake.name = "constant6", value = 0 : i32} : <>, <i32>
 
 // ^bb1:
@@ -24,7 +24,7 @@ handshake.func @test0(%var1: <i32>, %var0: memref<8xi32>, %var2: memref<8xi8>, %
 
 // CHECK-LABEL:   handshake.func @shrsi_giid(
 handshake.func @shrsi_giid(%var5: <i8>, %var1: memref<2xi16>, %var1_start: <>, %start: <>) -> (var1_end: <>, end: <>) {
-  %0:2 = lsq[%var1 : memref<2xi16>] start(%var1_start) groups(%start: [load(%addressResult), store(%addressResult_0, %dataResult_1)]) end(%start) {handshake.name = "lsq0"} : <i32>, <i16>
+  %0:2 = lsq[%var1 : memref<2xi16>] start(%var1_start) groups(%start: [load(%addressResult), store(%addressResult_0, %dataResult_1)]) end(%start) {handshake.name = "lsq0", loadQueueDepth = 16 : ui32, storeQueueDepth = 16 : ui32} : <i32>, <i16>
   %1 = constant %start {handshake.bb = 0 : ui32, handshake.name = "constant0", value = 0 : i32} : <>, <i32>
   // CHECK: = load[
   // CHECK-SAME: #handshake<deps[{

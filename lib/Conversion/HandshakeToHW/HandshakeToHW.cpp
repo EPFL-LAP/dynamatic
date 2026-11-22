@@ -832,9 +832,10 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addType("DATA_TYPE", ChannelType::get(dataType));
         addType("ADDR_TYPE", ChannelType::get(addrType));
       })
-      .Case<handshake::LSQOp>([&](auto) {
-        LSQGenerationInfo genInfo(ports, getUniqueName(op).str());
-        modName = getOpName() + "_" + genInfo.name;
+      .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
+        modName = getOpName() + "_" + getUniqueName(op).str();
+        unsigned loadQueueDepth = lsqOp.getLoadQueueDepth();
+        unsigned storeQueueDepth = lsqOp.getStoreQueueDepth();
 
         /// Converts an array into an equivalent MLIR attribute.
         Type intType = IntegerType::get(ctx, 32);
@@ -862,37 +863,98 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
           addParam(name, ArrayAttr::get(ctx, biArrayAttr));
         };
 
+        // The examples below are for an LSQ with queues of depth 4 and two
+        // groups, `[st0, ld0, st1, ld1]` and `[st2, ld2, st3]`.
+
+        // The legacy Chisel generator expects some per-group arrays padded with
+        // zeros to the depth of the queue of the access kind.
+        // Example: the load ports become `[[0, 1, 0, 0], [2, 0, 0, 0]]`
+        auto padToDepth = [](SmallVector<SmallVector<unsigned>> biArray,
+                             unsigned depth) {
+          for (SmallVector<unsigned> &array : biArray) {
+            assert(array.size() <= depth && "array larger than LSQ depth");
+            array.resize(depth, 0);
+          }
+          return biArray;
+        };
+
+        // The position of the first access of a kind in each group, as a
+        // single-element array (the format of the legacy Chisel generator), 0
+        // for a group without accesses of the kind.
+        // Example: `[[1], [1]]` for the loads, `[[0], [0]]` for the stores
+        auto getOffsets = [&](MemAccessKind kind) {
+          SmallVector<SmallVector<unsigned>> offsets;
+          for (std::optional<unsigned> position :
+               lsqOp.getFirstAccessPositions(kind))
+            offsets.push_back({position.value_or(0)});
+          return offsets;
+        };
+
+        // The port indices of the accesses of each group.
+        // Example: `[[0, 1], [2]]` for the loads, `[[0, 1], [2, 3]]` for the
+        // stores
+        SmallVector<SmallVector<unsigned>> loadPorts =
+            lsqOp.getPortIndicesPerGroup(MemAccessKind::Load);
+        SmallVector<SmallVector<unsigned>> storePorts =
+            lsqOp.getPortIndicesPerGroup(MemAccessKind::Store);
+
         addString("name", *modName);
         addBoolean("master", ports.interfacePorts.empty());
-        addUnsigned("fifoDepth", genInfo.depth);
-        addUnsigned("fifoDepth_L", genInfo.depthLoad);
-        addUnsigned("fifoDepth_S", genInfo.depthStore);
-        addUnsigned("bufferDepth", genInfo.bufferDepth);
-        addUnsigned("dataWidth", genInfo.dataWidth);
-        addUnsigned("addrWidth", genInfo.addrWidth);
-        addUnsigned("numBBs", genInfo.numGroups);
-        addUnsigned("numLoadPorts", genInfo.numLoads);
-        addUnsigned("numStorePorts", genInfo.numStores);
-        addArrayIntAttr("numLoads", genInfo.loadsPerGroup);
-        addArrayIntAttr("numStores", genInfo.storesPerGroup);
-        addBiArrayIntAttr("loadOffsets", genInfo.loadOffsets);
-        addBiArrayIntAttr("storeOffsets", genInfo.storeOffsets);
-        addBiArrayIntAttr("loadPorts", genInfo.loadPorts);
-        addBiArrayIntAttr("storePorts", genInfo.storePorts);
-        /// Add the attributes needed by the new lsq config file
-        addBiArrayIntAttr("ldOrder", genInfo.ldOrder);
-        addBiArrayIntAttr("ldPortIdx", genInfo.ldPortIdx);
-        addBiArrayIntAttr("stPortIdx", genInfo.stPortIdx);
-        addUnsigned("indexWidth", genInfo.indexWidth);
-        addUnsigned("numLdChannels", genInfo.numLdChannels);
-        addUnsigned("numStChannels", genInfo.numStChannels);
-        addUnsigned("stResp", genInfo.stResp);
-        addUnsigned("groupMulti", genInfo.groupMulti);
-        addUnsigned("pipe0En", genInfo.pipe0En);
-        addUnsigned("pipe1En", genInfo.pipe1En);
-        addUnsigned("pipeCompEn", genInfo.pipeCompEn);
-        addUnsigned("headLagEn", genInfo.headLagEn);
-        addUnsigned("bypassEn", genInfo.bypassEn);
+        // Legacy Chisel generator only: its AXI LSQ has one depth for both
+        // queues
+        addUnsigned("fifoDepth", std::max(loadQueueDepth, storeQueueDepth));
+        addUnsigned("fifoDepth_L", loadQueueDepth);
+        addUnsigned("fifoDepth_S", storeQueueDepth);
+        // Legacy Chisel generator only: depth of the buffers of its AXI
+        // interface
+        addUnsigned("bufferDepth", 0);
+        addUnsigned("dataWidth", ports.dataWidth);
+        addUnsigned("addrWidth", ports.addrWidth);
+        addUnsigned("numBBs", lsqOp.getGroups().size());
+        addUnsigned("numLoadPorts", lsqOp.getLdAddr().size());
+        addUnsigned("numStorePorts", lsqOp.getStAddr().size());
+        addArrayIntAttr("numLoads",
+                        lsqOp.getNumAccessesPerGroup(MemAccessKind::Load));
+        addArrayIntAttr("numStores",
+                        lsqOp.getNumAccessesPerGroup(MemAccessKind::Store));
+        // Legacy Chisel generator only: the padded offsets and port indices
+        addBiArrayIntAttr(
+            "loadOffsets",
+            padToDepth(getOffsets(MemAccessKind::Load), loadQueueDepth));
+        addBiArrayIntAttr(
+            "storeOffsets",
+            padToDepth(getOffsets(MemAccessKind::Store), storeQueueDepth));
+        addBiArrayIntAttr("loadPorts", padToDepth(loadPorts, loadQueueDepth));
+        addBiArrayIntAttr("storePorts",
+                          padToDepth(storePorts, storeQueueDepth));
+        // The parameters of the Python generator. The load order gives, for
+        // each load of each group, the number of stores of the group that
+        // precede it, i.e., the store entries that must complete before the
+        // load is issued.
+        // Example: `[[1, 2], [1]]` (in group 0, one store before ld0 and two
+        // before ld1; in group 1, one store before ld2)
+        addBiArrayIntAttr("ldOrder", lsqOp.getNumStoresBeforeLoads());
+        // The port indices hold the same information as the load and store
+        // ports, without the padding.
+        // Example: the store port indices are `[[0, 1], [2, 3]]` (two stores
+        // in each group), and the load port indices follow the same pattern
+        addBiArrayIntAttr("ldPortIdx", loadPorts);
+        addBiArrayIntAttr("stPortIdx", storePorts);
+        // Number of bits of the ID in the memory interface
+        addUnsigned("indexWidth", llvm::Log2_64_Ceil(loadQueueDepth));
+        // Fixed options of the Python generator: one channel per direction at
+        // the memory interface, no store response channel, one group
+        // allocation per cycle, no pipeline registers, a load queue head
+        // updated with the valid bits, and store-to-load forwarding
+        addUnsigned("numLdChannels", 1);
+        addUnsigned("numStChannels", 1);
+        addUnsigned("stResp", 0);
+        addUnsigned("groupMulti", 0);
+        addUnsigned("pipe0En", 0);
+        addUnsigned("pipe1En", 0);
+        addUnsigned("pipeCompEn", 0);
+        addUnsigned("headLagEn", 0);
+        addUnsigned("bypassEn", 1);
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";
