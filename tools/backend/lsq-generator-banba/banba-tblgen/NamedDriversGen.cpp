@@ -89,25 +89,36 @@ static bool genNamedDrivers(const RecordKeeper &records, raw_ostream &os) {
   // For each operation defined in the .td files
   for (const Record *def : records.getAllDerivedDefinitions("Op")) {
     Operator op(*def);
-    // Skip the operation if it is not declared with the trait
-    if (!op.getTrait("::banba::OpTrait::HasNamedOperandDrivers"))
+    bool hasOperandDrivers =
+        op.getTrait("::banba::OpTrait::HasNamedOperandDrivers");
+    bool hasResultDrivers =
+        op.getTrait("::banba::OpTrait::HasNamedResultDrivers");
+
+    // Skip the operation if it is declared with neither trait
+    if (!hasOperandDrivers && !hasResultDrivers)
       continue;
 
-    // Refuse an operation with a variadic operand or result,
+    // Refuse a variadic operand on an operation with named operand drivers,
+    // and a variadic result on one with named result drivers,
     // as the hardcoded indexes would not match
-    if (op.isVariadic())
+    if (hasOperandDrivers && op.getNumVariableLengthOperands() > 0)
       PrintFatalError(def->getLoc(),
-                      "named drivers need non-variadic operands and results");
+                      "named operand drivers need non-variadic operands");
+    if (hasResultDrivers && op.getNumVariableLengthResults() > 0)
+      PrintFatalError(def->getLoc(),
+                      "named result drivers need non-variadic results");
 
     // Forward declare the operation's class,
     // so we can reference it before it is defined
     genForwardDeclaration(op, os);
 
-    // Write the operation's two classes of named drivers,
+    // Write the operation's classes of named drivers,
     // inside the namespace of the dialect's traits
     os << "namespace banba::OpTrait {\n\n";
-    genOperandDrivers(op, os);
-    genResultDrivers(op, os);
+    if (hasOperandDrivers)
+      genOperandDrivers(op, os);
+    if (hasResultDrivers)
+      genResultDrivers(op, os);
     os << "} // namespace banba::OpTrait\n\n";
   }
   // Tablegen's convention: returning false means "no error"
