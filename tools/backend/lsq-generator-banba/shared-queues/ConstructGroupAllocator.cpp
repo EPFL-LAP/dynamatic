@@ -119,14 +119,21 @@ void PortIdxGenOp::constructRegion() {
     ldQMaskedGroupPorts.push_back(maskedGroupPorts);
   }
 
-  // OR reduce the masked vectors
-  OrReduceOp ldQPortIdxReduced =
-      BanbaSugar::createOp<OrReduceOp>(ldQMaskedGroupPorts);
+  // It's safe to OR reduce on a 1-element vector
+  // but it gives a cleaner output to avoid it
+  Value ldQPortIdxReduced;
+  if (ldQMaskedGroupPorts.size() > 1) {
+    // OR reduce the masked vectors
+    OrReduceOp reduced = BanbaSugar::createOp<OrReduceOp>(ldQMaskedGroupPorts);
+    ldQPortIdxReduced = reduced.getReduced();
+  } else {
+    ldQPortIdxReduced = ldQMaskedGroupPorts[0];
+  }
 
   // Align the per-entry port indices to match the load queue
   // by shifting them
-  CyclicLeftShiftOp ldQPortIdx = BanbaSugar::createOp<CyclicLeftShiftOp>(
-      ldQPortIdxReduced.getReduced(), getLdQTail());
+  CyclicLeftShiftOp ldQPortIdx =
+      BanbaSugar::createOp<CyclicLeftShiftOp>(ldQPortIdxReduced, getLdQTail());
 
   // An all-zero port index vector,
   // for masking out port indices which are not allocating.
@@ -149,14 +156,21 @@ void PortIdxGenOp::constructRegion() {
     stQMaskedGroupPorts.push_back(maskedGroupPorts);
   }
 
-  // OR reduce the masked vectors
-  OrReduceOp stQPortIdxReduced =
-      BanbaSugar::createOp<OrReduceOp>(stQMaskedGroupPorts);
+  // It's safe to OR reduce on a 1-element vector
+  // but it gives a cleaner output to avoid it
+  Value stQPortIdxReduced;
+  if (stQMaskedGroupPorts.size() > 1) {
+    // OR reduce the masked vectors
+    OrReduceOp reduced = BanbaSugar::createOp<OrReduceOp>(stQMaskedGroupPorts);
+    stQPortIdxReduced = reduced.getReduced();
+  } else {
+    stQPortIdxReduced = stQMaskedGroupPorts[0];
+  }
 
   // Align the per-entry port indices to match the store queue
   // by shifting them
-  CyclicLeftShiftOp stQPortIdx = BanbaSugar::createOp<CyclicLeftShiftOp>(
-      stQPortIdxReduced.getReduced(), getStQTail());
+  CyclicLeftShiftOp stQPortIdx =
+      BanbaSugar::createOp<CyclicLeftShiftOp>(stQPortIdxReduced, getStQTail());
 
   // Results
   driveLdQPortIdx(ldQPortIdx.getShifted());
