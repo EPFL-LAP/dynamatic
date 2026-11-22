@@ -76,4 +76,187 @@ def Shared_GroupAllocatorOp : SharedComponent<"group_allocator"> {
   }];
 }
 
+// A sub-component of the shared group allocator.
+// Its name in the IR starts with `shared.ga.`,
+// and its C++ class is in the `banba::shared::ga` namespace
+class SharedGaComponent<string mnemonic, list<Trait> traits = []>
+    : SharedComponent<"ga." # mnemonic, traits> {
+  let cppNamespace = "::banba::shared::ga";
+}
+
+// Free Entry Calculation:
+// Calculates the number of free entries in each queue,
+// by cyclic subtraction (WrapSub) of the head and tail pointers.
+// The subtraction is ambiguous when head == tail (empty or full).
+// We use a mux on the queue's empty flag to resolve it,
+// outputting the maximum queue size when empty
+// and the WrapSub result otherwise.
+def SharedGa_FreeEntryCalcOp : SharedGaComponent<"free_entry_calc"> {
+  let arguments = (ins
+      Int:$ld_q_head,
+      Int:$ld_q_tail,
+      Int:$st_q_head,
+      Int:$st_q_tail,
+      I1:$ld_q_empty,
+      I1:$st_q_empty);
+  let results = (outs
+      Int:$ld_num_free_entries,
+      Int:$st_num_free_entries);
+
+  let extraClassDefinition = [{
+    SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      unsigned ldPointerWidth = config.getLdPointerWidth();
+      unsigned stPointerWidth = config.getStPointerWidth();
+      return {t.Int(ldPointerWidth),   // ld_q_head
+              t.Int(ldPointerWidth),   // ld_q_tail
+              t.Int(stPointerWidth),   // st_q_head
+              t.Int(stPointerWidth),   // st_q_tail
+              t.Int(1),                // ld_q_empty
+              t.Int(1)};               // st_q_empty
+    }
+    SmallVector<Type> $cppClass::getExpectedResultTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Int(config.getLdFreeEntriesWidth()),   // ld_num_free_entries
+              t.Int(config.getStFreeEntriesWidth())};  // st_num_free_entries
+    }
+  }];
+}
+
+// Ready Signal Generation:
+// for each group, compare available space in each queue
+// with the required space to allocate that group.
+// A group is ready only if there is enough space
+// for both its loads and its stores.
+def SharedGa_ReadyGenOp : SharedGaComponent<"ready_gen"> {
+  let arguments = (ins
+      Int:$ld_num_free_entries,
+      Int:$st_num_free_entries);
+  let results = (outs ArrayI1:$ga_ready);
+
+  let extraClassDefinition = [{
+    SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Int(config.getLdFreeEntriesWidth()),   // ld_num_free_entries
+              t.Int(config.getStFreeEntriesWidth())};  // st_num_free_entries
+    }
+    SmallVector<Type> $cppClass::getExpectedResultTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Array(config.getNumBBs(), 1)};  // ga_ready
+    }
+  }];
+}
+
+// Port Index Generation:
+// ROM-lookup the source port of each entry
+// for the allocated group,
+// then CyclicLeftShift by each queue's tail to align it.
+def SharedGa_PortIdxGenOp : SharedGaComponent<"port_idx_gen"> {
+  let arguments = (ins
+      ArrayI1:$group_allocate,
+      Int:$ld_q_tail,
+      Int:$st_q_tail);
+  let results = (outs
+      ArrayInt:$ld_q_port_idx,
+      ArrayInt:$st_q_port_idx);
+
+  let extraClassDefinition = [{
+    SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Array(config.getNumBBs(), 1),      // group_allocate
+              t.Int(config.getLdPointerWidth()),   // ld_q_tail
+              t.Int(config.getStPointerWidth())};  // st_q_tail
+    }
+    SmallVector<Type> $cppClass::getExpectedResultTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Array(config.getFifoDepth_L(),
+                      config.getLdPortIdxWidth()),   // ld_q_port_idx
+              t.Array(config.getFifoDepth_S(),
+                      config.getStPortIdxWidth())};  // st_q_port_idx
+    }
+  }];
+}
+
+// Order Matrix Generation:
+// ROM lookup of the order inside
+// the allocated group,
+// first builds an un-shifted partial load-store order matrix,
+// then left shifts it twice, by st_q_tail and ld_q_tail,
+// to match the partial order matrix
+// with the LSQ's main order matrix.
+def SharedGa_OrderMatrixGenOp : SharedGaComponent<"order_matrix_gen"> {
+  let arguments = (ins
+      ArrayI1:$group_allocate,
+      Int:$ld_q_tail,
+      Int:$st_q_tail);
+  let results = (outs ArrayInt:$ga_ls_order);
+
+  let extraClassDefinition = [{
+    SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Array(config.getNumBBs(), 1),      // group_allocate
+              t.Int(config.getLdPointerWidth()),   // ld_q_tail
+              t.Int(config.getStPointerWidth())};  // st_q_tail
+    }
+    SmallVector<Type> $cppClass::getExpectedResultTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Array(config.getFifoDepth_L(),
+                      config.getFifoDepth_S())};  // ga_ls_order
+    }
+  }];
+}
+
+// Load/Store Count Extraction:
+// the number of loads and stores in the allocated group,
+// from a ROM lookup by the one-hot group_allocate.
+def SharedGa_CountExtractOp : SharedGaComponent<"count_extract"> {
+  let arguments = (ins ArrayI1:$group_allocate);
+  let results = (outs
+      Int:$num_loads,
+      Int:$num_stores);
+
+  let extraClassDefinition = [{
+    SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Array(config.getNumBBs(), 1)};  // group_allocate
+    }
+    SmallVector<Type> $cppClass::getExpectedResultTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Int(config.getLdCountWidth()),   // num_loads
+              t.Int(config.getStCountWidth())};  // num_stores
+    }
+  }];
+}
+
+// Allocating:
+// the per-entry allocation masks for both queues.
+// For each queue, create an unshifted bitmask,
+// then CyclicLeftShift it by the queue tail pointer
+// to rotate the block of 1s to start at the tail position.
+def SharedGa_AllocatingGenOp : SharedGaComponent<"allocating_gen"> {
+  let arguments = (ins
+      Int:$num_loads,
+      Int:$num_stores,
+      Int:$ld_q_tail,
+      Int:$st_q_tail);
+  let results = (outs
+      ArrayI1:$ld_q_allocating,
+      ArrayI1:$st_q_allocating);
+
+  let extraClassDefinition = [{
+    SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Int(config.getLdCountWidth()),     // num_loads
+              t.Int(config.getStCountWidth()),     // num_stores
+              t.Int(config.getLdPointerWidth()),   // ld_q_tail
+              t.Int(config.getStPointerWidth())};  // st_q_tail
+    }
+    SmallVector<Type> $cppClass::getExpectedResultTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      return {t.Array(config.getFifoDepth_L(), 1),   // ld_q_allocating
+              t.Array(config.getFifoDepth_S(), 1)};  // st_q_allocating
+    }
+  }];
+}
+
 #endif // BANBA_SHARED_QUEUE_OPS_TD

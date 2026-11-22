@@ -80,6 +80,14 @@ def Banba_ConfigAttr : AttrDef<Banba_Dialect, "Config"> {
     unsigned getStPortIdxWidth() const {
       return std::max(1u, Log2_32_Ceil(getNumStorePorts()));
     }
+
+    /// The width of the number of free entries in the load queue:
+    /// one bit more than a pointer into it
+    unsigned getLdFreeEntriesWidth() const { return getLdPointerWidth() + 1; }
+
+    /// The width of the number of free entries in the store queue:
+    /// one bit more than a pointer into it
+    unsigned getStFreeEntriesWidth() const { return getStPointerWidth() + 1; }
   }];
 }
 
