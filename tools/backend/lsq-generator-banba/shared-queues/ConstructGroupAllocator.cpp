@@ -123,13 +123,13 @@ void PortIdxGenOp::constructRegion() {
   }
 
   // OR reduce the masked vectors
-  OrReduceOp ldQPortIdxReduced = BanbaSugar::createOp<OrReduceOp>(
-      ldQPortIdxZero.getType(), ldQMaskedGroupPorts);
+  OrReduceOp ldQPortIdxReduced =
+      BanbaSugar::createOp<OrReduceOp>(ldQMaskedGroupPorts);
 
   // Align the per-entry port indices to match the load queue
   // by shifting them
   CyclicLeftShiftOp ldQPortIdx = BanbaSugar::createOp<CyclicLeftShiftOp>(
-      ldQPortIdxZero.getType(), ldQPortIdxReduced.getReduced(), getLdQTail());
+      ldQPortIdxReduced.getReduced(), getLdQTail());
 
   // An all-zero port index vector,
   // for masking out port indices which are not allocating.
@@ -155,13 +155,13 @@ void PortIdxGenOp::constructRegion() {
   }
 
   // OR reduce the masked vectors
-  OrReduceOp stQPortIdxReduced = BanbaSugar::createOp<OrReduceOp>(
-      stQPortIdxZero.getType(), stQMaskedGroupPorts);
+  OrReduceOp stQPortIdxReduced =
+      BanbaSugar::createOp<OrReduceOp>(stQMaskedGroupPorts);
 
   // Align the per-entry port indices to match the store queue
   // by shifting them
   CyclicLeftShiftOp stQPortIdx = BanbaSugar::createOp<CyclicLeftShiftOp>(
-      stQPortIdxZero.getType(), stQPortIdxReduced.getReduced(), getStQTail());
+      stQPortIdxReduced.getReduced(), getStQTail());
 
   // Results
   driveLdQPortIdx(ldQPortIdx.getShifted());
@@ -250,8 +250,8 @@ void OrderMatrixGenOp::constructRegion() {
         Value valueToShift;
         if (encodings[ld].size() > 1) {
           // OR reduce the possible encodings
-          OrReduceOp reduced = BanbaSugar::createOp<OrReduceOp>(
-              t.Int(numStqEntries), encodings[ld]);
+          OrReduceOp reduced =
+              BanbaSugar::createOp<OrReduceOp>(encodings[ld]);
           valueToShift = reduced.getReduced();
         } else {
           valueToShift = encodings[ld][0];
@@ -263,7 +263,7 @@ void OrderMatrixGenOp::constructRegion() {
 
         // Shift
         CyclicLeftShiftOp rowShift = BanbaSugar::createOp<CyclicLeftShiftOp>(
-            rowReducedArray.getType(), rowReducedArray, getStQTail());
+            rowReducedArray, getStQTail());
 
         // Cast the row back to iN
         Value rowShifted = BanbaSugar::castToInt(rowShift.getShifted());
@@ -283,8 +283,8 @@ void OrderMatrixGenOp::constructRegion() {
 
     // Once: align the order matrix to the load queue
     // by shifting the order of the rows
-    CyclicLeftShiftOp gaLsOrder = BanbaSugar::createOp<CyclicLeftShiftOp>(
-        rowArray.getType(), rowArray, getLdQTail());
+    CyclicLeftShiftOp gaLsOrder =
+        BanbaSugar::createOp<CyclicLeftShiftOp>(rowArray, getLdQTail());
 
     // Results
     driveGaLsOrder(gaLsOrder.getShifted());
@@ -299,23 +299,22 @@ void OrderMatrixGenOp::constructRegion() {
 void CountExtractOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
-  Types t(getContext());
 
   // ROM of the number of loads in each group
   Value numLoadsRom = BanbaSugar::arrayConstant(config.getNumLoads(),
                                                 config.getLdCountWidth());
 
   // Mux of the ROM by the one-hot group_allocate
-  OneHotMuxOp numLoads = BanbaSugar::createOp<OneHotMuxOp>(
-      t.Int(config.getLdCountWidth()), getGroupAllocate(), numLoadsRom);
+  OneHotMuxOp numLoads =
+      BanbaSugar::createOp<OneHotMuxOp>(getGroupAllocate(), numLoadsRom);
 
   // ROM of the number of stores in each group
   Value numStoresRom = BanbaSugar::arrayConstant(config.getNumStores(),
                                                  config.getStCountWidth());
 
   // Mux of the ROM by the one-hot group_allocate
-  OneHotMuxOp numStores = BanbaSugar::createOp<OneHotMuxOp>(
-      t.Int(config.getStCountWidth()), getGroupAllocate(), numStoresRom);
+  OneHotMuxOp numStores =
+      BanbaSugar::createOp<OneHotMuxOp>(getGroupAllocate(), numStoresRom);
 
   // Results
   driveNumLoads(numLoads.getSelected());
@@ -351,7 +350,7 @@ void AllocatingGenOp::constructRegion() {
   // Rotate the unshifted mask by the tail pointer
   // so its block of 1s starts at the queue tail
   CyclicLeftShiftOp ldQAllocating = BanbaSugar::createOp<CyclicLeftShiftOp>(
-      ldQAllocatingUnshifted.getType(), ldQAllocatingUnshifted, getLdQTail());
+      ldQAllocatingUnshifted, getLdQTail());
 
   // Declare a constant for each store queue entry index,
   // for comparison
@@ -378,7 +377,7 @@ void AllocatingGenOp::constructRegion() {
   // Rotate the unshifted mask by the tail pointer
   // so its block of 1s starts at the queue tail
   CyclicLeftShiftOp stQAllocating = BanbaSugar::createOp<CyclicLeftShiftOp>(
-      stQAllocatingUnshifted.getType(), stQAllocatingUnshifted, getStQTail());
+      stQAllocatingUnshifted, getStQTail());
 
   // Results
   driveLdQAllocating(ldQAllocating.getShifted());
