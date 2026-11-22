@@ -37,8 +37,8 @@ static void genOperandNames(const Operator &op, raw_ostream &os) {
       // or only after the operand if there is exactly one
       os << "  for (unsigned k = 0, n = getODSOperandIndexAndLength(" << index
          << ").second; k < n; ++k)\n";
-      os << "    names.push_back(n == 1 ? std::string(\"" << name
-         << "\") : \"" << name << "\" + std::to_string(k));\n";
+      os << "    names.push_back(n == 1 ? std::string(\"" << name << "\") : \""
+         << name << "\" + std::to_string(k));\n";
     } else {
       // Otherwise the operand is one value, named after the operand
       os << "  names.push_back(\"" << name << "\");\n";
@@ -80,8 +80,8 @@ static void genResultNames(const Operator &op, raw_ostream &os) {
       // or only after the result if there is exactly one
       os << "  for (unsigned k = 0, n = getODSResultIndexAndLength(" << index
          << ").second; k < n; ++k)\n";
-      os << "    names.push_back(n == 1 ? std::string(\"" << name
-         << "\") : \"" << name << "\" + std::to_string(k));\n";
+      os << "    names.push_back(n == 1 ? std::string(\"" << name << "\") : \""
+         << name << "\" + std::to_string(k));\n";
     } else {
       // Otherwise the result is one value, named after the result
       os << "  names.push_back(\"" << name << "\");\n";
@@ -112,5 +112,4 @@ static bool genPortNames(const RecordKeeper &records, raw_ostream &os) {
 
 static GenRegistration
     registration("gen-banba-port-names",
-                 "Generate the port names of Banba's operations",
-                 genPortNames);
+                 "Generate the port names of Banba's operations", genPortNames);

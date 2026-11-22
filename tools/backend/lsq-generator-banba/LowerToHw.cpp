@@ -143,8 +143,8 @@ static void replaceWithInst(OpBuilder &builder, ConstructsRegion op,
   instanceName.consume_front("_");
 
   // Create the inst
-  circt::hw::InstanceOp instance = circt::hw::InstanceOp::create(
-      builder, loc, module, instanceName, inputs);
+  circt::hw::InstanceOp instance =
+      circt::hw::InstanceOp::create(builder, loc, module, instanceName, inputs);
 
   // And have the inst replace the banba op
   op->replaceAllUsesWith(instance.getResults());
@@ -185,8 +185,7 @@ static void handleOp(OpBuilder &builder, ModuleOp modOp, ConstructsRegion op,
   std::string moduleName = nameHWModule(op.getOperation(), lsqName, counts);
 
   // Create the hw module
-  circt::hw::HWModuleOp hwMod =
-      createHWModule(builder, modOp, op, moduleName);
+  circt::hw::HWModuleOp hwMod = createHWModule(builder, modOp, op, moduleName);
 
   if (op->getParentOp() == modOp.getOperation()) {
     // An op directly in the builtin module has no hw.module around it,
