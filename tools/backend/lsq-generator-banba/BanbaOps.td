@@ -33,7 +33,7 @@ def GraphRegion : TraitList<[
 // and its channels to the memory
 def LsqOp : Op<Banba_Dialect, "lsq",
     [GraphRegion, DeclareOpInterfaceMethods<ExpectedTypes>,
-     VerifyTypesByConfig]> {
+     VerifyTypesByConfig, DeclareOpInterfaceMethods<ConstructsRegion>]> {
   let arguments = (ins
       ClockType:$clk,
       I1:$rst,
