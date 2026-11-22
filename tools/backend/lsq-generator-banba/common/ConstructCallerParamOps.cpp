@@ -74,10 +74,6 @@ LogicalResult OneHotMuxOp::verify() {
     return emitOpError() << "has " << numSelectBits << " select bits but "
                          << inputsType.getNumElements() << " inputs";
 
-  // Check that the result has the type of an input
-  if (getSelected().getType() != inputsType.getElementType())
-    return emitOpError() << "result type must match the type of an input";
-
   return success();
 }
 
@@ -103,8 +99,7 @@ void OneHotMuxOp::constructRegion() {
   }
 
   // OR-reduce the terms, with an OR reduction operation
-  OrReduceOp orReduce =
-      BanbaSugar::createOp<OrReduceOp>(inputsType.getElementType(), terms);
+  OrReduceOp orReduce = BanbaSugar::createOp<OrReduceOp>(terms);
 
   // Results
   driveSelected(orReduce.getReduced());

@@ -98,23 +98,22 @@ void OrderMatrixGenOp::constructRegion() {
 void CountExtractOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
-  Types t(getContext());
 
   // ROM of the number of loads in each group
-  Value numLoadsRom = BanbaSugar::arrayConstant(config.getNumLoads(),
-                                                config.getLdCountWidth());
+  Value numLoadsRom =
+      BanbaSugar::arrayConstant(config.getNumLoads(), config.getLdCountWidth());
 
   // Mux of the ROM by the one-hot group_allocate
-  OneHotMuxOp numLoads = BanbaSugar::createOp<OneHotMuxOp>(
-      t.Int(config.getLdCountWidth()), getGroupAllocate(), numLoadsRom);
+  OneHotMuxOp numLoads =
+      BanbaSugar::createOp<OneHotMuxOp>(getGroupAllocate(), numLoadsRom);
 
   // ROM of the number of stores in each group
   Value numStoresRom = BanbaSugar::arrayConstant(config.getNumStores(),
                                                  config.getStCountWidth());
 
   // Mux of the ROM by the one-hot group_allocate
-  OneHotMuxOp numStores = BanbaSugar::createOp<OneHotMuxOp>(
-      t.Int(config.getStCountWidth()), getGroupAllocate(), numStoresRom);
+  OneHotMuxOp numStores =
+      BanbaSugar::createOp<OneHotMuxOp>(getGroupAllocate(), numStoresRom);
 
   // Results
   driveNumLoads(numLoads.getSelected());
