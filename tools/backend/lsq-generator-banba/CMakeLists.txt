@@ -1,3 +1,8 @@
+# The tablegen rules below only watch the .td files directly in this folder.
+# This makes them watch the ones in the sub-folders too
+file(GLOB_RECURSE LLVM_TARGET_DEPENDS CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/*.td)
+
 # Generate the C++ code of the dialect from Banba.td
 add_mlir_dialect(Banba banba)
 
