@@ -123,13 +123,13 @@ void PortIdxGenOp::constructRegion() {
   }
 
   // OR reduce the masked vectors
-  OrReduceOp ldQPortIdxReduced = BanbaSugar::createOp<OrReduceOp>(
-      ldQPortIdxZero.getType(), ldQMaskedGroupPorts);
+  OrReduceOp ldQPortIdxReduced =
+      BanbaSugar::createOp<OrReduceOp>(ldQMaskedGroupPorts);
 
   // Align the per-entry port indices to match the load queue
   // by shifting them
   CyclicLeftShiftOp ldQPortIdx = BanbaSugar::createOp<CyclicLeftShiftOp>(
-      ldQPortIdxZero.getType(), ldQPortIdxReduced.getReduced(), getLdQTail());
+      ldQPortIdxReduced.getReduced(), getLdQTail());
 
   // An all-zero port index vector,
   // for masking out port indices which are not allocating.
@@ -155,13 +155,13 @@ void PortIdxGenOp::constructRegion() {
   }
 
   // OR reduce the masked vectors
-  OrReduceOp stQPortIdxReduced = BanbaSugar::createOp<OrReduceOp>(
-      stQPortIdxZero.getType(), stQMaskedGroupPorts);
+  OrReduceOp stQPortIdxReduced =
+      BanbaSugar::createOp<OrReduceOp>(stQMaskedGroupPorts);
 
   // Align the per-entry port indices to match the store queue
   // by shifting them
   CyclicLeftShiftOp stQPortIdx = BanbaSugar::createOp<CyclicLeftShiftOp>(
-      stQPortIdxZero.getType(), stQPortIdxReduced.getReduced(), getStQTail());
+      stQPortIdxReduced.getReduced(), getStQTail());
 
   // Results
   driveLdQPortIdx(ldQPortIdx.getShifted());
@@ -250,8 +250,8 @@ void OrderMatrixGenOp::constructRegion() {
         Value valueToShift;
         if (encodings[ld].size() > 1) {
           // OR reduce the possible encodings
-          OrReduceOp reduced = BanbaSugar::createOp<OrReduceOp>(
-              t.Int(numStqEntries), encodings[ld]);
+          OrReduceOp reduced =
+              BanbaSugar::createOp<OrReduceOp>(encodings[ld]);
           valueToShift = reduced.getReduced();
         } else {
           valueToShift = encodings[ld][0];
@@ -263,7 +263,7 @@ void OrderMatrixGenOp::constructRegion() {
 
         // Shift
         CyclicLeftShiftOp rowShift = BanbaSugar::createOp<CyclicLeftShiftOp>(
-            rowReducedArray.getType(), rowReducedArray, getStQTail());
+            rowReducedArray, getStQTail());
 
         // Cast the row back to iN
         Value rowShifted = BanbaSugar::castToInt(rowShift.getShifted());
@@ -283,8 +283,8 @@ void OrderMatrixGenOp::constructRegion() {
 
     // Once: align the order matrix to the load queue
     // by shifting the order of the rows
-    CyclicLeftShiftOp gaLsOrder = BanbaSugar::createOp<CyclicLeftShiftOp>(
-        rowArray.getType(), rowArray, getLdQTail());
+    CyclicLeftShiftOp gaLsOrder =
+        BanbaSugar::createOp<CyclicLeftShiftOp>(rowArray, getLdQTail());
 
     // Results
     driveGaLsOrder(gaLsOrder.getShifted());
@@ -325,11 +325,15 @@ void AllocatingGenOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
 
-  // Declare a constant for each load queue entry index,
-  // for comparison
-  SmallVector<BanbaValue> ldQEntryIndices;
-  for (unsigned entry = 0; entry < config.getFifoDepth_L(); ++entry)
-    ldQEntryIndices.push_back(BanbaValue(entry, config.getLdCountWidth()));
+  // The largest number of loads in any group,
+  // which num_loads can never exceed
+  ArrayRef<int32_t> numLoadsPerGroup = config.getNumLoads();
+  unsigned maxNumLoads =
+      *std::max_element(numLoadsPerGroup.begin(), numLoadsPerGroup.end());
+
+  // A zero bit, for the entries of either queue
+  // that num_loads or num_stores can never reach
+  BanbaValue zeroBit(0, 1);
 
   // For each load queue entry
   // decide if it is in the unshifted allocation mask
@@ -337,11 +341,19 @@ void AllocatingGenOp::constructRegion() {
   // Entry i of the mask is 1 if num_loads > i
   SmallVector<Value> ldQAllocatingUnshiftedVec;
   for (unsigned entry = 0; entry < config.getFifoDepth_L(); ++entry) {
-    BanbaValue allocatingBit = getNumLoads() > ldQEntryIndices[entry];
+    if (entry < maxNumLoads) {
+      // Compare num_loads with the entry's index, as a constant
+      BanbaValue entryIndex(entry, config.getLdCountWidth());
+      BanbaValue allocatingBit = getNumLoads() > entryIndex;
 
-    // Push into vector
-    // we will later convert to hw.array
-    ldQAllocatingUnshiftedVec.push_back(allocatingBit);
+      // Push into vector
+      // we will later convert to hw.array
+      ldQAllocatingUnshiftedVec.push_back(allocatingBit);
+    } else {
+      // num_loads can never be greater than this entry's index,
+      // so the bit is a constant zero
+      ldQAllocatingUnshiftedVec.push_back(zeroBit);
+    }
   }
 
   Value ldQAllocatingUnshifted =
@@ -350,13 +362,13 @@ void AllocatingGenOp::constructRegion() {
   // Rotate the unshifted mask by the tail pointer
   // so its block of 1s starts at the queue tail
   CyclicLeftShiftOp ldQAllocating = BanbaSugar::createOp<CyclicLeftShiftOp>(
-      ldQAllocatingUnshifted.getType(), ldQAllocatingUnshifted, getLdQTail());
+      ldQAllocatingUnshifted, getLdQTail());
 
-  // Declare a constant for each store queue entry index,
-  // for comparison
-  SmallVector<BanbaValue> stQEntryIndices;
-  for (unsigned entry = 0; entry < config.getFifoDepth_S(); ++entry)
-    stQEntryIndices.push_back(BanbaValue(entry, config.getStCountWidth()));
+  // The largest number of stores in any group,
+  // which num_stores can never exceed
+  ArrayRef<int32_t> numStoresPerGroup = config.getNumStores();
+  unsigned maxNumStores =
+      *std::max_element(numStoresPerGroup.begin(), numStoresPerGroup.end());
 
   // For each store queue entry
   // decide if it is in the unshifted allocation mask
@@ -364,11 +376,19 @@ void AllocatingGenOp::constructRegion() {
   // Entry i of the mask is 1 if num_stores > i
   SmallVector<Value> stQAllocatingUnshiftedVec;
   for (unsigned entry = 0; entry < config.getFifoDepth_S(); ++entry) {
-    BanbaValue allocatingBit = getNumStores() > stQEntryIndices[entry];
+    if (entry < maxNumStores) {
+      // Compare num_stores with the entry's index, as a constant
+      BanbaValue entryIndex(entry, config.getStCountWidth());
+      BanbaValue allocatingBit = getNumStores() > entryIndex;
 
-    // Push into vector
-    // we will later convert to hw.array
-    stQAllocatingUnshiftedVec.push_back(allocatingBit);
+      // Push into vector
+      // we will later convert to hw.array
+      stQAllocatingUnshiftedVec.push_back(allocatingBit);
+    } else {
+      // num_stores can never be greater than this entry's index,
+      // so the bit is a constant zero
+      stQAllocatingUnshiftedVec.push_back(zeroBit);
+    }
   }
 
   Value stQAllocatingUnshifted =
@@ -377,7 +397,7 @@ void AllocatingGenOp::constructRegion() {
   // Rotate the unshifted mask by the tail pointer
   // so its block of 1s starts at the queue tail
   CyclicLeftShiftOp stQAllocating = BanbaSugar::createOp<CyclicLeftShiftOp>(
-      stQAllocatingUnshifted.getType(), stQAllocatingUnshifted, getStQTail());
+      stQAllocatingUnshifted, getStQTail());
 
   // Results
   driveLdQAllocating(ldQAllocating.getShifted());
