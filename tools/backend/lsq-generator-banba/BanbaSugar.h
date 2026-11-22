@@ -179,6 +179,15 @@ inline BanbaValue operator>=(BanbaValue lhs, BanbaValue rhs) {
       .getResult();
 }
 
+/// `a > b` creates an unsigned greater-than comparison
+/// of two values, as a CIRCT comb.icmp operation
+inline BanbaValue operator>(BanbaValue lhs, BanbaValue rhs) {
+  return circt::comb::ICmpOp::create(BanbaSugarScope::getBuilder(),
+                                     BanbaSugarScope::getLoc(),
+                                     circt::comb::ICmpPredicate::ugt, lhs, rhs)
+      .getResult();
+}
+
 /// `a - b` creates the subtraction of two values,
 /// as a CIRCT comb.sub operation
 inline BanbaValue operator-(BanbaValue lhs, BanbaValue rhs) {
@@ -305,6 +314,30 @@ inline BanbaValue zext(BanbaValue value, unsigned bitwidth) {
                                        BanbaSugarScope::getLoc(), zeros,
                                        inValue)
       .getResult();
+}
+
+/// Cast a value to the given type, which must have the same number of bits.
+/// A value that already has the type is returned as it is
+inline BanbaValue castTo(BanbaValue value, Type type) {
+  Value raw = value;
+  if (raw.getType() == type)
+    return value;
+
+  assert(circt::hw::getBitWidth(type) ==
+             circt::hw::getBitWidth(raw.getType()) &&
+         "castTo target type has a different bit width");
+
+  return circt::hw::BitcastOp::create(BanbaSugarScope::getBuilder(),
+                                      BanbaSugarScope::getLoc(), type, raw)
+      .getResult();
+}
+
+/// Cast a value to an integer of the same number of bits.
+/// An integer is returned as it is
+inline BanbaValue castToInt(BanbaValue value) {
+  Value raw = value;
+  unsigned width = circt::hw::getBitWidth(raw.getType());
+  return castTo(value, BanbaSugarScope::getBuilder().getIntegerType(width));
 }
 
 /// Create an operation, and construct its region.

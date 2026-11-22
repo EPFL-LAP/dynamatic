@@ -9,14 +9,16 @@ void OrReduceOp::constructRegion() {
   // The list of values to build a set of ORs for.
   // That set of ORs will then produce a list of values
   // which is half as long
-  SmallVector<Value> inputs(getInputs().begin(), getInputs().end());
+  SmallVector<Value> inputs;
+  for (Value input : getInputs())
+    inputs.push_back(BanbaSugar::castToInt(input));
 
   // Sanity assert
   assert(!inputs.empty() && "cannot reduce an empty list");
 
   // If nothing to OR, return
   if (inputs.size() == 1) {
-    driveReduced(inputs.front());
+    driveReduced(BanbaSugar::castTo(inputs.front(), getReduced().getType()));
     return;
   }
 
@@ -52,7 +54,7 @@ void OrReduceOp::constructRegion() {
     // If this was the final round,
     // drive the result with the output
     if (numOutputs == 1) {
-      driveReduced(outputs.front());
+      driveReduced(BanbaSugar::castTo(outputs.front(), getReduced().getType()));
       return;
     }
 
@@ -164,6 +166,91 @@ void WrapSubOp::constructRegion() {
     // Mux based on the predicate
     driveDifference(BanbaSugar::select(pred, diff, borrowed));
   }
+}
+
+// Verify amount is clog2(element count of data) bits
+LogicalResult CyclicLeftShiftOp::verify() {
+  // Gets the binary width of the amount to shift by
+  unsigned amountWidth = cast<IntegerType>(getAmount().getType()).getWidth();
+
+  // Get the number of elements in the array
+  // also asserts the input type is an array
+  unsigned numElements =
+      cast<circt::hw::ArrayType>(getData().getType()).getNumElements();
+
+  // Should only be called on the load and store queue
+  // so we should never be shifting a 1-element queue
+  if (numElements < 2)
+    return emitOpError() << "data must have at least 2 elements, got "
+                         << numElements;
+
+  // Get the binary width required to fully shift a queue of numElements
+  unsigned expected = Log2_32_Ceil(numElements);
+
+  // Verify that the widths match
+  if (amountWidth != expected)
+    return emitOpError() << "amount is " << amountWidth
+                         << " bits, expected clog2(" << numElements
+                         << " elements) = " << expected;
+
+  // Verify that the shifted output type is the same
+  // as the to-shift input type
+  if (getShifted().getType() != getData().getType())
+    return emitOpError() << "shifted type must match data type";
+
+  return success();
+}
+
+// Cyclic left rotate
+void CyclicLeftShiftOp::constructRegion() {
+  BanbaSugarScope scope(getOperation());
+
+  // Get inputs
+  BanbaValue data = getData();
+  BanbaValue amount = getAmount();
+
+  // Get the array info
+  auto arrayType = cast<circt::hw::ArrayType>(getData().getType());
+  unsigned numElements = arrayType.getNumElements();
+  unsigned amountWidth = cast<IntegerType>(getAmount().getType()).getWidth();
+
+  // Convert from one hw.array value
+  // to a C++ list holding the value of each of its elements,
+  // as the initial set of values to shift
+  SmallVector<Value> elements;
+  for (unsigned i = 0; i < numElements; ++i)
+    elements.push_back(data[i]);
+
+  // For each bit starting with the MSB
+  // build a shift
+  for (int bit = amountWidth - 1; bit >= 0; --bit) {
+    // Potentially shift by 2^n
+    unsigned shift = (1u << bit);
+
+    // Get bit n of the amount to shift
+    BanbaValue selector = amount[bit];
+
+    // Make an output vector of the result of this shift
+    SmallVector<Value> shifted(numElements);
+
+    // For each output
+    for (unsigned i = 0; i < numElements; ++i) {
+      // Annoying indexing from the python version:
+      // we calculate the reverse of the shift by 2^n
+      // and then index into the input at that point
+      unsigned source = (i + numElements - shift) % numElements;
+
+      // Use a multiplexer to select the shifted input or unshifted input
+      // based on whether bit n of amount is 1
+      shifted[i] = BanbaSugar::select(selector, elements[source], elements[i]);
+    }
+
+    // Set up the next shifter to use the output of the previous shifter
+    elements = shifted;
+  }
+
+  // Pack into an array type, and drive the result
+  driveShifted(BanbaSugar::concatToArray(elements));
 }
 
 } // namespace banba
