@@ -39,16 +39,11 @@ private:
   MLIRContext *context;
 };
 
-/// Puts `value` everywhere `placeholder` is used, and removes the placeholder
-void replacePlaceholder(Value placeholder, Value value);
-
-/// Makes `value` operand number `index` of the operation,
-/// in place of the placeholder the operation was created with
+/// Makes `value` operand number `index` of the operation
 void driveOperand(Operation *op, unsigned index, Value value);
 
-/// Makes `value` result number `index` of the operation.
-/// The last operation inside it lists the values of its results,
-/// and holds placeholders until each result is driven
+/// Makes `value` result number `index` of the operation,
+/// by setting operand number `index` of the terminator of its region
 void driveResult(Operation *op, unsigned index, Value value);
 
 } // namespace banba

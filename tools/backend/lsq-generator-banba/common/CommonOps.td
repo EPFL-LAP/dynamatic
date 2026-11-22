@@ -166,13 +166,4 @@ def OutputOp : Op<Banba_Dialect, "output", [Terminator, ReturnLike, Pure]> {
   let assemblyFormat = "($outputs^ `:` type($outputs))? attr-dict";
 }
 
-// Stands in for a value that does not exist yet.
-// Components are created with placeholders as their inputs,
-// and their insides start with placeholders as their outputs;
-// each is replaced once the real value exists
-def PlaceholderOp : Op<Banba_Dialect, "placeholder", [Pure]> {
-  let results = (outs AnyType:$value);
-  let assemblyFormat = "attr-dict `:` type($value)";
-}
-
 #endif // BANBA_COMMON_OPS_TD
