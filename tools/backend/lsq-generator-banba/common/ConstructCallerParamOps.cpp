@@ -207,6 +207,8 @@ void CyclicLeftShiftOp::constructRegion() {
   OpBuilder &builder = BanbaSugarScope::getBuilder();
   Location loc = BanbaSugarScope::getLoc();
 
+  BanbaSugar::moduleComment(getOperation(), ModComment);
+
   // Get inputs
   BanbaValue amount = getAmount();
 

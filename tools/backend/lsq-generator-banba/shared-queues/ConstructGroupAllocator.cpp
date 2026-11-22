@@ -10,53 +10,7 @@ void GroupAllocatorOp::constructRegion() {
   // Emit the group allocator into group_allocator.sv
   setOutputFile(getOperation(), "group_allocator.sv");
 
-  BanbaSugar::moduleComment(
-      getOperation(),
-      {"Group Allocator:",
-       "manages entry allocation for the Load-Store Queue (LSQ).",
-       "",
-       "Dynamatic's circuits have no encoding of program order,",
-       "and so the group allocator unit of the LSQ has the",
-       "program order of memory accesses in each basic block",
-       "stored in Read-Only Memory (ROM).",
-       "",
-       "Each group corresponds to a basic block,",
-       "and so the allocation of a group is the allocation",
-       "of one queue entry per memory access",
-       "in that basic block,",
-       "and the updating of the order matrix to contain",
-       "the order of those accesses,",
-       "based on the order stored in ROM.",
-       "",
-       "Sub-components:",
-       "",
-       "1. Free Entry Calculation:",
-       "   the number of free entries in each queue,",
-       "   from its head and tail pointers,",
-       "",
-       "2. Ready Generation:",
-       "   checks if there is sufficient space in the queues",
-       "   to allocate a group",
-       "",
-       "3. Port Index Generation:",
-       "   drives the port index inputs of both queues",
-       "   so that the newly allocated queue entries",
-       "   know which port they belong to",
-       "",
-       "4. Order Matrix Generation:",
-       "   Generates a partial order matrix",
-       "   representing only the newly allocated group,",
-       "   already shifted based on the queue pointers",
-       "   so it can be easily combined",
-       "   with the current order matrix",
-       "",
-       "5. Load/Store Count Extraction:",
-       "   Shallow wrapper that reads the number",
-       "   of loads and stores of the group being allocated",
-       "   from ROM",
-       "",
-       "6. Allocating Generation:",
-       "   Drives the per-entry allocating input of each queue"});
+  BanbaSugar::moduleComment(getOperation(), ModComment);
 
   ////////////////////////////////////////////////////////////////
   // Declare the sub-components, without specifying inputs
@@ -127,6 +81,8 @@ void FreeEntryCalcOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
 
+  BanbaSugar::moduleComment(getOperation(), ModComment);
+
   unsigned ldQSize = config.getFifoDepth_L();
   unsigned stQSize = config.getFifoDepth_S();
 
@@ -169,6 +125,8 @@ void ReadyGenOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
 
+  BanbaSugar::moduleComment(getOperation(), ModComment);
+
   // For each group, make a ready calculation and save it in a vector
   SmallVector<Value> gaReadyVec;
   for (unsigned group = 0; group < config.getNumBBs(); ++group) {
@@ -200,6 +158,8 @@ void ReadyGenOp::constructRegion() {
 void PortIdxGenOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
+
+  BanbaSugar::moduleComment(getOperation(), ModComment);
 
   // Convert the one-hot group_allocate from one hw.array value
   // to a C++ list holding each group's allocate bit,
@@ -310,6 +270,8 @@ void OrderMatrixGenOp::constructRegion() {
 
   // If so we need the real logic
   if (nonzeroEncoding) {
+    BanbaSugar::moduleComment(getOperation(), ModComment);
+
     // A row of zeros, one bit per store queue entry
     BanbaValue zero(0, numStqEntries);
 
@@ -408,6 +370,8 @@ void OrderMatrixGenOp::constructRegion() {
     // Results
     driveGaLsOrder(gaLsOrder.getShifted());
   } else {
+    BanbaSugar::moduleComment(getOperation(), ZeroModComment);
+
     // In this kernel,
     // there is never a store before a load inside a basic block,
     // so return a constant zero matrix
@@ -418,6 +382,8 @@ void OrderMatrixGenOp::constructRegion() {
 void CountExtractOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
+
+  BanbaSugar::moduleComment(getOperation(), ModComment);
 
   Value numLoads;
   if (config.getNumBBs() > 1) {
@@ -466,6 +432,8 @@ void CountExtractOp::constructRegion() {
 void AllocatingGenOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
+
+  BanbaSugar::moduleComment(getOperation(), ModComment);
 
   // The largest number of loads in any group,
   // which num_loads can never exceed

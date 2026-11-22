@@ -66,6 +66,12 @@ def CyclicLeftShiftOp : CallerParamComponent<"cyclic_left_shift",
   // Output
   let results = (outs ArrayInt:$shifted);
 
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog
+    static constexpr StringRef ModComment[] = {
+        "CyclicLeftShift: rotate an array left by the shift amount"};
+  }];
+
   // Verify amount is clog2(element count of data) bits
   let hasVerifier = 1;
 }
