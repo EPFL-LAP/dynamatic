@@ -1,4 +1,5 @@
 #include "BanbaOps.h"
+#include "LowerToHw.h"
 #include "LsqConfig.h"
 #include "circt/Dialect/Comb/CombDialect.h"
 #include "circt/Dialect/HW/HWDialect.h"
@@ -88,6 +89,9 @@ int main(int argc, char **argv) {
   // Create and construct the shared group allocator
   createWithPlaceholders<banba::shared::GroupAllocatorOp>(builder, loc,
                                                           configAttr);
+
+  // Lower the banba dialect to hw modules and instances
+  banba::lowerToHw(*module);
 
   // Print the module
   module->print(llvm::outs());

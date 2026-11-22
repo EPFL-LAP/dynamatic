@@ -45,4 +45,20 @@ def ConstructsRegion : OpInterface<"ConstructsRegion"> {
   ];
 }
 
+// Lets an operation give the names of its inputs and outputs,
+// in the order in which its declaration lists them.
+// The lowering to hardware uses them as the names of the module's ports.
+// The functions are generated per operation by banba-tblgen
+def PortNames : OpInterface<"PortNames"> {
+  let cppNamespace = "::banba";
+  let methods = [
+    InterfaceMethod<
+        "The names of the operation's inputs, in order.",
+        "SmallVector<std::string>", "getOperandNames">,
+    InterfaceMethod<
+        "The names of the operation's outputs, in order.",
+        "SmallVector<std::string>", "getResultNames">,
+  ];
+}
+
 #endif // BANBA_INTERFACES_TD
