@@ -21,7 +21,7 @@ void ReadyGenOp::constructRegion() {
   ConfigAttr config = BanbaSugarScope::getConfig();
 
   // For each group, make a ready calculation and save it in a vector
-  SmallVector<Value> groupAllocateReadyVec;
+  SmallVector<Value> gaReadyVec;
   for (unsigned group = 0; group < config.getNumBBs(); ++group) {
     // The number of loads and stores in the group, as constants
     BanbaValue numLoads(config.getNumLoads()[group],
@@ -39,14 +39,13 @@ void ReadyGenOp::constructRegion() {
     BanbaValue ready = loadsFit & storesFit;
 
     // Push into the vector, which is later converted to a hw.array
-    groupAllocateReadyVec.push_back(ready);
+    gaReadyVec.push_back(ready);
   }
 
-  BanbaValue groupAllocateReady =
-      BanbaSugar::concatToArray(groupAllocateReadyVec);
+  BanbaValue gaReady = BanbaSugar::concatToArray(gaReadyVec);
 
   // Results
-  driveGroupAllocateReady(groupAllocateReady);
+  driveGaReady(gaReady);
 }
 
 void PortIdxGenOp::constructRegion() {
