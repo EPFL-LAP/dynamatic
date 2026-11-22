@@ -268,8 +268,8 @@ inline BanbaValue zeroValue(Type type) {
 /// and the arguments are passed on to the operation's own `create`
 template <typename OpT, typename... Args>
 OpT createOp(Args &&...args) {
-  OpT op = OpT::create(BanbaSugarScope::getBuilder(),
-                       BanbaSugarScope::getLoc(), std::forward<Args>(args)...);
+  OpT op = OpT::create(BanbaSugarScope::getBuilder(), BanbaSugarScope::getLoc(),
+                       std::forward<Args>(args)...);
   op.constructRegion();
   return op;
 }
