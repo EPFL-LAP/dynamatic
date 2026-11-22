@@ -1,3 +1,4 @@
+add_subdirectory(lsq-generator-banba)
 add_subdirectory(rtl-cmpf-generator)
 add_subdirectory(rtl-cmpi-generator)
 add_subdirectory(rtl-constant-generator-verilog)
