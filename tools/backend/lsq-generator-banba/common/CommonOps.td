@@ -49,6 +49,7 @@ def HasNamedResultDrivers : NativeOpTrait<"HasNamedResultDrivers"> {
 class BanbaComponent<string mnemonic, list<Trait> traits = []>
     : Op<Banba_Dialect, mnemonic,
          [GraphRegion, HasNamedResultDrivers,
+          DeclareOpInterfaceMethods<PortNames>,
           DeclareOpInterfaceMethods<ConstructsRegion>] # traits> {
   let regions = (region SizedRegion<1>:$body);
 

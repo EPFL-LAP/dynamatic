@@ -6,6 +6,7 @@ set(LLVM_LINK_COMPONENTS
 add_tablegen(banba-tblgen BANBA
   banba-tblgen.cpp
   NamedDriversGen.cpp
+  PortNamesGen.cpp
 )
 
 target_link_libraries(banba-tblgen
