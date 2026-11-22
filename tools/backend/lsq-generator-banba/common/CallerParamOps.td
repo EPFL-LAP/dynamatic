@@ -32,4 +32,23 @@ def OneHotMuxOp : CallerParamComponent<"one_hot_mux",
   let hasVerifier = 1;
 }
 
+// WrapSub: a - b modulo num_entries.
+// We need to store the modulus on the op, as the constructRegion function
+// needs to know it in order to build the correct RTL logic
+def WrapSubOp : CallerParamComponent<"wrap_sub",
+    [SameOperandsAndResultType]> {
+  let arguments = (ins
+      // Inputs
+      Int:$a,
+      Int:$b,
+      // Modulo as meta data
+      I32Attr:$modulo);
+
+  // Output
+  let results = (outs Int:$difference);
+
+  // Verify a, b, and difference are clog2(modulo) bits
+  let hasVerifier = 1;
+}
+
 #endif // BANBA_CALLER_PARAM_OPS_TD
