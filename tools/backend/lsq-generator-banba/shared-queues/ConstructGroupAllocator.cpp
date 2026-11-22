@@ -101,9 +101,7 @@ void PortIdxGenOp::constructRegion() {
   // An all-zero port index vector,
   // for masking out port indices which are not allocating.
   // The width is 1 bit even when there is 1 load port
-  Value ldQPortIdxZero = BanbaSugar::arrayConstant(
-      /*values=*/{}, config.getLdPortIdxWidth(),
-      /*numElements=*/config.getFifoDepth_L());
+  Value ldQPortIdxZero = BanbaSugar::zeroValue(getLdQPortIdx().getType());
 
   // For each group,
   // declare its unshifted port indices as a constant vector
@@ -133,9 +131,7 @@ void PortIdxGenOp::constructRegion() {
   // An all-zero port index vector,
   // for masking out port indices which are not allocating.
   // The width is 1 bit even when there is 1 store port
-  Value stQPortIdxZero = BanbaSugar::arrayConstant(
-      /*values=*/{}, config.getStPortIdxWidth(),
-      /*numElements=*/config.getFifoDepth_S());
+  Value stQPortIdxZero = BanbaSugar::zeroValue(getStQPortIdx().getType());
 
   // For each group,
   // declare its unshifted port indices as a constant vector

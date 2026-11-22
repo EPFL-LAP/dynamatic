@@ -233,49 +233,6 @@ inline BanbaValue select(BanbaValue sel, BanbaValue trueValue,
       .getResult();
 }
 
-/// Build a hw.array constant from a list of values,
-/// bitwidth bits per element.
-/// numElements pads the array with zeros beyond the list
-/// (0 means exactly the list length)
-inline BanbaValue arrayConstant(ArrayRef<int32_t> values, unsigned bitwidth,
-                                unsigned numElements = 0) {
-  OpBuilder &builder = BanbaSugarScope::getBuilder();
-
-  // If no number of elements is given, use the length of the list
-  if (numElements == 0)
-    numElements = values.size();
-
-  // Check that the list fits in the array
-  assert(values.size() <= (size_t)numElements &&
-         "more constant values than array elements");
-
-  // The type of an element of the array
-  Type elementType = builder.getIntegerType(bitwidth);
-
-  // For each element of the array,
-  // make an attribute holding its constant value
-  SmallVector<Attribute> elements;
-  for (unsigned i = 0; i < numElements; ++i) {
-    // Take the value from the list, or zero beyond the end of the list
-    int32_t value = i < values.size() ? values[i] : 0;
-
-    // Make the attribute, and add it to the elements
-    elements.push_back(builder.getIntegerAttr(elementType, value));
-  }
-
-  // Callers build their lists element 0 first,
-  // but hw.aggregate_constant expects the highest-indexed element first,
-  // so first reverse
-  std::reverse(elements.begin(), elements.end());
-
-  // And then make the constant array, as a single operation
-  return circt::hw::AggregateConstantOp::create(
-             builder, BanbaSugarScope::getLoc(),
-             circt::hw::ArrayType::get(elementType, numElements),
-             builder.getArrayAttr(elements))
-      .getResult();
-}
-
 /// Get a zero-valued value of the given type
 inline BanbaValue zeroValue(Type type) {
   OpBuilder &builder = BanbaSugarScope::getBuilder();
@@ -314,6 +271,78 @@ inline BanbaValue zext(BanbaValue value, unsigned bitwidth) {
                                        BanbaSugarScope::getLoc(), zeros,
                                        inValue)
       .getResult();
+}
+
+/// Zero-extend a hw.array to the given number of elements,
+/// by concatenating zero elements above it
+inline BanbaValue arrayZext(BanbaValue array, unsigned numElements) {
+  Value inArray = array;
+  auto arrayType = cast<circt::hw::ArrayType>(inArray.getType());
+  unsigned inNumElements = arrayType.getNumElements();
+  assert(numElements >= inNumElements &&
+         "arrayZext target has fewer elements than the input");
+
+  // Nothing to extend if the array already has the target number of elements
+  if (numElements == inNumElements)
+    return array;
+
+  // The zero elements, as an array with the same element type
+  Value zeros = zeroValue(circt::hw::ArrayType::get(
+      arrayType.getElementType(), numElements - inNumElements));
+
+  // hw.array_concat expects the highest-indexed array first
+  return circt::hw::ArrayConcatOp::create(BanbaSugarScope::getBuilder(),
+                                          BanbaSugarScope::getLoc(),
+                                          ArrayRef<Value>{zeros, inArray})
+      .getResult();
+}
+
+/// Build a hw.array constant from a list of values,
+/// bitwidth bits per element.
+/// numElements zero-extends the array beyond the list
+/// (0 means exactly the list length)
+inline BanbaValue arrayConstant(ArrayRef<int32_t> values, unsigned bitwidth,
+                                unsigned numElements = 0) {
+  OpBuilder &builder = BanbaSugarScope::getBuilder();
+
+  // If no number of elements is given, use the length of the list
+  if (numElements == 0)
+    numElements = values.size();
+
+  // An array constant with no elements cannot be created
+  assert(numElements > 0 && "array constant with no elements");
+
+  // Check that the list fits in the array
+  assert(values.size() <= (size_t)numElements &&
+         "more constant values than array elements");
+
+  // The type of an element of the array
+  Type elementType = builder.getIntegerType(bitwidth);
+
+  if (values.empty()) {
+    // With an empty list, the whole array is zero
+    return zeroValue(circt::hw::ArrayType::get(elementType, numElements));
+  } else {
+    // For each value in the list, make an attribute holding it
+    SmallVector<Attribute> elements;
+    for (int32_t value : values)
+      elements.push_back(builder.getIntegerAttr(elementType, value));
+
+    // Callers build their lists element 0 first,
+    // but hw.aggregate_constant expects the highest-indexed element first,
+    // so first reverse
+    std::reverse(elements.begin(), elements.end());
+
+    // And then make the constant array of the list, as a single operation
+    Value constant = circt::hw::AggregateConstantOp::create(
+                         builder, BanbaSugarScope::getLoc(),
+                         circt::hw::ArrayType::get(elementType, values.size()),
+                         builder.getArrayAttr(elements))
+                         .getResult();
+
+    // Zero-extend it to the number of elements
+    return arrayZext(constant, numElements);
+  }
 }
 
 /// Cast a value to the given type, which must have the same number of bits.
