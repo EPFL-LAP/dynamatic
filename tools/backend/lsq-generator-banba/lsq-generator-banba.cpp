@@ -79,6 +79,23 @@ int main(int argc, char **argv) {
   // Construct the inside of the ready generation
   readyGen.constructRegion();
 
+  // Create a placeholder for each operand of the count extraction
+  llvm::SmallVector<mlir::Value> countExtractPlaceholders;
+  for (mlir::Type type :
+       banba::shared::ga::CountExtractOp::getExpectedOperandTypes(configAttr))
+    countExtractPlaceholders.push_back(
+        banba::PlaceholderOp::create(builder, loc, type));
+
+  // Create the count extraction, with its expected result types
+  // and the placeholders as its operands
+  auto countExtract = banba::shared::ga::CountExtractOp::create(
+      builder, loc,
+      banba::shared::ga::CountExtractOp::getExpectedResultTypes(configAttr),
+      countExtractPlaceholders);
+
+  // Construct the inside of the count extraction
+  countExtract.constructRegion();
+
   // Print the module
   module->print(llvm::outs());
   return 0;
