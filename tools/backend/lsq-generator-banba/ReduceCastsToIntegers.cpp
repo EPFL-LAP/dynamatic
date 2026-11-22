@@ -24,13 +24,6 @@ static Type integerFor(Type arrayOf1BitValues) {
                           arrayType.getNumElements());
 }
 
-/// The array type of 1-bit values with one element per bit of an integer
-static Type arrayFor(Type integer) {
-  unsigned numBits = integer.getIntOrFloatBitWidth();
-  Type bit = IntegerType::get(integer.getContext(), 1);
-  return circt::hw::ArrayType::get(bit, numBits);
-}
-
 /// Create a cast of a value to the given type, at the builder's position
 static Value castTo(OpBuilder &builder, Value value, Type type) {
   return circt::hw::BitcastOp::create(builder, value.getLoc(), type, value);
@@ -462,8 +455,9 @@ static void consumeIntegers(Operation *op, ArrayRef<OpOperand *> operands,
     // hw.array_get at a constant index: comb.extract of that one bit
     auto index = get.getIndex().getDefiningOp<circt::hw::ConstantOp>();
     unsigned bit = index.getValue().getZExtValue();
-    Value extracted = circt::comb::ExtractOp::create(builder, op->getLoc(),
-                                                     get.getInput(), bit, 1);
+    Value input = asInteger(builder, get.getInput(), pool);
+    Value extracted =
+        circt::comb::ExtractOp::create(builder, op->getLoc(), input, bit, 1);
 
     // What consumed the hw.array_get consumes the comb.extract
     get.replaceAllUsesWith(extracted);
@@ -476,8 +470,9 @@ static void consumeIntegers(Operation *op, ArrayRef<OpOperand *> operands,
     auto lowIndex = slice.getLowIndex().getDefiningOp<circt::hw::ConstantOp>();
     unsigned lowBit = lowIndex.getValue().getZExtValue();
     unsigned numBits = integerFor(slice.getType()).getIntOrFloatBitWidth();
-    Value extracted = circt::comb::ExtractOp::create(
-        builder, op->getLoc(), slice.getInput(), lowBit, numBits);
+    Value input = asInteger(builder, slice.getInput(), pool);
+    Value extracted = circt::comb::ExtractOp::create(builder, op->getLoc(),
+                                                     input, lowBit, numBits);
 
     // The slice produced an array, so put a cast to the array
     // after the comb.extract, and add the cast to the pool
@@ -537,10 +532,14 @@ static void consumeIntegers(Operation *op, ArrayRef<OpOperand *> operands,
     op->erase();
   } else {
     // Anything else cannot be changed:
-    // put one cast to the array right before it, for each of the operands
+    // for each of the operands, put a cast to the integer
+    // and a cast back to the array right before it.
+    // The first is removed with the casts that produce the array,
+    // and the second is the one cast that stays
     for (OpOperand *operand : operands) {
-      Value integer = operand->get();
-      operand->set(castTo(builder, integer, arrayFor(integer.getType())));
+      Value array = operand->get();
+      Value integer = castTo(builder, array, integerFor(array.getType()));
+      operand->set(castTo(builder, integer, array.getType()));
     }
   }
 }
@@ -602,6 +601,11 @@ static void examineCastToArray(circt::hw::BitcastOp cast,
       if (!isCastToInteger(consumer))
         operandsOf[consumer->getOwner()].push_back(consumer);
 
+    // Make each consuming operation consume integers,
+    // through a cast to the integer in front of it
+    for (auto &[op, operands] : operandsOf)
+      consumeIntegers(op, operands, pool);
+
     // For each cast that produces the array
     for (Value producer : producers) {
       // Everything that used the array uses the integer that the cast reads
@@ -614,13 +618,10 @@ static void examineCastToArray(circt::hw::BitcastOp cast,
       pool.remove(producerCast);
       producerCast.erase();
 
-      // Update everything from the integer to its consumers to match
+      // Update everything from the integer to its consumers to match,
+      // which removes the casts put in front of the consumers
       consumeAsInteger(integer, hierarchy, pool);
     }
-
-    // Make each consuming operation consume integers
-    for (auto &[op, operands] : operandsOf)
-      consumeIntegers(op, operands, pool);
   }
 }
 
