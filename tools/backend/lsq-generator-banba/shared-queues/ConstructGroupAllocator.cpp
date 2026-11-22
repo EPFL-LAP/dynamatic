@@ -352,33 +352,36 @@ void AllocatingGenOp::constructRegion() {
   unsigned maxNumLoads =
       *std::max_element(numLoadsPerGroup.begin(), numLoadsPerGroup.end());
 
-  // A zero bit, for the entries of either queue
-  // that num_loads or num_stores can never reach
-  BanbaValue zeroBit(0, 1);
-
-  // For each load queue entry
+  // For each load queue entry that num_loads can reach,
   // decide if it is in the unshifted allocation mask
   // and save the bit in a vector.
   // Entry i of the mask is 1 if num_loads > i
   SmallVector<Value> ldQAllocatingUnshiftedVec;
-  for (unsigned entry = 0; entry < config.getFifoDepth_L(); ++entry) {
-    if (entry < maxNumLoads) {
-      // Compare num_loads with the entry's index, as a constant
-      BanbaValue entryIndex(entry, config.getLdCountWidth());
-      BanbaValue allocatingBit = getNumLoads() > entryIndex;
+  for (unsigned entry = 0; entry < maxNumLoads; ++entry) {
+    // Compare num_loads with the entry's index, as a constant
+    BanbaValue entryIndex(entry, config.getLdCountWidth());
+    BanbaValue allocatingBit = getNumLoads() > entryIndex;
 
-      // Push into vector
-      // we will later convert to hw.array
-      ldQAllocatingUnshiftedVec.push_back(allocatingBit);
-    } else {
-      // num_loads can never be greater than this entry's index,
-      // so the bit is a constant zero
-      ldQAllocatingUnshiftedVec.push_back(zeroBit);
-    }
+    // Push into vector
+    // we will later convert to hw.array
+    ldQAllocatingUnshiftedVec.push_back(allocatingBit);
+  }
+
+  // The mask as an integer, with one bit per load queue entry
+  Value ldQAllocatingInt;
+  if (maxNumLoads > 0) {
+    // num_loads can never be greater than the index of any other entry,
+    // so their bits are constant zero: zero-extend the bits in the vector
+    BanbaValue reachable = BanbaSugar::castToInt(
+        BanbaSugar::concatToArray(ldQAllocatingUnshiftedVec));
+    ldQAllocatingInt = BanbaSugar::zext(reachable, config.getFifoDepth_L());
+  } else {
+    // No group has a load, so the whole mask is constant zero
+    ldQAllocatingInt = BanbaValue(0, config.getFifoDepth_L());
   }
 
   Value ldQAllocatingUnshifted =
-      BanbaSugar::concatToArray(ldQAllocatingUnshiftedVec);
+      BanbaSugar::castTo(ldQAllocatingInt, getLdQAllocating().getType());
 
   // Rotate the unshifted mask by the tail pointer
   // so its block of 1s starts at the queue tail
@@ -391,29 +394,36 @@ void AllocatingGenOp::constructRegion() {
   unsigned maxNumStores =
       *std::max_element(numStoresPerGroup.begin(), numStoresPerGroup.end());
 
-  // For each store queue entry
+  // For each store queue entry that num_stores can reach,
   // decide if it is in the unshifted allocation mask
   // and save the bit in a vector.
   // Entry i of the mask is 1 if num_stores > i
   SmallVector<Value> stQAllocatingUnshiftedVec;
-  for (unsigned entry = 0; entry < config.getFifoDepth_S(); ++entry) {
-    if (entry < maxNumStores) {
-      // Compare num_stores with the entry's index, as a constant
-      BanbaValue entryIndex(entry, config.getStCountWidth());
-      BanbaValue allocatingBit = getNumStores() > entryIndex;
+  for (unsigned entry = 0; entry < maxNumStores; ++entry) {
+    // Compare num_stores with the entry's index, as a constant
+    BanbaValue entryIndex(entry, config.getStCountWidth());
+    BanbaValue allocatingBit = getNumStores() > entryIndex;
 
-      // Push into vector
-      // we will later convert to hw.array
-      stQAllocatingUnshiftedVec.push_back(allocatingBit);
-    } else {
-      // num_stores can never be greater than this entry's index,
-      // so the bit is a constant zero
-      stQAllocatingUnshiftedVec.push_back(zeroBit);
-    }
+    // Push into vector
+    // we will later convert to hw.array
+    stQAllocatingUnshiftedVec.push_back(allocatingBit);
+  }
+
+  // The mask as an integer, with one bit per store queue entry
+  Value stQAllocatingInt;
+  if (maxNumStores > 0) {
+    // num_stores can never be greater than the index of any other entry,
+    // so their bits are constant zero: zero-extend the bits in the vector
+    BanbaValue reachable = BanbaSugar::castToInt(
+        BanbaSugar::concatToArray(stQAllocatingUnshiftedVec));
+    stQAllocatingInt = BanbaSugar::zext(reachable, config.getFifoDepth_S());
+  } else {
+    // No group has a store, so the whole mask is constant zero
+    stQAllocatingInt = BanbaValue(0, config.getFifoDepth_S());
   }
 
   Value stQAllocatingUnshifted =
-      BanbaSugar::concatToArray(stQAllocatingUnshiftedVec);
+      BanbaSugar::castTo(stQAllocatingInt, getStQAllocating().getType());
 
   // Rotate the unshifted mask by the tail pointer
   // so its block of 1s starts at the queue tail
