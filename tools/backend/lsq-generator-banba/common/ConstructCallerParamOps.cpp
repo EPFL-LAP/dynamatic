@@ -110,4 +110,61 @@ void OneHotMuxOp::constructRegion() {
   driveSelected(orReduce.getReduced());
 }
 
+// Verify a, b, and difference are clog2(modulo) bits
+LogicalResult WrapSubOp::verify() {
+  // Modulo 1 doesn't make any sense
+  if (getModulo() < 2)
+    return emitOpError() << "modulo must be at least 2, got " << getModulo();
+
+  // Get binary width of the modulo
+  unsigned expected = Log2_32_Ceil(getModulo());
+  if (cast<IntegerType>(getA().getType()).getWidth() != expected)
+    return emitOpError() << "a must be clog2(modulo = " << getModulo()
+                         << ") = " << expected << " bits";
+  if (cast<IntegerType>(getB().getType()).getWidth() != expected)
+    return emitOpError() << "b must be clog2(modulo = " << getModulo()
+                         << ") = " << expected << " bits";
+  if (cast<IntegerType>(getDifference().getType()).getWidth() != expected)
+    return emitOpError() << "difference must be clog2(modulo = " << getModulo()
+                         << ") = " << expected << " bits";
+  return success();
+}
+
+// WrapSub: a - b modulo num_entries,
+// for circular pointers of clog2(num_entries) bits.
+// A power-of-two size wraps for free;
+// otherwise we pick a - b when a >= b
+// and num_entries - b + a when it would borrow.
+void WrapSubOp::constructRegion() {
+  BanbaSugarScope scope(getOperation());
+
+  // Get inputs and the modulo
+  BanbaValue a = getA(), b = getB();
+  unsigned modulo = getModulo();
+
+  // RTL subtraction
+  BanbaValue diff = a - b;
+
+  if (llvm::isPowerOf2_32(modulo)) {
+    // The subtraction wraps automatically if
+    // modulo is a power of 2
+    driveDifference(diff);
+  } else {
+    // Otherwise need extra logic:
+    // if a >= b: out = a - b; else: out = (a + modulo) - b
+
+    // RTL: a >= b
+    BanbaValue pred = a >= b;
+
+    // Get the modulo as an RTL constant
+    BanbaValue moduloConst(modulo, Log2_32_Ceil(modulo));
+
+    // RTL: (a + modulo) - b
+    BanbaValue borrowed = (moduloConst + a) - b;
+
+    // Mux based on the predicate
+    driveDifference(BanbaSugar::select(pred, diff, borrowed));
+  }
+}
+
 } // namespace banba

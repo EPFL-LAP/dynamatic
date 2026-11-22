@@ -96,6 +96,23 @@ int main(int argc, char **argv) {
   // Construct the inside of the count extraction
   countExtract.constructRegion();
 
+  // Create a placeholder for each operand of the free-entry calculation
+  llvm::SmallVector<mlir::Value> freeEntryCalcPlaceholders;
+  for (mlir::Type type :
+       banba::shared::ga::FreeEntryCalcOp::getExpectedOperandTypes(configAttr))
+    freeEntryCalcPlaceholders.push_back(
+        banba::PlaceholderOp::create(builder, loc, type));
+
+  // Create the free-entry calculation, with its expected result types
+  // and the placeholders as its operands
+  auto freeEntryCalc = banba::shared::ga::FreeEntryCalcOp::create(
+      builder, loc,
+      banba::shared::ga::FreeEntryCalcOp::getExpectedResultTypes(configAttr),
+      freeEntryCalcPlaceholders);
+
+  // Construct the inside of the free-entry calculation
+  freeEntryCalc.constructRegion();
+
   // Print the module
   module->print(llvm::outs());
   return 0;

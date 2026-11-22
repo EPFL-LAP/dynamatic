@@ -53,7 +53,8 @@ class BanbaComponent<string mnemonic, list<Trait> traits = []>
   let regions = (region SizedRegion<1>:$body);
 
   let assemblyFormat =
-      "`(` operands `)` attr-dict `:` functional-type(operands, results) $body";
+      "`(` operands `)` prop-dict attr-dict `:` "
+      "functional-type(operands, results) $body";
 }
 
 // A hardware component whose types are fixed by the config,

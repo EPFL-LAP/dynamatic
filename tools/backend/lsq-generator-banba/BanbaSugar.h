@@ -179,6 +179,22 @@ inline BanbaValue operator>=(BanbaValue lhs, BanbaValue rhs) {
       .getResult();
 }
 
+/// `a - b` creates the subtraction of two values,
+/// as a CIRCT comb.sub operation
+inline BanbaValue operator-(BanbaValue lhs, BanbaValue rhs) {
+  return circt::comb::SubOp::create(BanbaSugarScope::getBuilder(),
+                                    BanbaSugarScope::getLoc(), lhs, rhs)
+      .getResult();
+}
+
+/// `a + b` creates the addition of two values,
+/// as a CIRCT comb.add operation
+inline BanbaValue operator+(BanbaValue lhs, BanbaValue rhs) {
+  return circt::comb::AddOp::create(BanbaSugarScope::getBuilder(),
+                                    BanbaSugarScope::getLoc(), lhs, rhs)
+      .getResult();
+}
+
 // Syntactic sugar that is written as a function call.
 // The namespace makes each call show that it is sugar,
 // which creates its operations through the current BanbaSugarScope:
@@ -195,6 +211,16 @@ inline BanbaValue concatToArray(ArrayRef<Value> elements) {
   // And then make the array
   return circt::hw::ArrayCreateOp::create(BanbaSugarScope::getBuilder(),
                                           BanbaSugarScope::getLoc(), operands)
+      .getResult();
+}
+
+/// Select between two values on a single bit,
+/// as a CIRCT comb.mux operation
+inline BanbaValue select(BanbaValue sel, BanbaValue trueValue,
+                         BanbaValue falseValue) {
+  return circt::comb::MuxOp::create(BanbaSugarScope::getBuilder(),
+                                    BanbaSugarScope::getLoc(), sel, trueValue,
+                                    falseValue)
       .getResult();
 }
 
@@ -246,6 +272,24 @@ inline BanbaValue zeroValue(Type type) {
 
   // And then cast it to an array type
   return circt::hw::BitcastOp::create(builder, loc, type, packed).getResult();
+}
+
+/// Zero-extend an integer to the given width,
+/// by concatenating zeros above it
+inline BanbaValue zext(BanbaValue value, unsigned bitwidth) {
+  Value inValue = value;
+  unsigned inBitwidth = inValue.getType().getIntOrFloatBitWidth();
+  assert(bitwidth >= inBitwidth && "zext target width smaller than input");
+
+  // Nothing to extend if the value already has the target width
+  if (bitwidth == inBitwidth)
+    return value;
+
+  BanbaValue zeros(0, bitwidth - inBitwidth);
+  return circt::comb::ConcatOp::create(BanbaSugarScope::getBuilder(),
+                                       BanbaSugarScope::getLoc(), zeros,
+                                       inValue)
+      .getResult();
 }
 
 /// Create an operation, and construct its region.
