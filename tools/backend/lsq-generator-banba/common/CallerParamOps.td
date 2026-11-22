@@ -2,11 +2,15 @@
 #define BANBA_CALLER_PARAM_OPS_TD
 
 // OR Reduction:
-// OR-reduces a list of values into one, as a balanced binary tree
+// OR-reduces a list of values into one, as a balanced binary tree.
+// On hw.array values the OR is elementwise:
+// each is cast to a flat integer, they are OR-reduced once,
+// and the result is cast back to the array type
+// (hardware-identical to per-element gates)
 def OrReduceOp : CallerParamComponent<"or_reduce",
     [SameOperandsAndResultType]> {
-  let arguments = (ins Variadic<Int>:$inputs);
-  let results = (outs Int:$reduced);
+  let arguments = (ins Variadic<AnyTypeOf<[Int, ArrayInt]>>:$inputs);
+  let results = (outs AnyTypeOf<[Int, ArrayInt]>:$reduced);
 }
 
 // One-Hot Mux:
@@ -41,6 +45,21 @@ def WrapSubOp : CallerParamComponent<"wrap_sub",
   let results = (outs Int:$difference);
 
   // Verify a, b, and difference are clog2(modulo) bits
+  let hasVerifier = 1;
+}
+
+// Rotate the elements of an array left by `amount`, cyclically, as a barrel
+def CyclicLeftShiftOp : CallerParamComponent<"cyclic_left_shift",
+    [AllTypesMatch<["data", "shifted"]>]> {
+  let arguments = (ins
+      // Inputs: array and shift amount
+      ArrayInt:$data,
+      Int:$amount);
+
+  // Output
+  let results = (outs ArrayInt:$shifted);
+
+  // Verify amount is clog2(element count of data) bits
   let hasVerifier = 1;
 }
 

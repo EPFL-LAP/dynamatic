@@ -16,6 +16,27 @@ static llvm::cl::opt<std::string>
     configFile("config", llvm::cl::desc("Path to the LSQ's JSON config file"),
                llvm::cl::Required, llvm::cl::cat(banbaCategory));
 
+/// Creates an operation with a placeholder for each operand it expects,
+/// and constructs its region.
+/// Temporary, until this program creates the top-level `lsq` operation
+template <typename OpT>
+static void createWithPlaceholders(mlir::OpBuilder &builder,
+                                   mlir::Location loc,
+                                   banba::ConfigAttr config) {
+  // Create a placeholder for each operand of the operation
+  llvm::SmallVector<mlir::Value> placeholders;
+  for (mlir::Type type : OpT::getExpectedOperandTypes(config))
+    placeholders.push_back(banba::PlaceholderOp::create(builder, loc, type));
+
+  // Create the operation, with its expected result types
+  // and the placeholders as its operands
+  OpT op = OpT::create(builder, loc, OpT::getExpectedResultTypes(config),
+                       placeholders);
+
+  // Construct the inside of the operation
+  op.constructRegion();
+}
+
 int main(int argc, char **argv) {
   // Only show this program's own options in --help
   llvm::cl::HideUnrelatedOptions(banbaCategory);
@@ -63,55 +84,14 @@ int main(int argc, char **argv) {
   builder.setInsertionPointToEnd(module->getBody());
   mlir::Location loc = builder.getUnknownLoc();
 
-  // Create a placeholder for each operand of the ready generation
-  llvm::SmallVector<mlir::Value> placeholders;
-  for (mlir::Type type :
-       banba::shared::ga::ReadyGenOp::getExpectedOperandTypes(configAttr))
-    placeholders.push_back(banba::PlaceholderOp::create(builder, loc, type));
-
-  // Create the ready generation, with its expected result types
-  // and the placeholders as its operands
-  auto readyGen = banba::shared::ga::ReadyGenOp::create(
-      builder, loc,
-      banba::shared::ga::ReadyGenOp::getExpectedResultTypes(configAttr),
-      placeholders);
-
-  // Construct the inside of the ready generation
-  readyGen.constructRegion();
-
-  // Create a placeholder for each operand of the count extraction
-  llvm::SmallVector<mlir::Value> countExtractPlaceholders;
-  for (mlir::Type type :
-       banba::shared::ga::CountExtractOp::getExpectedOperandTypes(configAttr))
-    countExtractPlaceholders.push_back(
-        banba::PlaceholderOp::create(builder, loc, type));
-
-  // Create the count extraction, with its expected result types
-  // and the placeholders as its operands
-  auto countExtract = banba::shared::ga::CountExtractOp::create(
-      builder, loc,
-      banba::shared::ga::CountExtractOp::getExpectedResultTypes(configAttr),
-      countExtractPlaceholders);
-
-  // Construct the inside of the count extraction
-  countExtract.constructRegion();
-
-  // Create a placeholder for each operand of the free-entry calculation
-  llvm::SmallVector<mlir::Value> freeEntryCalcPlaceholders;
-  for (mlir::Type type :
-       banba::shared::ga::FreeEntryCalcOp::getExpectedOperandTypes(configAttr))
-    freeEntryCalcPlaceholders.push_back(
-        banba::PlaceholderOp::create(builder, loc, type));
-
-  // Create the free-entry calculation, with its expected result types
-  // and the placeholders as its operands
-  auto freeEntryCalc = banba::shared::ga::FreeEntryCalcOp::create(
-      builder, loc,
-      banba::shared::ga::FreeEntryCalcOp::getExpectedResultTypes(configAttr),
-      freeEntryCalcPlaceholders);
-
-  // Construct the inside of the free-entry calculation
-  freeEntryCalc.constructRegion();
+  // Create and construct each sub-component of the shared group allocator
+  using namespace banba::shared::ga;
+  createWithPlaceholders<FreeEntryCalcOp>(builder, loc, configAttr);
+  createWithPlaceholders<ReadyGenOp>(builder, loc, configAttr);
+  createWithPlaceholders<PortIdxGenOp>(builder, loc, configAttr);
+  createWithPlaceholders<OrderMatrixGenOp>(builder, loc, configAttr);
+  createWithPlaceholders<CountExtractOp>(builder, loc, configAttr);
+  createWithPlaceholders<AllocatingGenOp>(builder, loc, configAttr);
 
   // Print the module
   module->print(llvm::outs());
