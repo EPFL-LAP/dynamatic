@@ -28,7 +28,8 @@ void GroupAllocatorOp::constructRegion() {
   // Mutually exclusive 1-bit signals
   // showing which (if any) group is allocating this cycle.
   // Element-wise AND (returns iN)
-  Value groupAllocate = readyGen.getGaReady() & getGaValid();
+  Value groupAllocate =
+      (readyGen.getGaReady() & getGaValid()).nameValueInIR("group_allocate");
 
   /////////////////////////////////////////////////////////
   // Finally, wire the components together
