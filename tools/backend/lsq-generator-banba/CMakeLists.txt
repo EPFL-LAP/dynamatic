@@ -1,10 +1,7 @@
 # The tablegen rules below only watch the .td files directly in this folder.
-# These are the ones in the sub-folders, which Banba.td includes
-set(LLVM_TARGET_DEPENDS
-  ${CMAKE_CURRENT_SOURCE_DIR}/common/CommonOps.td
-  ${CMAKE_CURRENT_SOURCE_DIR}/per-port-queues/PerPortQueueOps.td
-  ${CMAKE_CURRENT_SOURCE_DIR}/shared-queues/SharedQueueOps.td
-)
+# This makes them watch the ones in the sub-folders too
+file(GLOB_RECURSE LLVM_TARGET_DEPENDS CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/*.td)
 
 # Banba's own tablegen tool, which generates code that mlir-tblgen does not
 add_subdirectory(banba-tblgen)
