@@ -28,7 +28,8 @@ void GroupAllocatorOp::constructRegion() {
   // Mutually exclusive 1-bit signals
   // showing which (if any) group is allocating this cycle.
   // Element-wise AND (returns iN)
-  Value groupAllocate = readyGen.getGaReady() & getGaValid();
+  Value groupAllocate =
+      (readyGen.getGaReady() & getGaValid()).nameValueInIR("group_allocate");
 
   /////////////////////////////////////////////////////////
   // Finally, wire the components together
@@ -453,7 +454,8 @@ void AllocatingGenOp::constructRegion() {
   }
 
   Value ldQAllocatingUnshifted =
-      BanbaSugar::castTo(ldQAllocatingInt, getLdQAllocating().getType());
+      BanbaSugar::castTo(ldQAllocatingInt, getLdQAllocating().getType())
+          .nameValueInIR("ld_q_allocating_unshifted");
 
   // Rotate the unshifted mask by the tail pointer
   // so its block of 1s starts at the queue tail
@@ -495,7 +497,8 @@ void AllocatingGenOp::constructRegion() {
   }
 
   Value stQAllocatingUnshifted =
-      BanbaSugar::castTo(stQAllocatingInt, getStQAllocating().getType());
+      BanbaSugar::castTo(stQAllocatingInt, getStQAllocating().getType())
+          .nameValueInIR("st_q_allocating_unshifted");
 
   // Rotate the unshifted mask by the tail pointer
   // so its block of 1s starts at the queue tail

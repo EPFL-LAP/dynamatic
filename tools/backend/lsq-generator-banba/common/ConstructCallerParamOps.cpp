@@ -245,7 +245,15 @@ void CyclicLeftShiftOp::constructRegion() {
 
     // Use a multiplexer to select the shifted array or the unshifted array
     // based on whether bit n of amount is 1
-    shifted = BanbaSugar::select(amount[bit], rotated, shifted);
+    BanbaValue stage = BanbaSugar::select(amount[bit], rotated, shifted);
+
+    if (bit > 0) {
+      // Name the stage's value after the distance it shifts by: `shift_8`
+      shifted = stage.nameValueInIR("shift_" + std::to_string(shift));
+    } else {
+      // The last stage drives the result, which has its own name
+      shifted = stage;
+    }
   }
 
   // Results

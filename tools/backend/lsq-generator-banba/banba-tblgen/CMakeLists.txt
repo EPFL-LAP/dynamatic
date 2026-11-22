@@ -7,6 +7,7 @@ add_tablegen(banba-tblgen BANBA
   banba-tblgen.cpp
   NamedDriversGen.cpp
   PortNamesGen.cpp
+  ResultNamesGen.cpp
 )
 
 target_link_libraries(banba-tblgen

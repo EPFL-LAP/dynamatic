@@ -45,11 +45,13 @@ def HasNamedResultDrivers : NativeOpTrait<"HasNamedResultDrivers"> {
 // What every hardware component has: an inside,
 // which is one region that holds the operations it is made of,
 // a constructRegion that creates those operations,
-// and a named driver for each of its results
+// a named driver for each of its results,
+// and the declared name of each result as its name in the printed IR
 class BanbaComponent<string mnemonic, list<Trait> traits = []>
     : Op<Banba_Dialect, mnemonic,
          [GraphRegion, HasNamedResultDrivers,
           DeclareOpInterfaceMethods<PortNames>,
+          DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
           DeclareOpInterfaceMethods<ConstructsRegion>] # traits> {
   let regions = (region SizedRegion<1>:$body);
 
