@@ -250,8 +250,7 @@ void OrderMatrixGenOp::constructRegion() {
         Value valueToShift;
         if (encodings[ld].size() > 1) {
           // OR reduce the possible encodings
-          OrReduceOp reduced =
-              BanbaSugar::createOp<OrReduceOp>(encodings[ld]);
+          OrReduceOp reduced = BanbaSugar::createOp<OrReduceOp>(encodings[ld]);
           valueToShift = reduced.getReduced();
         } else {
           valueToShift = encodings[ld][0];
