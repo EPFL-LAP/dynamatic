@@ -55,6 +55,16 @@ inline constexpr StringLiteral outputFileAttrName = "banba.output_file";
 /// Attribute name for the comment printed above an op's module
 inline constexpr StringLiteral modCommentAttrName = "banba.mod_comment";
 
+/// Attribute names for the label on a lowered hw.module:
+/// the name of the operation it was lowered from,
+/// and that operation's attributes
+inline constexpr StringLiteral opNameAttrName = "banba.op_name";
+inline constexpr StringLiteral opAttrsAttrName = "banba.op_attrs";
+
+/// Attribute name on a module comment,
+/// for the name of the hw.module it belongs to
+inline constexpr StringLiteral commentOfAttrName = "banba.comment_of";
+
 /// Store the specified output name (prefixed with the lsq name)
 /// as an attribute on the op
 inline void setOutputFile(Operation *op, StringRef file) {

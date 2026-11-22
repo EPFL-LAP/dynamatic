@@ -1,6 +1,7 @@
 #include "BanbaOps.h"
 #include "LowerToHw.h"
 #include "LsqConfig.h"
+#include "MergeIdenticalModules.h"
 #include "ReduceCastsToIntegers.h"
 #include "circt/Conversion/ExportVerilog.h"
 #include "circt/Conversion/SeqToSV.h"
@@ -108,6 +109,10 @@ int main(int argc, char **argv) {
   // which are left where a component's port is such an array
   // and the logic around it works on integers
   banba::reduceCastsToIntegers(*module);
+
+  // Merge the modules that are the same hardware into one,
+  // which several instances then share
+  banba::mergeIdenticalModules(*module);
 
   // Print the module
   module->print(llvm::outs());
