@@ -92,5 +92,13 @@ void banba::driveOperand(Operation *op, unsigned index, Value value) {
 
 void banba::driveResult(Operation *op, unsigned index, Value value) {
   Operation *terminator = op->getRegion(0).front().getTerminator();
+
+  // Get the placeholder that the terminator has as this operand
+  Operation *placeholder = terminator->getOperand(index).getDefiningOp();
+  assert(placeholder && isa<PlaceholderOp>(placeholder) &&
+         "result is already driven");
+
+  // Replace the placeholder with the value, and remove the placeholder
   terminator->setOperand(index, value);
+  placeholder->erase();
 }

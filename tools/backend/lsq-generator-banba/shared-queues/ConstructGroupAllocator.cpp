@@ -1,4 +1,5 @@
 #include "BanbaOps.h"
+#include "BanbaSugar.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace banba::shared {
@@ -15,9 +16,7 @@ void FreeEntryCalcOp::constructRegion() {
   llvm::outs() << "Construct shared.ga.free_entry_calc op region\n";
 }
 
-void ReadyGenOp::constructRegion() {
-  llvm::outs() << "Construct shared.ga.ready_gen op region\n";
-}
+void ReadyGenOp::constructRegion() { BanbaSugarScope scope(getOperation()); }
 
 void PortIdxGenOp::constructRegion() {
   llvm::outs() << "Construct shared.ga.port_idx_gen op region\n";
