@@ -13,6 +13,8 @@ namespace banba {
 /// Declaring a BanbaSugarScope
 /// allows the use of syntactic sugar: operations can be created
 /// without explicitly passing an OpBuilder for every single one.
+/// It gives access to the config of the LSQ being generated,
+/// which it gets from the module that contains the operation.
 /// It also adds the block that holds those operations
 /// to the operation's region,
 /// containing only the terminator of that block
@@ -49,6 +51,12 @@ public:
     // Create all later operations above the terminator
     builder.setInsertionPoint(terminator);
 
+    // Get the config, stored on the module that contains the operation
+    ModuleOp module = op->getParentOfType<ModuleOp>();
+    assert(module && "the operation is not inside a module");
+    config = module->getAttrOfType<ConfigAttr>(configAttrName);
+    assert(config && "the module has no config");
+
     // Allow later syntactic sugar to find this scope
     // through the single static `active` pointer
     active = this;
@@ -71,6 +79,13 @@ public:
     return active->loc;
   }
 
+  /// Static config getter,
+  /// finds the current scope through the static `active` pointer
+  static ConfigAttr getConfig() {
+    assert(active && "no BanbaSugarScope has been declared");
+    return active->config;
+  }
+
 private:
   /// Static pointer to the current scope
   inline static BanbaSugarScope *active = nullptr;
@@ -81,6 +96,9 @@ private:
   /// Location of this scope's operation,
   /// given to every operation created inside its region
   Location loc;
+
+  /// Config of the LSQ being generated
+  ConfigAttr config;
 
   /// Pointer to the scope to restore when this scope ends
   BanbaSugarScope *previous;
