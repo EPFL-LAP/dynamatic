@@ -1,3 +1,8 @@
+# The tablegen rules below only watch the .td files directly in this folder.
+# This makes them watch the ones in the sub-folders too
+file(GLOB_RECURSE LLVM_TARGET_DEPENDS CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/*.td)
+
 # Generate the C++ code of the dialect from Banba.td
 add_mlir_dialect(Banba banba)
 
@@ -20,8 +25,10 @@ set(LLVM_LINK_COMPONENTS
 add_llvm_tool(lsq-generator-banba
   lsq-generator-banba.cpp
   BanbaDialect.cpp
-  ConstructLsq.cpp
+  common/ConstructLsq.cpp
   LsqConfig.cpp
+  per-port-queues/ConstructGroupAllocator.cpp
+  shared-queues/ConstructGroupAllocator.cpp
 
   DEPENDS
   MLIRBanbaIncGen
@@ -32,6 +39,8 @@ add_llvm_tool(lsq-generator-banba
 llvm_update_compile_flags(lsq-generator-banba)
 target_include_directories(lsq-generator-banba PRIVATE
   ${CIRCT_INCLUDE_DIRS}
+  # So that files in the sub-folders find the headers in this folder
+  ${CMAKE_CURRENT_SOURCE_DIR}
   # The generated files are written to the build folder
   ${CMAKE_CURRENT_BINARY_DIR}
 )

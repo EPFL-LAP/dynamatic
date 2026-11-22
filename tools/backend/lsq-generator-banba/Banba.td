@@ -21,6 +21,8 @@ def Banba_Dialect : Dialect {
 
 include "BanbaAttrs.td"
 include "BanbaInterfaces.td"
-include "BanbaOps.td"
+include "common/CommonOps.td"
+include "shared-queues/SharedQueueOps.td"
+include "per-port-queues/PerPortQueueOps.td"
 
 #endif // BANBA_TD

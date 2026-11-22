@@ -1,5 +1,5 @@
-#ifndef BANBA_OPS_TD
-#define BANBA_OPS_TD
+#ifndef BANBA_COMMON_OPS_TD
+#define BANBA_COMMON_OPS_TD
 
 // Shorter names for the types of the operations' inputs and outputs.
 // These only check the kind of type (an integer, an array);
@@ -28,12 +28,24 @@ def GraphRegion : TraitList<[
     NativeOpTrait<"HasOnlyGraphRegion">,
     RegionKindInterface]>;
 
+// A hardware component with an inside:
+// one region that holds the operations it is made of.
+// Its types are checked against the config
+class BanbaComponent<string mnemonic, list<Trait> traits = []>
+    : Op<Banba_Dialect, mnemonic,
+         [GraphRegion, VerifyTypesByConfig,
+          DeclareOpInterfaceMethods<ExpectedTypes>,
+          DeclareOpInterfaceMethods<ConstructsRegion>] # traits> {
+  let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat =
+      "`(` operands `)` attr-dict `:` functional-type(operands, results) $body";
+}
+
 // The top-level load-store queue.
 // Its inputs and outputs are the LSQ's ports to the circuit
 // and its channels to the memory
-def LsqOp : Op<Banba_Dialect, "lsq",
-    [GraphRegion, DeclareOpInterfaceMethods<ExpectedTypes>,
-     VerifyTypesByConfig, DeclareOpInterfaceMethods<ConstructsRegion>]> {
+def LsqOp : BanbaComponent<"lsq"> {
   let arguments = (ins
       ClockType:$clk,
       I1:$rst,
@@ -75,12 +87,6 @@ def LsqOp : Op<Banba_Dialect, "lsq",
       Int:$wr_req_data,
       I1:$wr_resp_ready,
       I1:$empty);
-
-  // The inside of the LSQ, holding the components it is made of
-  let regions = (region SizedRegion<1>:$body);
-
-  let assemblyFormat =
-      "`(` operands `)` attr-dict `:` functional-type(operands, results) $body";
 
   let extraClassDefinition = [{
     SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
@@ -145,4 +151,4 @@ def OutputOp : Op<Banba_Dialect, "output", [Terminator, ReturnLike, Pure]> {
   let assemblyFormat = "($outputs^ `:` type($outputs))? attr-dict";
 }
 
-#endif // BANBA_OPS_TD
+#endif // BANBA_COMMON_OPS_TD

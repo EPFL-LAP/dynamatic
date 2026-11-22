@@ -17,7 +17,8 @@ using namespace banba;
 // generated from BanbaInterfaces.td
 #include "BanbaInterfaces.cpp.inc"
 
-// The definitions of the dialect's operations, generated from BanbaOps.td
+// The definitions of the dialect's operations,
+// generated from the Ops.td file of each folder
 #define GET_OP_CLASSES
 #include "Banba.cpp.inc"
 

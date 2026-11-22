@@ -12,12 +12,12 @@ The `lsq` operation is the outermost component: the whole LSQ. Its inputs and ou
 
 ## Where Operations Are Declared
 
-Operations are declared in `BanbaOps.td`, in [TableGen](https://mlir.llvm.org/docs/DefiningDialects/Operations/). From each declaration, the build generates a C++ class.
+Operations are declared in the `Ops.td` file of each folder, such as `common/CommonOps.td`, in [TableGen](https://mlir.llvm.org/docs/DefiningDialects/Operations/). From each declaration, the build generates a C++ class.
 
 This is the declaration of the `lsq` operation, showing only its name and some of its inputs and outputs:
 
 ```tablegen
-def LsqOp : Op<Banba_Dialect, "lsq"> {
+def LsqOp : BanbaComponent<"lsq"> {
   let arguments = (ins
       ClockType:$clk,
       I1:$rst,
@@ -32,7 +32,7 @@ def LsqOp : Op<Banba_Dialect, "lsq"> {
 }
 ```
 
-The first line gives the operation its name in the IR, `banba.lsq`, and the name of its C++ class, `banba::LsqOp`.
+The first line gives the operation its name in the IR, `banba.lsq`, and the name of its C++ class, `banba::LsqOp`. `BanbaComponent` is the base class of every operation that is a hardware component.
 
 ## Inputs and Outputs
 
@@ -46,7 +46,7 @@ The types of an operation's inputs and outputs are verified in two ways.
 
 The declaration gives each input and output a kind of type, such as `Int` or `ArrayI1`. MLIR checks these kinds automatically.
 
-The kinds of type are declared at the top of `BanbaOps.td`:
+The kinds of type are declared at the top of `common/CommonOps.td`:
 
 | Kind | Meaning |
 |---|---|
@@ -64,11 +64,10 @@ A kind is loose. For example, `Int` says that an input is an integer, but not ho
 
 The exact widths and lengths depend on the LSQ's config. For example, `ld_port_addr` has one address per load port, and the width of an address comes from the config.
 
-Banba defines simple functionality for enforcing the types of an operation based on the config. An operation declares that it uses this functionality by listing the `ExpectedTypes` interface and the `VerifyTypesByConfig` trait. The trait performs the check, each time the IR is verified.
+Banba defines simple functionality for enforcing the types of an operation based on the config. An operation uses this functionality by deriving from `BanbaComponent`, which has the `ExpectedTypes` interface and the `VerifyTypesByConfig` trait. The trait performs the check, each time the IR is verified.
 
 ```tablegen
-def LsqOp : Op<Banba_Dialect, "lsq",
-    [DeclareOpInterfaceMethods<ExpectedTypes>, VerifyTypesByConfig]> {
+def LsqOp : BanbaComponent<"lsq"> {
 ```
 
 To fulfill the contract the interface specifies, the operation must provide a definition of the `getExpectedOperandTypes` and `getExpectedResultTypes` functions. Each returns one type per input, or per output, in the order in which the declaration lists them.
@@ -130,12 +129,7 @@ SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
 
 Banba operations correspond to sub-modules. Each operation is responsible for adding its own internal sub-operations and wiring them together, as well as possibly adding some direct RTL logic.
 
-An operation declares that it does so using the `ConstructsRegion` interface. To meet the contract specified, it must then provide a definition of the `constructRegion` function.
-
-```tablegen
-def LsqOp : Op<Banba_Dialect, "lsq",
-    [DeclareOpInterfaceMethods<ConstructsRegion>]> {
-```
+`BanbaComponent` declares that an operation does so, using the `ConstructsRegion` interface. To meet the contract specified, the operation must provide a definition of the `constructRegion` function.
 
 ```cpp
 void LsqOp::constructRegion() {
