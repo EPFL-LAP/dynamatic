@@ -108,6 +108,13 @@ static circt::hw::HWModuleOp createHWModule(OpBuilder &builder, ModuleOp modOp,
 
   setOutputFileInHW(hwMod, outputFile);
 
+  // Label the module with the operation it is lowered from
+  // and that operation's attributes, such as the modulo of a wrap_sub.
+  // Two modules with the same label and the same ports are the same hardware
+  hwMod->setAttr(opNameAttrName,
+                 builder.getStringAttr(op->getName().getStringRef()));
+  hwMod->setAttr(opAttrsAttrName, op->getAttrDictionary());
+
   // Emit the module comment above the module
   // (prefixing every line of a multi-line comment)
   if (auto comment = op->getAttrOfType<mlir::StringAttr>(modCommentAttrName)) {
@@ -125,6 +132,10 @@ static circt::hw::HWModuleOp createHWModule(OpBuilder &builder, ModuleOp modOp,
 
     // The comment goes into the same file as its module
     setOutputFileInHW(commentOp, outputFile);
+
+    // Record which module the comment belongs to,
+    // so that it can be removed together with the module
+    commentOp->setAttr(commentOfAttrName, builder.getStringAttr(moduleName));
   }
 
   // Get both output operations
