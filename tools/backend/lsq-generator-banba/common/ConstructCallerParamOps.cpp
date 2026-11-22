@@ -6,21 +6,21 @@ namespace banba {
 void OrReduceOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
 
+  // Sanity assert
+  assert(!getInputs().empty() && "cannot reduce an empty list");
+
+  // If nothing to OR, return the single input as it is
+  if (getInputs().size() == 1) {
+    driveReduced(getInputs().front());
+    return;
+  }
+
   // The list of values to build a set of ORs for.
   // That set of ORs will then produce a list of values
   // which is half as long
   SmallVector<Value> inputs;
   for (Value input : getInputs())
     inputs.push_back(BanbaSugar::castToInt(input));
-
-  // Sanity assert
-  assert(!inputs.empty() && "cannot reduce an empty list");
-
-  // If nothing to OR, return
-  if (inputs.size() == 1) {
-    driveReduced(BanbaSugar::castTo(inputs.front(), getReduced().getType()));
-    return;
-  }
 
   // The first layer of the OR tree has a number of outputs
   // equal to the largest power-of-two value that is strictly smaller
