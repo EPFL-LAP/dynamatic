@@ -91,7 +91,7 @@ class SharedGaComponent<string mnemonic, list<Trait> traits = []>
 // We use a mux on the queue's empty flag to resolve it,
 // outputting the maximum queue size when empty
 // and the WrapSub result otherwise.
-def SharedGa_FreeEntryOp : SharedGaComponent<"free_entry"> {
+def SharedGa_FreeEntryCalcOp : SharedGaComponent<"free_entry_calc"> {
   let arguments = (ins
       Int:$ld_q_head,
       Int:$ld_q_tail,
@@ -128,7 +128,7 @@ def SharedGa_FreeEntryOp : SharedGaComponent<"free_entry"> {
 // with the required space to allocate that group.
 // A group is ready only if there is enough space
 // for both its loads and its stores.
-def SharedGa_ReadyOp : SharedGaComponent<"ready"> {
+def SharedGa_ReadyGenOp : SharedGaComponent<"ready_gen"> {
   let arguments = (ins
       Int:$ld_num_free_entries,
       Int:$st_num_free_entries);
@@ -184,7 +184,7 @@ def SharedGa_PortIdxGenOp : SharedGaComponent<"port_idx_gen"> {
 // then left shifts it twice, by st_q_tail and ld_q_tail,
 // to match the partial order matrix
 // with the LSQ's main order matrix.
-def SharedGa_OrderMatrixOp : SharedGaComponent<"order_matrix"> {
+def SharedGa_OrderMatrixGenOp : SharedGaComponent<"order_matrix_gen"> {
   let arguments = (ins
       ArrayI1:$group_allocate,
       Int:$ld_q_tail,
@@ -209,7 +209,7 @@ def SharedGa_OrderMatrixOp : SharedGaComponent<"order_matrix"> {
 // Load/Store Count Extraction:
 // the number of loads and stores in the allocated group,
 // from a ROM lookup by the one-hot group_allocate.
-def SharedGa_CountsOp : SharedGaComponent<"counts"> {
+def SharedGa_CountExtractOp : SharedGaComponent<"count_extract"> {
   let arguments = (ins ArrayI1:$group_allocate);
   let results = (outs
       Int:$num_loads,
