@@ -25,8 +25,7 @@ void GroupAllocatorOp::constructRegion() {
   // Mutually exclusive 1-bit signals
   // showing which (if any) group is allocating this cycle.
   // Element-wise AND (returns iN)
-  Value groupAllocate =
-      readyGen.getGroupAllocateReady() & getGroupAllocateValid();
+  Value groupAllocate = readyGen.getGaReady() & getGaValid();
 
   /////////////////////////////////////////////////////////
   // Finally, wire the components together
@@ -58,7 +57,7 @@ void GroupAllocatorOp::constructRegion() {
   allocatingGen.driveStQTail(getStQTail());
 
   // Results
-  driveGroupAllocateReady(readyGen.getGroupAllocateReady());
+  driveGaReady(readyGen.getGaReady());
   driveLdQAllocating(allocatingGen.getLdQAllocating());
   driveNumLoads(countExtract.getNumLoads());
   driveStQAllocating(allocatingGen.getStQAllocating());
