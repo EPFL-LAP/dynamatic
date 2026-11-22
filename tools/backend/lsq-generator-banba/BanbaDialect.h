@@ -23,6 +23,7 @@ using llvm::isa;
 using llvm::Log2_32_Ceil;
 using llvm::SmallVector;
 using llvm::StringLiteral;
+using mlir::Attribute;
 using mlir::DenseI32ArrayAttr;
 using mlir::IntegerType;
 using mlir::Location;
