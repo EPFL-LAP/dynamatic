@@ -4,6 +4,7 @@
 include "mlir/IR/OpBase.td"
 include "mlir/IR/RegionKindInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def Banba_Dialect : Dialect {
@@ -22,6 +23,7 @@ def Banba_Dialect : Dialect {
 include "BanbaAttrs.td"
 include "BanbaInterfaces.td"
 include "common/CommonOps.td"
+include "common/CallerParamOps.td"
 include "shared-queues/SharedQueueOps.td"
 include "per-port-queues/PerPortQueueOps.td"
 

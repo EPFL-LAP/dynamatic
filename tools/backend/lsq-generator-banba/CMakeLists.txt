@@ -33,6 +33,7 @@ set(LLVM_LINK_COMPONENTS
 add_llvm_tool(lsq-generator-banba
   lsq-generator-banba.cpp
   BanbaDialect.cpp
+  common/ConstructCallerParamOps.cpp
   common/ConstructLsq.cpp
   LsqConfig.cpp
   per-port-queues/ConstructGroupAllocator.cpp
