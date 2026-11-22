@@ -122,6 +122,42 @@ public:
   // wherever an MLIR Value is expected
   operator Value() const { return value; }
 
+  // Index with a constant:
+  // on an integer, extract a single bit,
+  // and on a hw.array, read an element
+  BanbaValue operator[](unsigned index) {
+    OpBuilder &builder = BanbaSugarScope::getBuilder();
+    Location loc = BanbaSugarScope::getLoc();
+
+    // On an integer, index out a single bit
+    if (isa<IntegerType>(value.getType()))
+      return circt::comb::ExtractOp::create(builder, loc, value, index, 1)
+          .getResult();
+
+    // Otherwise the value must be a hw.array, which cast asserts
+    auto arrayType = cast<circt::hw::ArrayType>(value.getType());
+    unsigned numElements = arrayType.getNumElements();
+
+    // We use a bitcast on a one-entry array
+    // to avoid dealing with indexing headaches
+    if (numElements == 1) {
+      // Only entry 0 exists, so the index must be 0
+      assert(index == 0 && "non-zero constant index into a one-entry array");
+
+      // And then just bitcast it to be non-array
+      return circt::hw::BitcastOp::create(builder, loc,
+                                          arrayType.getElementType(), value)
+          .getResult();
+    }
+
+    // Otherwise convert the index to a constant in the IR
+    BanbaValue indexConstant(index, Log2_32_Ceil(numElements));
+
+    // And then return the indexing operation
+    return circt::hw::ArrayGetOp::create(builder, loc, value, indexConstant)
+        .getResult();
+  }
+
 private:
   /// The wrapped MLIR Value
   Value value;
@@ -160,6 +196,56 @@ inline BanbaValue concatToArray(ArrayRef<Value> elements) {
   return circt::hw::ArrayCreateOp::create(BanbaSugarScope::getBuilder(),
                                           BanbaSugarScope::getLoc(), operands)
       .getResult();
+}
+
+/// Build a hw.array constant from a list of values,
+/// bitwidth bits per element.
+/// numElements pads the array with zeros beyond the list
+/// (0 means exactly the list length)
+inline BanbaValue arrayConstant(ArrayRef<int32_t> values, unsigned bitwidth,
+                                unsigned numElements = 0) {
+  // If no number of elements is given, use the length of the list
+  if (numElements == 0)
+    numElements = values.size();
+
+  // Check that the list fits in the array
+  assert(values.size() <= (size_t)numElements &&
+         "more constant values than array elements");
+
+  // For each element of the array
+  SmallVector<Value> elements;
+  for (unsigned i = 0; i < numElements; ++i) {
+    // Take the value from the list, or zero beyond the end of the list
+    int32_t value = i < values.size() ? values[i] : 0;
+
+    // Create the constant, and add it to the elements
+    elements.push_back(BanbaValue(value, bitwidth));
+  }
+
+  // Build the hw.array from the elements
+  return concatToArray(elements);
+}
+
+/// Get a zero-valued value of the given type
+inline BanbaValue zeroValue(Type type) {
+  OpBuilder &builder = BanbaSugarScope::getBuilder();
+  Location loc = BanbaSugarScope::getLoc();
+
+  // Integer
+  if (isa<IntegerType>(type))
+    return circt::hw::ConstantOp::create(builder, loc, type, 0).getResult();
+
+  // Else assert it is an array type
+  auto arrayType = cast<circt::hw::ArrayType>(type);
+
+  // Just make a super-wide zero integer,
+  // so first we get the width
+  unsigned width = arrayType.getNumElements() *
+                   arrayType.getElementType().getIntOrFloatBitWidth();
+  BanbaValue packed(0, width);
+
+  // And then cast it to an array type
+  return circt::hw::BitcastOp::create(builder, loc, type, packed).getResult();
 }
 
 } // namespace BanbaSugar
