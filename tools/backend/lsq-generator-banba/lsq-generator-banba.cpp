@@ -1,6 +1,7 @@
 #include "BanbaOps.h"
 #include "LowerToHw.h"
 #include "LsqConfig.h"
+#include "ReduceCastsToIntegers.h"
 #include "circt/Conversion/ExportVerilog.h"
 #include "circt/Conversion/SeqToSV.h"
 #include "circt/Dialect/Comb/CombDialect.h"
@@ -102,6 +103,11 @@ int main(int argc, char **argv) {
 
   // Lower the banba dialect to hw modules and instances
   banba::lowerToHw(*module);
+
+  // Reduce the casts between arrays of 1-bit values and integers,
+  // which are left where a component's port is such an array
+  // and the logic around it works on integers
+  banba::reduceCastsToIntegers(*module);
 
   // Print the module
   module->print(llvm::outs());

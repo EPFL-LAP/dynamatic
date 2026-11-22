@@ -48,6 +48,7 @@ add_llvm_tool(lsq-generator-banba
   LowerToHw.cpp
   LsqConfig.cpp
   per-port-queues/ConstructGroupAllocator.cpp
+  ReduceCastsToIntegers.cpp
   shared-queues/ConstructGroupAllocator.cpp
 
   DEPENDS
