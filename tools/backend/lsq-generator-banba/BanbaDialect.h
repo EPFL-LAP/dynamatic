@@ -9,8 +9,10 @@
 #include "BanbaDialect.h.inc"
 
 namespace banba {
-// The names from MLIR that the dialect's code, including the generated code,
-// uses without writing their namespace
+// The names from MLIR and LLVM that the dialect's code,
+// including the generated code, uses without writing their namespace
+using llvm::cast;
+using llvm::isa;
 using mlir::DenseI32ArrayAttr;
 } // namespace banba
 

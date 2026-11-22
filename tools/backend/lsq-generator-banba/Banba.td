@@ -2,6 +2,9 @@
 #define BANBA_TD
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/RegionKindInterface.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def Banba_Dialect : Dialect {
   let name = "banba";
@@ -17,5 +20,6 @@ def Banba_Dialect : Dialect {
 }
 
 include "BanbaAttrs.td"
+include "BanbaOps.td"
 
 #endif // BANBA_TD
