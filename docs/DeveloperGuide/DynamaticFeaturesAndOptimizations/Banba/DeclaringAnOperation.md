@@ -17,7 +17,7 @@ Operations are declared in the `Ops.td` file of each folder, such as `common/Com
 This is the declaration of the `lsq` operation, showing only its name and some of its inputs and outputs:
 
 ```tablegen
-def LsqOp : BanbaComponent<"lsq"> {
+def LsqOp : ConfigParamComponent<"lsq"> {
   let arguments = (ins
       ClockType:$clk,
       I1:$rst,
@@ -32,7 +32,9 @@ def LsqOp : BanbaComponent<"lsq"> {
 }
 ```
 
-The first line gives the operation its name in the IR, `banba.lsq`, and the name of its C++ class, `banba::LsqOp`. `BanbaComponent` is the base class of every operation that is a hardware component.
+The first line gives the operation its name in the IR, `banba.lsq`, and the name of its C++ class, `banba::LsqOp`. `ConfigParamComponent` is the base class of the operations whose types are fixed by the config. It derives from `BanbaComponent`, the base class of every operation that is a hardware component.
+
+The other class that derives from `BanbaComponent` is `CallerParamComponent`, for the operations whose types are chosen by the code that creates them.
 
 ## Inputs and Outputs
 
@@ -64,10 +66,10 @@ A kind is loose. For example, `Int` says that an input is an integer, but not ho
 
 The exact widths and lengths depend on the LSQ's config. For example, `ld_port_addr` has one address per load port, and the width of an address comes from the config.
 
-Banba defines simple functionality for enforcing the types of an operation based on the config. An operation uses this functionality by deriving from `BanbaComponent`, which has the `ExpectedTypes` interface and the `VerifyTypesByConfig` trait. The trait performs the check, each time the IR is verified.
+Banba defines simple functionality for enforcing the types of an operation based on the config. An operation uses this functionality by deriving from `ConfigParamComponent`, which has the `ExpectedTypes` interface and the `VerifyTypesByConfig` trait. The trait performs the check, each time the IR is verified.
 
 ```tablegen
-def LsqOp : BanbaComponent<"lsq"> {
+def LsqOp : ConfigParamComponent<"lsq"> {
 ```
 
 To fulfill the contract the interface specifies, the operation must provide a definition of the `getExpectedOperandTypes` and `getExpectedResultTypes` functions. Each returns one type per input, or per output, in the order in which the declaration lists them.

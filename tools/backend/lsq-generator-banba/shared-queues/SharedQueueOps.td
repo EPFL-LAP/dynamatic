@@ -5,7 +5,7 @@
 // Its name in the IR starts with `shared.`,
 // and its C++ class is in the `banba::shared` namespace
 class SharedComponent<string mnemonic, list<Trait> traits = []>
-    : BanbaComponent<"shared." # mnemonic, traits> {
+    : ConfigParamComponent<"shared." # mnemonic, traits> {
   let cppNamespace = "::banba::shared";
 }
 

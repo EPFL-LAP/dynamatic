@@ -42,14 +42,12 @@ def HasNamedResultDrivers : NativeOpTrait<"HasNamedResultDrivers"> {
   let cppNamespace = "::banba::OpTrait";
 }
 
-// A hardware component with an inside:
-// one region that holds the operations it is made of.
-// Its types are checked against the config
+// What every hardware component has: an inside,
+// which is one region that holds the operations it is made of,
+// and a constructRegion that creates those operations
 class BanbaComponent<string mnemonic, list<Trait> traits = []>
     : Op<Banba_Dialect, mnemonic,
-         [GraphRegion, VerifyTypesByConfig,
-          HasNamedOperandDrivers, HasNamedResultDrivers,
-          DeclareOpInterfaceMethods<ExpectedTypes>,
+         [GraphRegion,
           DeclareOpInterfaceMethods<ConstructsRegion>] # traits> {
   let regions = (region SizedRegion<1>:$body);
 
@@ -57,10 +55,22 @@ class BanbaComponent<string mnemonic, list<Trait> traits = []>
       "`(` operands `)` attr-dict `:` functional-type(operands, results) $body";
 }
 
+// A hardware component whose types are fixed by the config,
+// and checked against it
+class ConfigParamComponent<string mnemonic, list<Trait> traits = []>
+    : BanbaComponent<mnemonic,
+         [VerifyTypesByConfig,
+          HasNamedOperandDrivers, HasNamedResultDrivers,
+          DeclareOpInterfaceMethods<ExpectedTypes>] # traits>;
+
+// A hardware component whose types are chosen by the code that creates it
+class CallerParamComponent<string mnemonic, list<Trait> traits = []>
+    : BanbaComponent<mnemonic, traits>;
+
 // The top-level load-store queue.
 // Its inputs and outputs are the LSQ's ports to the circuit
 // and its channels to the memory
-def LsqOp : BanbaComponent<"lsq"> {
+def LsqOp : ConfigParamComponent<"lsq"> {
   let arguments = (ins
       ClockType:$clk,
       I1:$rst,
