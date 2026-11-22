@@ -163,10 +163,18 @@ private:
   Value value;
 };
 
-/// `a & b` creates the AND of two values, as a CIRCT comb.and operation
+// Defined below, needed by the & operator
+namespace BanbaSugar {
+inline BanbaValue castToInt(BanbaValue value);
+} // namespace BanbaSugar
+
+/// `a & b` creates the AND of two values, as a CIRCT comb.and operation.
+/// Array operands are cast to integers, and the result is always an integer
 inline BanbaValue operator&(BanbaValue lhs, BanbaValue rhs) {
   return circt::comb::AndOp::create(BanbaSugarScope::getBuilder(),
-                                    BanbaSugarScope::getLoc(), lhs, rhs)
+                                    BanbaSugarScope::getLoc(),
+                                    BanbaSugar::castToInt(lhs),
+                                    BanbaSugar::castToInt(rhs))
       .getResult();
 }
 
@@ -376,6 +384,31 @@ template <typename OpT, typename... Args>
 OpT createOp(Args &&...args) {
   OpT op = OpT::create(BanbaSugarScope::getBuilder(), BanbaSugarScope::getLoc(),
                        std::forward<Args>(args)...);
+  op.constructRegion();
+  return op;
+}
+
+/// Create an operation whose types are fixed by the config,
+/// and construct its region.
+/// Each of its operands is a placeholder of the type the operation expects,
+/// to be driven afterwards with the operation's named operand drivers
+template <typename OpT>
+OpT createOpFromConfig() {
+  OpBuilder &builder = BanbaSugarScope::getBuilder();
+  Location loc = BanbaSugarScope::getLoc();
+  ConfigAttr config = BanbaSugarScope::getConfig();
+
+  // Create a placeholder for each operand of the operation
+  SmallVector<Value> placeholders;
+  for (Type type : OpT::getExpectedOperandTypes(config))
+    placeholders.push_back(PlaceholderOp::create(builder, loc, type));
+
+  // Create the operation, with its expected result types
+  // and the placeholders as its operands
+  OpT op = OpT::create(builder, loc, OpT::getExpectedResultTypes(config),
+                       placeholders);
+
+  // Construct the inside of the operation
   op.constructRegion();
   return op;
 }

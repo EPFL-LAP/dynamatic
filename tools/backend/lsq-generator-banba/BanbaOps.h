@@ -40,7 +40,8 @@ private:
   MLIRContext *context;
 };
 
-/// Makes `value` operand number `index` of the operation
+/// Makes `value` operand number `index` of the operation,
+/// in place of the placeholder that the operation was created with
 void driveOperand(Operation *op, unsigned index, Value value);
 
 /// Makes `value` result number `index` of the operation,
