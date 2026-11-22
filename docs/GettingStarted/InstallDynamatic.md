@@ -37,11 +37,12 @@ These are optional tools which you can see how to [install](../UserGuide/Advance
 > Before moving on to the next step, refresh your environment variables in your current terminal to make sure that all newly installed tools are visible in your PATH. Alternatively, open a new terminal and proceed to cloning the project.
 
 **2. Cloning the Project and Its Submodules**  
-Dynamatic depends on a fork of [LLVM/MLIR](https://github.com/EPFL-LAP/llvm-project). To instruct git to clone the appropriate versions submodules used by Dynamatic, we enable the `--recurse-submodules` flag.  
+Dynamatic depends on [LLVM/MLIR](https://github.com/llvm/llvm-project). It is a git submodule: a separate repository that git downloads into Dynamatic's folder. Clone Dynamatic, then download its submodules:  
 ```sh
-git clone --recurse-submodules https://github.com/EPFL-LAP/dynamatic.git
+git clone https://github.com/EPFL-LAP/dynamatic.git
+git -C dynamatic submodule update --init --depth 1
 ```
-This creates a `dynamatic` folder in your current working directory.
+This creates a `dynamatic` folder in your current working directory. `--depth 1` makes git download only the commit of each submodule that Dynamatic uses, without its history.
 
 **3. Build the Project**  
 
@@ -52,7 +53,7 @@ chmod +x ./build.sh
 ./build.sh --release
 ```
 
-**Using prebuilt LLVM.** The commands above might take quite some time to finish since we need to build LLVM. Alternatively, the `build.sh` script can download a prebuilt LLVM and link Dynamatic against that instead. If this is preferred, you could run the following command:
+**Using prebuilt LLVM.** The commands above might take quite some time to finish since we need to build LLVM. Alternatively, the `build.sh` script can download a prebuilt LLVM and link Dynamatic against that instead. The prebuilt LLVM is always built in Release mode with assertions enabled, whether Dynamatic itself is built in Debug or Release mode. If this is preferred, you could run the following command:
 
 ```sh
 ./build.sh --release --use-prebuilt-llvm
