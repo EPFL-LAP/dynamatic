@@ -61,8 +61,8 @@ void CountExtractOp::constructRegion() {
   ConfigAttr config = BanbaSugarScope::getConfig();
 
   // ROM of the number of loads in each group
-  Value numLoadsRom = BanbaSugar::arrayConstant(config.getNumLoads(),
-                                                config.getLdCountWidth());
+  Value numLoadsRom =
+      BanbaSugar::arrayConstant(config.getNumLoads(), config.getLdCountWidth());
 
   // Mux of the ROM by the one-hot group_allocate
   OneHotMuxOp numLoads =
