@@ -44,10 +44,11 @@ def HasNamedResultDrivers : NativeOpTrait<"HasNamedResultDrivers"> {
 
 // What every hardware component has: an inside,
 // which is one region that holds the operations it is made of,
-// and a constructRegion that creates those operations
+// a constructRegion that creates those operations,
+// and a named driver for each of its results
 class BanbaComponent<string mnemonic, list<Trait> traits = []>
     : Op<Banba_Dialect, mnemonic,
-         [GraphRegion,
+         [GraphRegion, HasNamedResultDrivers,
           DeclareOpInterfaceMethods<ConstructsRegion>] # traits> {
   let regions = (region SizedRegion<1>:$body);
 
@@ -56,11 +57,13 @@ class BanbaComponent<string mnemonic, list<Trait> traits = []>
 }
 
 // A hardware component whose types are fixed by the config,
-// and checked against it
+// and checked against it.
+// It is created with placeholders as its operands,
+// and has a named driver for each of them
 class ConfigParamComponent<string mnemonic, list<Trait> traits = []>
     : BanbaComponent<mnemonic,
          [VerifyTypesByConfig,
-          HasNamedOperandDrivers, HasNamedResultDrivers,
+          HasNamedOperandDrivers,
           DeclareOpInterfaceMethods<ExpectedTypes>] # traits>;
 
 // A hardware component whose types are chosen by the code that creates it
