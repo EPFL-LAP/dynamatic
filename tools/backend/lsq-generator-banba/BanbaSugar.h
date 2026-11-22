@@ -239,6 +239,8 @@ inline BanbaValue select(BanbaValue sel, BanbaValue trueValue,
 /// (0 means exactly the list length)
 inline BanbaValue arrayConstant(ArrayRef<int32_t> values, unsigned bitwidth,
                                 unsigned numElements = 0) {
+  OpBuilder &builder = BanbaSugarScope::getBuilder();
+
   // If no number of elements is given, use the length of the list
   if (numElements == 0)
     numElements = values.size();
@@ -247,18 +249,31 @@ inline BanbaValue arrayConstant(ArrayRef<int32_t> values, unsigned bitwidth,
   assert(values.size() <= (size_t)numElements &&
          "more constant values than array elements");
 
-  // For each element of the array
-  SmallVector<Value> elements;
+  // The type of an element of the array
+  Type elementType = builder.getIntegerType(bitwidth);
+
+  // For each element of the array,
+  // make an attribute holding its constant value
+  SmallVector<Attribute> elements;
   for (unsigned i = 0; i < numElements; ++i) {
     // Take the value from the list, or zero beyond the end of the list
     int32_t value = i < values.size() ? values[i] : 0;
 
-    // Create the constant, and add it to the elements
-    elements.push_back(BanbaValue(value, bitwidth));
+    // Make the attribute, and add it to the elements
+    elements.push_back(builder.getIntegerAttr(elementType, value));
   }
 
-  // Build the hw.array from the elements
-  return concatToArray(elements);
+  // Callers build their lists element 0 first,
+  // but hw.aggregate_constant expects the highest-indexed element first,
+  // so first reverse
+  std::reverse(elements.begin(), elements.end());
+
+  // And then make the constant array, as a single operation
+  return circt::hw::AggregateConstantOp::create(
+             builder, BanbaSugarScope::getLoc(),
+             circt::hw::ArrayType::get(elementType, numElements),
+             builder.getArrayAttr(elements))
+      .getResult();
 }
 
 /// Get a zero-valued value of the given type
@@ -330,8 +345,8 @@ inline BanbaValue castToInt(BanbaValue value) {
 /// and the arguments are passed on to the operation's own `create`
 template <typename OpT, typename... Args>
 OpT createOp(Args &&...args) {
-  OpT op = OpT::create(BanbaSugarScope::getBuilder(),
-                       BanbaSugarScope::getLoc(), std::forward<Args>(args)...);
+  OpT op = OpT::create(BanbaSugarScope::getBuilder(), BanbaSugarScope::getLoc(),
+                       std::forward<Args>(args)...);
   op.constructRegion();
   return op;
 }

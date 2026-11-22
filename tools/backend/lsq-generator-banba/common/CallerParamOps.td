@@ -13,19 +13,26 @@ def OrReduceOp : CallerParamComponent<"or_reduce",
   let results = (outs AnyTypeOf<[Int, ArrayInt]>:$reduced);
 }
 
+// The result `selected` has the element type of the hw.array `inputs`.
+// MLIR checks this, and uses it to work out the result type
+// when the operation is created without one
+def SelectedHasElementTypeOfInputs : TypesMatchWith<
+    "selected has the element type of inputs", "inputs", "selected",
+    "::llvm::cast<::circt::hw::ArrayType>($_self).getElementType()">;
+
 // One-Hot Mux:
 // one-hot selection between the elements of a hw.array:
 // each element is selected against zero on its select bit,
 // and the terms OR-reduced (a one-hot and-or mux).
 // The select is one bit per input, as an array of bits or an integer
-def OneHotMuxOp : CallerParamComponent<"one_hot_mux"> {
+def OneHotMuxOp : CallerParamComponent<"one_hot_mux",
+    [SelectedHasElementTypeOfInputs]> {
   let arguments = (ins
       AnyTypeOf<[Int, ArrayI1]>:$one_hot_sel,
       ArrayInt:$inputs);
   let results = (outs Int:$selected);
 
-  // Verify that there is one select bit per input,
-  // and that the result has the type of an input
+  // Verify that there is one select bit per input
   let hasVerifier = 1;
 }
 
