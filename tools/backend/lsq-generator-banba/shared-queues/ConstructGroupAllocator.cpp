@@ -7,6 +7,9 @@ namespace banba::shared {
 void GroupAllocatorOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
 
+  // Emit the group allocator into group_allocator.sv
+  setOutputFile(getOperation(), "group_allocator.sv");
+
   ////////////////////////////////////////////////////////////////
   // Declare the sub-components, without specifying inputs
   ////////////////////////////////////////////////////////////////
