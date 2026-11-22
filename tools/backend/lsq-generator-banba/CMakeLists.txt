@@ -20,8 +20,10 @@ set(LLVM_LINK_COMPONENTS
 add_llvm_tool(lsq-generator-banba
   lsq-generator-banba.cpp
   BanbaDialect.cpp
-  ConstructLsq.cpp
+  common/ConstructLsq.cpp
   LsqConfig.cpp
+  per-port-queues/ConstructGroupAllocator.cpp
+  shared-queues/ConstructGroupAllocator.cpp
 
   DEPENDS
   MLIRBanbaIncGen
@@ -32,6 +34,8 @@ add_llvm_tool(lsq-generator-banba
 llvm_update_compile_flags(lsq-generator-banba)
 target_include_directories(lsq-generator-banba PRIVATE
   ${CIRCT_INCLUDE_DIRS}
+  # So that files in the sub-folders find the headers in this folder
+  ${CMAKE_CURRENT_SOURCE_DIR}
   # The generated files are written to the build folder
   ${CMAKE_CURRENT_BINARY_DIR}
 )

@@ -44,6 +44,43 @@ def Banba_ConfigAttr : AttrDef<Banba_Dialect, "Config"> {
   // Declares a way of creating the attribute from an LsqConfig struct,
   // which is defined in BanbaDialect.cpp
   let builders = [AttrBuilder<(ins "const ::LsqConfig &":$config)>];
+
+  // Values derived from the fields above
+  let extraClassDeclaration = [{
+    /// The width of a pointer into the load queue
+    unsigned getLdPointerWidth() const {
+      return Log2_32_Ceil(getFifoDepth_L());
+    }
+
+    /// The width of a pointer into the store queue
+    unsigned getStPointerWidth() const {
+      return Log2_32_Ceil(getFifoDepth_S());
+    }
+
+    /// The width of a number of load queue entries,
+    /// from zero up to all of them
+    unsigned getLdCountWidth() const {
+      return Log2_32_Ceil(getFifoDepth_L() + 1);
+    }
+
+    /// The width of a number of store queue entries,
+    /// from zero up to all of them
+    unsigned getStCountWidth() const {
+      return Log2_32_Ceil(getFifoDepth_S() + 1);
+    }
+
+    /// The width of the index of a load port.
+    /// One bit even when there is a single load port
+    unsigned getLdPortIdxWidth() const {
+      return std::max(1u, Log2_32_Ceil(getNumLoadPorts()));
+    }
+
+    /// The width of the index of a store port.
+    /// One bit even when there is a single store port
+    unsigned getStPortIdxWidth() const {
+      return std::max(1u, Log2_32_Ceil(getNumStorePorts()));
+    }
+  }];
 }
 
 #endif // BANBA_ATTRS_TD

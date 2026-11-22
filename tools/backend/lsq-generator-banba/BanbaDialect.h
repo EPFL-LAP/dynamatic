@@ -7,6 +7,8 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
+#include "llvm/Support/MathExtras.h"
+#include <algorithm>
 
 // The declaration of the dialect, generated from Banba.td
 #include "BanbaDialect.h.inc"
@@ -17,6 +19,7 @@ namespace banba {
 using mlir::DenseI32ArrayAttr;
 using llvm::cast;
 using llvm::isa;
+using llvm::Log2_32_Ceil;
 using llvm::SmallVector;
 using llvm::StringLiteral;
 using circt::seq::ClockType;

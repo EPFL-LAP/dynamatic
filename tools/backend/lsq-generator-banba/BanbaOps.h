@@ -119,7 +119,8 @@ public:
 } // namespace OpTrait
 } // namespace banba
 
-// The declarations of the dialect's operations, generated from BanbaOps.td
+// The declarations of the dialect's operations,
+// generated from the Ops.td file of each folder
 #define GET_OP_CLASSES
 #include "Banba.h.inc"
 
