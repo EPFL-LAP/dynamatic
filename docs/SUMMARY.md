@@ -65,6 +65,8 @@
 - [Documentation](DeveloperGuide/Documentation.md)
 
 - [Dynamatic Features And Optimizations]()
+  - [Banba]()
+    - [Declaring an Operation](DeveloperGuide/DynamaticFeaturesAndOptimizations/Banba/DeclaringAnOperation.md)
   - [Buffering](DeveloperGuide/DynamaticFeaturesAndOptimizations/Buffering/Buffering.md)
     - [MapBuf](DeveloperGuide/DynamaticFeaturesAndOptimizations/Buffering/MapBuf/MapBuf.md)
       - [Blif Generator](DeveloperGuide/DynamaticFeaturesAndOptimizations/Buffering/MapBuf/BlifGenerator.md)
