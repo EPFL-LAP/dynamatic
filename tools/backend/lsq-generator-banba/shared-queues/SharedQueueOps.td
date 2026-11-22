@@ -26,7 +26,7 @@ def Shared_GroupAllocatorOp : SharedComponent<"group_allocator"> {
   let arguments = (ins
       ClockType:$clk,
       I1:$rst,
-      ArrayI1:$group_allocate_valid,
+      ArrayI1:$ga_valid,
       Int:$ld_q_tail,
       Int:$ld_q_head,
       I1:$ld_q_empty,
@@ -34,7 +34,7 @@ def Shared_GroupAllocatorOp : SharedComponent<"group_allocator"> {
       Int:$st_q_head,
       I1:$st_q_empty);
   let results = (outs
-      ArrayI1:$group_allocate_ready,
+      ArrayI1:$ga_ready,
       ArrayI1:$ld_q_allocating,
       Int:$num_loads,
       ArrayI1:$st_q_allocating,
@@ -51,7 +51,7 @@ def Shared_GroupAllocatorOp : SharedComponent<"group_allocator"> {
       unsigned stPointerWidth = config.getStPointerWidth();
       return {t.Clock(),               // clk
               t.Int(1),                // rst
-              t.Array(numGroups, 1),   // group_allocate_valid
+              t.Array(numGroups, 1),   // ga_valid
               t.Int(ldPointerWidth),   // ld_q_tail
               t.Int(ldPointerWidth),   // ld_q_head
               t.Int(1),                // ld_q_empty
@@ -64,7 +64,7 @@ def Shared_GroupAllocatorOp : SharedComponent<"group_allocator"> {
       unsigned numGroups = config.getNumBBs();
       unsigned numLdEntries = config.getFifoDepth_L();
       unsigned numStEntries = config.getFifoDepth_S();
-      return {t.Array(numGroups, 1),                               // group_allocate_ready
+      return {t.Array(numGroups, 1),                               // ga_ready
               t.Array(numLdEntries, 1),                            // ld_q_allocating
               t.Int(config.getLdCountWidth()),                     // num_loads
               t.Array(numStEntries, 1),                            // st_q_allocating
@@ -132,7 +132,7 @@ def SharedGa_ReadyGenOp : SharedGaComponent<"ready_gen"> {
   let arguments = (ins
       Int:$ld_num_free_entries,
       Int:$st_num_free_entries);
-  let results = (outs ArrayI1:$group_allocate_ready);
+  let results = (outs ArrayI1:$ga_ready);
 
   let extraClassDefinition = [{
     SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
@@ -142,7 +142,7 @@ def SharedGa_ReadyGenOp : SharedGaComponent<"ready_gen"> {
     }
     SmallVector<Type> $cppClass::getExpectedResultTypes(ConfigAttr config) {
       Types t(config.getContext());
-      return {t.Array(config.getNumBBs(), 1)};  // group_allocate_ready
+      return {t.Array(config.getNumBBs(), 1)};  // ga_ready
     }
   }];
 }
