@@ -385,11 +385,15 @@ void AllocatingGenOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
 
-  // Declare a constant for each load queue entry index,
-  // for comparison
-  SmallVector<BanbaValue> ldQEntryIndices;
-  for (unsigned entry = 0; entry < config.getFifoDepth_L(); ++entry)
-    ldQEntryIndices.push_back(BanbaValue(entry, config.getLdCountWidth()));
+  // The largest number of loads in any group,
+  // which num_loads can never exceed
+  ArrayRef<int32_t> numLoadsPerGroup = config.getNumLoads();
+  unsigned maxNumLoads =
+      *std::max_element(numLoadsPerGroup.begin(), numLoadsPerGroup.end());
+
+  // A zero bit, for the entries of either queue
+  // that num_loads or num_stores can never reach
+  BanbaValue zeroBit(0, 1);
 
   // For each load queue entry
   // decide if it is in the unshifted allocation mask
@@ -397,11 +401,19 @@ void AllocatingGenOp::constructRegion() {
   // Entry i of the mask is 1 if num_loads > i
   SmallVector<Value> ldQAllocatingUnshiftedVec;
   for (unsigned entry = 0; entry < config.getFifoDepth_L(); ++entry) {
-    BanbaValue allocatingBit = getNumLoads() > ldQEntryIndices[entry];
+    if (entry < maxNumLoads) {
+      // Compare num_loads with the entry's index, as a constant
+      BanbaValue entryIndex(entry, config.getLdCountWidth());
+      BanbaValue allocatingBit = getNumLoads() > entryIndex;
 
-    // Push into vector
-    // we will later convert to hw.array
-    ldQAllocatingUnshiftedVec.push_back(allocatingBit);
+      // Push into vector
+      // we will later convert to hw.array
+      ldQAllocatingUnshiftedVec.push_back(allocatingBit);
+    } else {
+      // num_loads can never be greater than this entry's index,
+      // so the bit is a constant zero
+      ldQAllocatingUnshiftedVec.push_back(zeroBit);
+    }
   }
 
   Value ldQAllocatingUnshifted =
@@ -412,11 +424,11 @@ void AllocatingGenOp::constructRegion() {
   CyclicLeftShiftOp ldQAllocating = BanbaSugar::createOp<CyclicLeftShiftOp>(
       ldQAllocatingUnshifted, getLdQTail());
 
-  // Declare a constant for each store queue entry index,
-  // for comparison
-  SmallVector<BanbaValue> stQEntryIndices;
-  for (unsigned entry = 0; entry < config.getFifoDepth_S(); ++entry)
-    stQEntryIndices.push_back(BanbaValue(entry, config.getStCountWidth()));
+  // The largest number of stores in any group,
+  // which num_stores can never exceed
+  ArrayRef<int32_t> numStoresPerGroup = config.getNumStores();
+  unsigned maxNumStores =
+      *std::max_element(numStoresPerGroup.begin(), numStoresPerGroup.end());
 
   // For each store queue entry
   // decide if it is in the unshifted allocation mask
@@ -424,11 +436,19 @@ void AllocatingGenOp::constructRegion() {
   // Entry i of the mask is 1 if num_stores > i
   SmallVector<Value> stQAllocatingUnshiftedVec;
   for (unsigned entry = 0; entry < config.getFifoDepth_S(); ++entry) {
-    BanbaValue allocatingBit = getNumStores() > stQEntryIndices[entry];
+    if (entry < maxNumStores) {
+      // Compare num_stores with the entry's index, as a constant
+      BanbaValue entryIndex(entry, config.getStCountWidth());
+      BanbaValue allocatingBit = getNumStores() > entryIndex;
 
-    // Push into vector
-    // we will later convert to hw.array
-    stQAllocatingUnshiftedVec.push_back(allocatingBit);
+      // Push into vector
+      // we will later convert to hw.array
+      stQAllocatingUnshiftedVec.push_back(allocatingBit);
+    } else {
+      // num_stores can never be greater than this entry's index,
+      // so the bit is a constant zero
+      stQAllocatingUnshiftedVec.push_back(zeroBit);
+    }
   }
 
   Value stQAllocatingUnshifted =
