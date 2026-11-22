@@ -5,7 +5,7 @@
 // Its name in the IR starts with `per_port.`,
 // and its C++ class is in the `banba::per_port` namespace
 class PerPortComponent<string mnemonic, list<Trait> traits = []>
-    : BanbaComponent<"per_port." # mnemonic, traits> {
+    : ConfigParamComponent<"per_port." # mnemonic, traits> {
   let cppNamespace = "::banba::per_port";
 }
 
