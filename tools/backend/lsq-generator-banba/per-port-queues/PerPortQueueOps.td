@@ -1,6 +1,14 @@
 #ifndef BANBA_PER_PORT_QUEUE_OPS_TD
 #define BANBA_PER_PORT_QUEUE_OPS_TD
 
+// A component of an LSQ with one queue per port.
+// Its name in the IR starts with `per_port.`,
+// and its C++ class is in the `banba::per_port` namespace
+class PerPortComponent<string mnemonic, list<Trait> traits = []>
+    : BanbaComponent<"per_port." # mnemonic, traits> {
+  let cppNamespace = "::banba::per_port";
+}
+
 // Per-Port Group Allocator:
 // manages entry allocation for an LSQ with one queue per port.
 //
@@ -16,7 +24,7 @@
 // and so the order in which groups are allocated
 // is recorded in a FIFO, outside this component.
 // A group is then only ready when that FIFO has room.
-def PerPortGroupAllocatorOp : BanbaComponent<"per_port_group_allocator"> {
+def PerPort_GroupAllocatorOp : PerPortComponent<"group_allocator"> {
   let arguments = (ins
       // clock and reset
       ClockType:$clk,

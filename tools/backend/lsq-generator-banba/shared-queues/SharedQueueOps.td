@@ -1,6 +1,14 @@
 #ifndef BANBA_SHARED_QUEUE_OPS_TD
 #define BANBA_SHARED_QUEUE_OPS_TD
 
+// A component of an LSQ whose queues are shared by all ports.
+// Its name in the IR starts with `shared.`,
+// and its C++ class is in the `banba::shared` namespace
+class SharedComponent<string mnemonic, list<Trait> traits = []>
+    : BanbaComponent<"shared." # mnemonic, traits> {
+  let cppNamespace = "::banba::shared";
+}
+
 // Group Allocator:
 // manages entry allocation for the Load-Store Queue (LSQ).
 //
@@ -14,7 +22,7 @@
 // of one queue entry per memory access in that basic block,
 // and the updating of the order matrix to contain
 // the order of those accesses, based on the order stored in ROM.
-def SharedGroupAllocatorOp : BanbaComponent<"shared_group_allocator"> {
+def Shared_GroupAllocatorOp : SharedComponent<"group_allocator"> {
   let arguments = (ins
       ClockType:$clk,
       I1:$rst,

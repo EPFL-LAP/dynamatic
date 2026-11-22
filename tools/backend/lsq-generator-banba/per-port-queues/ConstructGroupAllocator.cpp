@@ -1,8 +1,10 @@
 #include "BanbaOps.h"
 #include "llvm/Support/raw_ostream.h"
 
-using namespace banba;
+namespace banba::per_port {
 
-void PerPortGroupAllocatorOp::constructRegion() {
+void GroupAllocatorOp::constructRegion() {
   llvm::outs() << "Construct per-port group allocator op region\n";
 }
+
+} // namespace banba::per_port
