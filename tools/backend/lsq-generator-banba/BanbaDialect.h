@@ -31,6 +31,7 @@ using mlir::Operation;
 using mlir::success;
 using mlir::Type;
 using mlir::TypeRange;
+using mlir::Value;
 using mlir::OpTrait::TraitBase;
 } // namespace banba
 

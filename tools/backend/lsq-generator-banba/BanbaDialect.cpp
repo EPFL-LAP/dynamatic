@@ -85,3 +85,12 @@ ConfigAttr ConfigAttr::get(MLIRContext *context, const LsqConfig &config) {
       toArrayAttrs(builder, config.stPortIdx));
   // clang-format on
 }
+
+void banba::driveOperand(Operation *op, unsigned index, Value value) {
+  op->setOperand(index, value);
+}
+
+void banba::driveResult(Operation *op, unsigned index, Value value) {
+  Operation *terminator = op->getRegion(0).front().getTerminator();
+  terminator->setOperand(index, value);
+}

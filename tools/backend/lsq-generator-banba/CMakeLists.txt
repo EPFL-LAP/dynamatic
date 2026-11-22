@@ -3,6 +3,9 @@
 file(GLOB_RECURSE LLVM_TARGET_DEPENDS CONFIGURE_DEPENDS
   ${CMAKE_CURRENT_SOURCE_DIR}/*.td)
 
+# Banba's own tablegen tool, which generates code that mlir-tblgen does not
+add_subdirectory(banba-tblgen)
+
 # Generate the C++ code of the dialect from Banba.td
 add_mlir_dialect(Banba banba)
 
@@ -17,6 +20,11 @@ set(LLVM_TARGET_DEFINITIONS BanbaInterfaces.td)
 mlir_tablegen(BanbaInterfaces.h.inc -gen-op-interface-decls)
 mlir_tablegen(BanbaInterfaces.cpp.inc -gen-op-interface-defs)
 add_public_tablegen_target(MLIRBanbaInterfacesIncGen)
+
+# Generate the named drivers of the dialect's operations, with banba-tblgen
+set(LLVM_TARGET_DEFINITIONS Banba.td)
+tablegen(BANBA BanbaNamedDrivers.h.inc -gen-banba-named-drivers)
+add_public_tablegen_target(MLIRBanbaNamedDriversIncGen)
 
 set(LLVM_LINK_COMPONENTS
   Support
@@ -34,6 +42,7 @@ add_llvm_tool(lsq-generator-banba
   MLIRBanbaIncGen
   MLIRBanbaAttrsIncGen
   MLIRBanbaInterfacesIncGen
+  MLIRBanbaNamedDriversIncGen
 )
 
 llvm_update_compile_flags(lsq-generator-banba)

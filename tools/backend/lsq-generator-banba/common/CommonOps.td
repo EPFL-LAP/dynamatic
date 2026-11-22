@@ -28,12 +28,27 @@ def GraphRegion : TraitList<[
     NativeOpTrait<"HasOnlyGraphRegion">,
     RegionKindInterface]>;
 
+// Lets the code that creates a component
+// drive each of its operands by name: `fifo.driveClk(clk)`.
+// The functions are generated per operation by banba-tblgen
+def HasNamedOperandDrivers : NativeOpTrait<"HasNamedOperandDrivers"> {
+  let cppNamespace = "::banba::OpTrait";
+}
+
+// Lets the code that builds the inside of a component
+// drive each of its results by name: `driveEmpty(empty)`.
+// The functions are generated per operation by banba-tblgen
+def HasNamedResultDrivers : NativeOpTrait<"HasNamedResultDrivers"> {
+  let cppNamespace = "::banba::OpTrait";
+}
+
 // A hardware component with an inside:
 // one region that holds the operations it is made of.
 // Its types are checked against the config
 class BanbaComponent<string mnemonic, list<Trait> traits = []>
     : Op<Banba_Dialect, mnemonic,
          [GraphRegion, VerifyTypesByConfig,
+          HasNamedOperandDrivers, HasNamedResultDrivers,
           DeclareOpInterfaceMethods<ExpectedTypes>,
           DeclareOpInterfaceMethods<ConstructsRegion>] # traits> {
   let regions = (region SizedRegion<1>:$body);
