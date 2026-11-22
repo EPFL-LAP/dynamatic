@@ -5,7 +5,66 @@
 namespace banba::shared {
 
 void GroupAllocatorOp::constructRegion() {
-  llvm::outs() << "Construct shared group allocator op region\n";
+  BanbaSugarScope scope(getOperation());
+
+  ////////////////////////////////////////////////////////////////
+  // Declare the sub-components, without specifying inputs
+  ////////////////////////////////////////////////////////////////
+
+  auto freeEntryCalc = BanbaSugar::createOpFromConfig<ga::FreeEntryCalcOp>();
+  auto readyGen = BanbaSugar::createOpFromConfig<ga::ReadyGenOp>();
+  auto portIdxGen = BanbaSugar::createOpFromConfig<ga::PortIdxGenOp>();
+  auto orderMatrixGen = BanbaSugar::createOpFromConfig<ga::OrderMatrixGenOp>();
+  auto countExtract = BanbaSugar::createOpFromConfig<ga::CountExtractOp>();
+  auto allocatingGen = BanbaSugar::createOpFromConfig<ga::AllocatingGenOp>();
+
+  /////////////////////////////////////////////////////////
+  // Top level logic
+  /////////////////////////////////////////////////////////
+
+  // Mutually exclusive 1-bit signals
+  // showing which (if any) group is allocating this cycle.
+  // Element-wise AND (returns iN)
+  Value groupAllocate = readyGen.getGaReady() & getGaValid();
+
+  /////////////////////////////////////////////////////////
+  // Finally, wire the components together
+  /////////////////////////////////////////////////////////
+
+  freeEntryCalc.driveLdQHead(getLdQHead());
+  freeEntryCalc.driveLdQTail(getLdQTail());
+  freeEntryCalc.driveStQHead(getStQHead());
+  freeEntryCalc.driveStQTail(getStQTail());
+  freeEntryCalc.driveLdQEmpty(getLdQEmpty());
+  freeEntryCalc.driveStQEmpty(getStQEmpty());
+
+  readyGen.driveLdNumFreeEntries(freeEntryCalc.getLdNumFreeEntries());
+  readyGen.driveStNumFreeEntries(freeEntryCalc.getStNumFreeEntries());
+
+  portIdxGen.driveGroupAllocate(groupAllocate);
+  portIdxGen.driveLdQTail(getLdQTail());
+  portIdxGen.driveStQTail(getStQTail());
+
+  orderMatrixGen.driveGroupAllocate(groupAllocate);
+  orderMatrixGen.driveLdQTail(getLdQTail());
+  orderMatrixGen.driveStQTail(getStQTail());
+
+  countExtract.driveGroupAllocate(groupAllocate);
+
+  allocatingGen.driveNumLoads(countExtract.getNumLoads());
+  allocatingGen.driveNumStores(countExtract.getNumStores());
+  allocatingGen.driveLdQTail(getLdQTail());
+  allocatingGen.driveStQTail(getStQTail());
+
+  // Results
+  driveGaReady(readyGen.getGaReady());
+  driveLdQAllocating(allocatingGen.getLdQAllocating());
+  driveNumLoads(countExtract.getNumLoads());
+  driveStQAllocating(allocatingGen.getStQAllocating());
+  driveNumStores(countExtract.getNumStores());
+  driveGaLsOrder(orderMatrixGen.getGaLsOrder());
+  driveLdQPortIdx(portIdxGen.getLdQPortIdx());
+  driveStQPortIdx(portIdxGen.getStQPortIdx());
 }
 
 } // namespace banba::shared

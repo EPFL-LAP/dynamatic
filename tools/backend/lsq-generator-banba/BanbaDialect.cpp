@@ -1,4 +1,5 @@
 #include "BanbaOps.h"
+#include "BanbaSugar.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -87,7 +88,20 @@ ConfigAttr ConfigAttr::get(MLIRContext *context, const LsqConfig &config) {
 }
 
 void banba::driveOperand(Operation *op, unsigned index, Value value) {
-  op->setOperand(index, value);
+  // Get the placeholder that the operation has as this operand
+  Value placeholder = op->getOperand(index);
+  Operation *placeholderOp = placeholder.getDefiningOp();
+  assert(placeholderOp && isa<PlaceholderOp>(placeholderOp) &&
+         "operand is already driven");
+
+  // Cast the value to the type of the operand,
+  // if it has the same number of bits in another shape
+  value = BanbaSugar::castTo(value, placeholder.getType());
+
+  // Replace the placeholder with the value everywhere it is used,
+  // which includes the inside of the operation, and remove the placeholder
+  placeholder.replaceAllUsesWith(value);
+  placeholderOp->erase();
 }
 
 void banba::driveResult(Operation *op, unsigned index, Value value) {
