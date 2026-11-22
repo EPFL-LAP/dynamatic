@@ -60,9 +60,11 @@ struct LsqConfig {
 bool fromJSON(const llvm::json::Value &value, LsqConfig &config,
               llvm::json::Path path);
 
-/// Checks that the switches of the pre-existing LSQ generators, and `BANBA`,
-/// have the values that Banba requires,
-/// and reports the first one that does not.
+/// Checks what Banba requires of the config,
+/// and reports the first key that does not satisfy it:
+/// the switches of the pre-existing LSQ generators, and `BANBA`,
+/// must have the one value Banba supports for them,
+/// and there must be at least one load port and one store port.
 bool hasRequiredValues(const LsqConfig &config);
 
 #endif // DYNAMATIC_TOOLS_BACKEND_LSQ_GENERATOR_BANBA_LSQCONFIG_H

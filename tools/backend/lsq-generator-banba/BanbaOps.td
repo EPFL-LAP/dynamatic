@@ -14,6 +14,13 @@ def ArrayI1 : Type<
 def ClockType : Type<CPred<"isa<circt::seq::ClockType>($_self)">,
     "seq.clock">;
 
+// Checks the types of an operation's inputs and outputs
+// against the ones it states through ExpectedTypes.
+// The check itself is written in C++, in BanbaOps.h
+def VerifyTypesByConfig : NativeOpTrait<"VerifyTypesByConfig"> {
+  let cppNamespace = "::banba::OpTrait";
+}
+
 // Tells MLIR that the order of the operations inside a region does not matter:
 // as with wires in hardware,
 // a value may be used above the operation that produces it
@@ -24,7 +31,9 @@ def GraphRegion : TraitList<[
 // The top-level load-store queue.
 // Its inputs and outputs are the LSQ's ports to the circuit
 // and its channels to the memory
-def LsqOp : Op<Banba_Dialect, "lsq", [GraphRegion]> {
+def LsqOp : Op<Banba_Dialect, "lsq",
+    [GraphRegion, DeclareOpInterfaceMethods<ExpectedTypes>,
+     VerifyTypesByConfig]> {
   let arguments = (ins
       ClockType:$clk,
       I1:$rst,
@@ -72,6 +81,60 @@ def LsqOp : Op<Banba_Dialect, "lsq", [GraphRegion]> {
 
   let assemblyFormat =
       "`(` operands `)` attr-dict `:` functional-type(operands, results) $body";
+
+  let extraClassDefinition = [{
+    SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      unsigned numGroups = config.getNumBBs();
+      unsigned numLoadPorts = config.getNumLoadPorts();
+      unsigned numStorePorts = config.getNumStorePorts();
+      unsigned addrWidth = config.getAddrWidth();
+      unsigned dataWidth = config.getDataWidth();
+      unsigned indexWidth = config.getIndexWidth();
+      return {t.Clock(),                          // clk
+              t.Int(1),                           // rst
+              t.Array(numGroups, 1),              // group_init_valid
+              t.Array(numLoadPorts, addrWidth),   // ld_port_addr
+              t.Array(numLoadPorts, 1),           // ld_port_addr_valid
+              t.Array(numLoadPorts, 1),           // ld_port_data_ready
+              t.Array(numStorePorts, addrWidth),  // st_port_addr
+              t.Array(numStorePorts, 1),          // st_port_addr_valid
+              t.Array(numStorePorts, dataWidth),  // st_port_data
+              t.Array(numStorePorts, 1),          // st_port_data_valid
+              t.Int(1),                           // rd_req_ready
+              t.Int(1),                           // rd_resp_valid
+              t.Int(indexWidth),                  // rd_resp_id
+              t.Int(dataWidth),                   // rd_resp_data
+              t.Int(1),                           // wr_req_ready
+              t.Int(1),                           // wr_resp_valid
+              t.Int(indexWidth)};                 // wr_resp_id
+    }
+    SmallVector<Type> $cppClass::getExpectedResultTypes(ConfigAttr config) {
+      Types t(config.getContext());
+      unsigned numGroups = config.getNumBBs();
+      unsigned numLoadPorts = config.getNumLoadPorts();
+      unsigned numStorePorts = config.getNumStorePorts();
+      unsigned addrWidth = config.getAddrWidth();
+      unsigned dataWidth = config.getDataWidth();
+      unsigned indexWidth = config.getIndexWidth();
+      return {t.Array(numGroups, 1),              // group_init_ready
+              t.Array(numLoadPorts, 1),           // ld_port_addr_ready
+              t.Array(numLoadPorts, dataWidth),   // ld_port_data
+              t.Array(numLoadPorts, 1),           // ld_port_data_valid
+              t.Array(numStorePorts, 1),          // st_port_addr_ready
+              t.Array(numStorePorts, 1),          // st_port_data_ready
+              t.Int(1),                           // rd_req_valid
+              t.Int(indexWidth),                  // rd_req_id
+              t.Int(addrWidth),                   // rd_req_addr
+              t.Int(1),                           // rd_resp_ready
+              t.Int(1),                           // wr_req_valid
+              t.Int(indexWidth),                  // wr_req_id
+              t.Int(addrWidth),                   // wr_req_addr
+              t.Int(dataWidth),                   // wr_req_data
+              t.Int(1),                           // wr_resp_ready
+              t.Int(1)};                          // empty
+    }
+  }];
 }
 
 // Ends the inside of a component,

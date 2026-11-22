@@ -13,6 +13,10 @@ using namespace banba;
 #define GET_ATTRDEF_CLASSES
 #include "BanbaAttrs.cpp.inc"
 
+// The definitions of the dialect's interfaces,
+// generated from BanbaInterfaces.td
+#include "BanbaInterfaces.cpp.inc"
+
 // The definitions of the dialect's operations, generated from BanbaOps.td
 #define GET_OP_CLASSES
 #include "Banba.cpp.inc"
