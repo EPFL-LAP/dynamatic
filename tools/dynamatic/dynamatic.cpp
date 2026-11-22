@@ -311,6 +311,7 @@ public:
       "calculate-path-delays";
   static constexpr llvm::StringLiteral INSTRUMENT_II = "instrument-ii";
   static constexpr llvm::StringLiteral LSQ_SIZING = "lsq-sizing";
+  static constexpr llvm::StringLiteral USE_BANBA_LSQS = "use-banba-lsqs";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -361,6 +362,9 @@ public:
              "Size the load and store queues of the LSQs from the CFDFCs "
              "found by buffer placement (requires an MILP-based buffer "
              "placement algorithm); otherwise LSQs use the default depth"});
+    addFlag({USE_BANBA_LSQS,
+             "Generate the LSQs with Banba instead of the pre-existing LSQ "
+             "generators"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -809,6 +813,7 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
   std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
   std::string lsqSizing = args.flags.contains(LSQ_SIZING) ? "1" : "0";
+  std::string useBanbaLSQs = args.flags.contains(USE_BANBA_LSQS) ? "1" : "0";
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
@@ -816,7 +821,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
                  fastTokenDelivery, milpSolver, straightToQueue, speculation,
                  enableShortCircuit, enableDuplication, calculatePathDelays,
-                 instrumentII, lsqSizing);
+                 instrumentII, lsqSizing, useBanbaLSQs);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

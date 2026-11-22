@@ -28,6 +28,7 @@ add_dynamatic_library(DynamaticTransforms
   DropUnlistedFunctions.cpp
   HandshakeTreeHeightReduction.cpp
   HandshakeSetUnitImplAttributes.cpp
+  HandshakeUseBanbaLSQs.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

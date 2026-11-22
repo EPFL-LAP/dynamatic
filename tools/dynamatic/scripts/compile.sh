@@ -27,6 +27,7 @@ ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
 USE_LSQ_SIZING=${20:-0}
+USE_BANBA_LSQS=${21:-0}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -461,8 +462,15 @@ else
   cd - > /dev/null
 fi
 
-# speculation (post-buffer): 
-# add extra buffer slots to cover the commit unit weirdness 
+# Banba: mark the LSQs so that the backend generates them with Banba
+BANBA_PASS=""
+if [[ $USE_BANBA_LSQS -ne 0 ]]; then
+  BANBA_PASS="--handshake-use-banba-lsqs"
+  echo_info "Set to generate the LSQs with Banba."
+fi
+
+# speculation (post-buffer):
+# add extra buffer slots to cover the commit unit weirdness
 # materialize and then
 # canonicalize
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
@@ -470,6 +478,7 @@ fi
   --handshake-materialize \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
+  ${BANBA_PASS:+"$BANBA_PASS"} \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to generate handshake_export" "Generated handshake_export"
 
