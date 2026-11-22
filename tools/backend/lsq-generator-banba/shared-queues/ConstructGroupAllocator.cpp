@@ -13,7 +13,45 @@ void GroupAllocatorOp::constructRegion() {
 namespace banba::shared::ga {
 
 void FreeEntryCalcOp::constructRegion() {
-  llvm::outs() << "Construct shared.ga.free_entry_calc op region\n";
+  BanbaSugarScope scope(getOperation());
+  ConfigAttr config = BanbaSugarScope::getConfig();
+
+  unsigned ldQSize = config.getFifoDepth_L();
+  unsigned stQSize = config.getFifoDepth_S();
+
+  // Tentative free load-queue entries: ld_q_head - ld_q_tail
+  WrapSubOp ldWrapSub =
+      BanbaSugar::createOp<WrapSubOp>(getLdQHead(), getLdQTail(), ldQSize);
+
+  // Tentative free store-queue entries: st_q_head - st_q_tail
+  WrapSubOp stWrapSub =
+      BanbaSugar::createOp<WrapSubOp>(getStQHead(), getStQTail(), stQSize);
+
+  // Zero-extend the load-queue pointer difference
+  BanbaValue ldWrapSubZext = BanbaSugar::zext(ldWrapSub.getDifference(),
+                                              config.getLdFreeEntriesWidth());
+
+  // Zero-extend the store-queue pointer difference
+  BanbaValue stWrapSubZext = BanbaSugar::zext(stWrapSub.getDifference(),
+                                              config.getStFreeEntriesWidth());
+
+  // The number of entries of each queue, as constants
+  BanbaValue maxNumLoads(ldQSize, config.getLdFreeEntriesWidth());
+  BanbaValue maxNumStores(stQSize, config.getStFreeEntriesWidth());
+
+  // If the load queue is empty, it has all of its entries free, not 0.
+  // Otherwise, the wrapped subtraction of the pointers is correct
+  BanbaValue ldNumFreeEntries =
+      BanbaSugar::select(getLdQEmpty(), maxNumLoads, ldWrapSubZext);
+
+  // If the store queue is empty, it has all of its entries free, not 0.
+  // Otherwise, the wrapped subtraction of the pointers is correct
+  BanbaValue stNumFreeEntries =
+      BanbaSugar::select(getStQEmpty(), maxNumStores, stWrapSubZext);
+
+  // Results
+  driveLdNumFreeEntries(ldNumFreeEntries);
+  driveStNumFreeEntries(stNumFreeEntries);
 }
 
 void ReadyGenOp::constructRegion() {
