@@ -132,7 +132,7 @@ def SharedGa_ReadyGenOp : SharedGaComponent<"ready_gen"> {
   let arguments = (ins
       Int:$ld_num_free_entries,
       Int:$st_num_free_entries);
-  let results = (outs ArrayI1:$group_allocate_ready);
+  let results = (outs ArrayI1:$ga_ready);
 
   let extraClassDefinition = [{
     SmallVector<Type> $cppClass::getExpectedOperandTypes(ConfigAttr config) {
@@ -142,7 +142,7 @@ def SharedGa_ReadyGenOp : SharedGaComponent<"ready_gen"> {
     }
     SmallVector<Type> $cppClass::getExpectedResultTypes(ConfigAttr config) {
       Types t(config.getContext());
-      return {t.Array(config.getNumBBs(), 1)};  // group_allocate_ready
+      return {t.Array(config.getNumBBs(), 1)};  // ga_ready
     }
   }];
 }
