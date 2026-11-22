@@ -248,6 +248,17 @@ inline BanbaValue zeroValue(Type type) {
   return circt::hw::BitcastOp::create(builder, loc, type, packed).getResult();
 }
 
+/// Create an operation, and construct its region.
+/// The OpBuilder and the location come from the current BanbaSugarScope,
+/// and the arguments are passed on to the operation's own `create`
+template <typename OpT, typename... Args>
+OpT createOp(Args &&...args) {
+  OpT op = OpT::create(BanbaSugarScope::getBuilder(),
+                       BanbaSugarScope::getLoc(), std::forward<Args>(args)...);
+  op.constructRegion();
+  return op;
+}
+
 } // namespace BanbaSugar
 
 } // namespace banba

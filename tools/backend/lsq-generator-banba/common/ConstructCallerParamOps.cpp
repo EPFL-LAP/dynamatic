@@ -103,10 +103,8 @@ void OneHotMuxOp::constructRegion() {
   }
 
   // OR-reduce the terms, with an OR reduction operation
-  OrReduceOp orReduce = OrReduceOp::create(
-      BanbaSugarScope::getBuilder(), BanbaSugarScope::getLoc(),
-      inputsType.getElementType(), terms);
-  orReduce.constructRegion();
+  OrReduceOp orReduce =
+      BanbaSugar::createOp<OrReduceOp>(inputsType.getElementType(), terms);
 
   // Results
   driveSelected(orReduce.getReduced());
