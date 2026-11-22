@@ -16,9 +16,7 @@ void FreeEntryCalcOp::constructRegion() {
   llvm::outs() << "Construct shared.ga.free_entry_calc op region\n";
 }
 
-void ReadyGenOp::constructRegion() {
-  BanbaSugarScope scope(getOperation());
-}
+void ReadyGenOp::constructRegion() { BanbaSugarScope scope(getOperation()); }
 
 void PortIdxGenOp::constructRegion() {
   llvm::outs() << "Construct shared.ga.port_idx_gen op region\n";
