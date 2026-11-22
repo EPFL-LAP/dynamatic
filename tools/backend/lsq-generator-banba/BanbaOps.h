@@ -43,7 +43,8 @@ private:
 void driveOperand(Operation *op, unsigned index, Value value);
 
 /// Makes `value` result number `index` of the operation,
-/// by setting operand number `index` of the terminator of its region
+/// by setting operand number `index` of the terminator of its region,
+/// and removes the placeholder that was there
 void driveResult(Operation *op, unsigned index, Value value);
 
 } // namespace banba
