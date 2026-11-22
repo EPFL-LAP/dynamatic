@@ -31,6 +31,11 @@ set(LLVM_TARGET_DEFINITIONS Banba.td)
 tablegen(BANBA BanbaPortNames.cpp.inc -gen-banba-port-names)
 add_public_tablegen_target(MLIRBanbaPortNamesIncGen)
 
+# Generate the result names of the dialect's operations, with banba-tblgen
+set(LLVM_TARGET_DEFINITIONS Banba.td)
+tablegen(BANBA BanbaResultNames.cpp.inc -gen-banba-result-names)
+add_public_tablegen_target(MLIRBanbaResultNamesIncGen)
+
 set(LLVM_LINK_COMPONENTS
   Support
 )
@@ -51,6 +56,7 @@ add_llvm_tool(lsq-generator-banba
   MLIRBanbaInterfacesIncGen
   MLIRBanbaNamedDriversIncGen
   MLIRBanbaPortNamesIncGen
+  MLIRBanbaResultNamesIncGen
 )
 
 llvm_update_compile_flags(lsq-generator-banba)

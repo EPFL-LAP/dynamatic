@@ -122,6 +122,20 @@ public:
   // wherever an MLIR Value is expected
   operator Value() const { return value; }
 
+  // Name the wire this value becomes in the emitted SystemVerilog,
+  // as a hw.wire the emitter must declare
+  // (a namehint would be dropped
+  // whenever the emitter inlines the value into its use).
+  // The name is also the value's name in the printed IR.
+  // Returns the named wire, so it can be chained onto an expression
+  BanbaValue nameValueInIR(StringRef name) {
+    assert(value.getDefiningOp() && "cannot name a block argument");
+
+    return circt::hw::WireOp::create(BanbaSugarScope::getBuilder(),
+                                     BanbaSugarScope::getLoc(), value, name)
+        .getResult();
+  }
+
   // Index with a constant:
   // on an integer, extract a single bit,
   // and on a hw.array, read an element

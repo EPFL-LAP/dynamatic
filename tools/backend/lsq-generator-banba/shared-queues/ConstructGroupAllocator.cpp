@@ -453,7 +453,8 @@ void AllocatingGenOp::constructRegion() {
   }
 
   Value ldQAllocatingUnshifted =
-      BanbaSugar::castTo(ldQAllocatingInt, getLdQAllocating().getType());
+      BanbaSugar::castTo(ldQAllocatingInt, getLdQAllocating().getType())
+          .nameValueInIR("ld_q_allocating_unshifted");
 
   // Rotate the unshifted mask by the tail pointer
   // so its block of 1s starts at the queue tail
@@ -495,7 +496,8 @@ void AllocatingGenOp::constructRegion() {
   }
 
   Value stQAllocatingUnshifted =
-      BanbaSugar::castTo(stQAllocatingInt, getStQAllocating().getType());
+      BanbaSugar::castTo(stQAllocatingInt, getStQAllocating().getType())
+          .nameValueInIR("st_q_allocating_unshifted");
 
   // Rotate the unshifted mask by the tail pointer
   // so its block of 1s starts at the queue tail
