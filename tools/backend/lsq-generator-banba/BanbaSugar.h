@@ -171,10 +171,9 @@ inline BanbaValue castToInt(BanbaValue value);
 /// `a & b` creates the AND of two values, as a CIRCT comb.and operation.
 /// Array operands are cast to integers, and the result is always an integer
 inline BanbaValue operator&(BanbaValue lhs, BanbaValue rhs) {
-  return circt::comb::AndOp::create(BanbaSugarScope::getBuilder(),
-                                    BanbaSugarScope::getLoc(),
-                                    BanbaSugar::castToInt(lhs),
-                                    BanbaSugar::castToInt(rhs))
+  return circt::comb::AndOp::create(
+             BanbaSugarScope::getBuilder(), BanbaSugarScope::getLoc(),
+             BanbaSugar::castToInt(lhs), BanbaSugar::castToInt(rhs))
       .getResult();
 }
 
@@ -353,8 +352,8 @@ inline BanbaValue castToInt(BanbaValue value) {
 /// and the arguments are passed on to the operation's own `create`
 template <typename OpT, typename... Args>
 OpT createOp(Args &&...args) {
-  OpT op = OpT::create(BanbaSugarScope::getBuilder(),
-                       BanbaSugarScope::getLoc(), std::forward<Args>(args)...);
+  OpT op = OpT::create(BanbaSugarScope::getBuilder(), BanbaSugarScope::getLoc(),
+                       std::forward<Args>(args)...);
   op.constructRegion();
   return op;
 }

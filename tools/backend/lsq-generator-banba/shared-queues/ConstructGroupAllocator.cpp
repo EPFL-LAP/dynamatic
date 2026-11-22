@@ -310,8 +310,7 @@ void OrderMatrixGenOp::constructRegion() {
         Value valueToShift;
         if (encodings[ld].size() > 1) {
           // OR reduce the possible encodings
-          OrReduceOp reduced =
-              BanbaSugar::createOp<OrReduceOp>(encodings[ld]);
+          OrReduceOp reduced = BanbaSugar::createOp<OrReduceOp>(encodings[ld]);
           valueToShift = reduced.getReduced();
         } else {
           valueToShift = encodings[ld][0];
@@ -361,8 +360,8 @@ void CountExtractOp::constructRegion() {
   ConfigAttr config = BanbaSugarScope::getConfig();
 
   // ROM of the number of loads in each group
-  Value numLoadsRom = BanbaSugar::arrayConstant(config.getNumLoads(),
-                                                config.getLdCountWidth());
+  Value numLoadsRom =
+      BanbaSugar::arrayConstant(config.getNumLoads(), config.getLdCountWidth());
 
   // Mux of the ROM by the one-hot group_allocate
   OneHotMuxOp numLoads =

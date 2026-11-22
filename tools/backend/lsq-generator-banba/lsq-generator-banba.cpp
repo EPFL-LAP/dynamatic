@@ -21,8 +21,7 @@ static llvm::cl::opt<std::string>
 /// and constructs its region.
 /// Temporary, until this program creates the top-level `lsq` operation
 template <typename OpT>
-static void createWithPlaceholders(mlir::OpBuilder &builder,
-                                   mlir::Location loc,
+static void createWithPlaceholders(mlir::OpBuilder &builder, mlir::Location loc,
                                    banba::ConfigAttr config) {
   // Create a placeholder for each operand of the operation
   llvm::SmallVector<mlir::Value> placeholders;
