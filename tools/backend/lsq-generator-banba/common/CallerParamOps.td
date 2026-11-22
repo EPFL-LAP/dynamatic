@@ -11,6 +11,13 @@ def OrReduceOp : CallerParamComponent<"or_reduce",
     [SameOperandsAndResultType]> {
   let arguments = (ins Variadic<AnyTypeOf<[Int, ArrayInt]>>:$inputs);
   let results = (outs AnyTypeOf<[Int, ArrayInt]>:$reduced);
+
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog
+    static constexpr StringRef ModComment[] = {
+        "OrReduce: OR-reduce a list of values into one, "
+        "as a balanced binary tree"};
+  }];
 }
 
 // The result `selected` has the element type of the hw.array `inputs`.
@@ -32,6 +39,14 @@ def OneHotMuxOp : CallerParamComponent<"one_hot_mux",
       ArrayInt:$inputs);
   let results = (outs Int:$selected);
 
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog
+    static constexpr StringRef ModComment[] = {
+        "OneHotMux: select one element of an array based on a one-hot input,",
+        "by masking each element with its select bit "
+        "and OR-reducing the results"};
+  }];
+
   // Verify that there is one select bit per input
   let hasVerifier = 1;
 }
@@ -50,6 +65,16 @@ def WrapSubOp : CallerParamComponent<"wrap_sub",
 
   // Output
   let results = (outs Int:$difference);
+
+  let extraClassDeclaration = [{
+    /// The comment printed above the operation's module in the SystemVerilog,
+    /// which names the operation's modulo
+    static std::string modComment(unsigned modulo) {
+      return ("WrapSub: cyclic subtraction a - b modulo " +
+              llvm::Twine(modulo) + ".")
+          .str();
+    }
+  }];
 
   // Verify a, b, and difference are clog2(modulo) bits
   let hasVerifier = 1;
