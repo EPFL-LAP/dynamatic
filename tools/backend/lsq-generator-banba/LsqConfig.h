@@ -60,7 +60,7 @@ struct LsqConfig {
 bool fromJSON(const llvm::json::Value &value, LsqConfig &config,
               llvm::json::Path path);
 
-/// Checks that the switches of the pre-existing LSQ generators
+/// Checks that the switches of the pre-existing LSQ generators, and `BANBA`,
 /// have the values that Banba requires,
 /// and reports the first one that does not.
 bool hasRequiredValues(const LsqConfig &config);
