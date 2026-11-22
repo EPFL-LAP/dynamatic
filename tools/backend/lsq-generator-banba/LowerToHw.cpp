@@ -3,6 +3,7 @@
 #include "circt/Dialect/HW/HWAttributes.h"
 #include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HW/PortImplementation.h"
+#include "circt/Dialect/SV/SVOps.h"
 #include "mlir/IR/Builders.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringMap.h"
@@ -106,6 +107,25 @@ static circt::hw::HWModuleOp createHWModule(OpBuilder &builder, ModuleOp modOp,
   Block *hwModuleBody = hwMod.getBodyBlock();
 
   setOutputFileInHW(hwMod, outputFile);
+
+  // Emit the module comment above the module
+  // (prefixing every line of a multi-line comment)
+  if (auto comment = op->getAttrOfType<mlir::StringAttr>(modCommentAttrName)) {
+    builder.setInsertionPoint(hwMod);
+    SmallVector<StringRef> lines;
+    comment.getValue().split(lines, '\n');
+    std::string prefixed;
+    for (StringRef line : lines) {
+      if (!prefixed.empty())
+        prefixed += '\n';
+      prefixed += "// ";
+      prefixed += line;
+    }
+    auto commentOp = circt::sv::VerbatimOp::create(builder, loc, prefixed);
+
+    // The comment goes into the same file as its module
+    setOutputFileInHW(commentOp, outputFile);
+  }
 
   // Get both output operations
   Operation *banbaOutput = banbaBody->getTerminator();
