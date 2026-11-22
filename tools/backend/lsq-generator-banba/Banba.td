@@ -20,6 +20,7 @@ def Banba_Dialect : Dialect {
 }
 
 include "BanbaAttrs.td"
+include "BanbaInterfaces.td"
 include "BanbaOps.td"
 
 #endif // BANBA_TD

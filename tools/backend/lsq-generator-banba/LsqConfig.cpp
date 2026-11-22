@@ -58,6 +58,15 @@ static bool hasRequiredValue(llvm::StringRef key, unsigned value,
   return false;
 }
 
+/// Checks that a count is at least one, and reports the key otherwise.
+static bool isAtLeastOne(llvm::StringRef key, unsigned value) {
+  if (value >= 1)
+    return true;
+  llvm::errs() << "LSQ config: Banba requires '" << key
+               << "' to be at least 1, but it is " << value << "\n";
+  return false;
+}
+
 bool hasRequiredValues(const LsqConfig &config) {
   // clang-format off
   return hasRequiredValue("bufferDepth", config.bufferDepth, 0) &&
@@ -68,6 +77,8 @@ bool hasRequiredValues(const LsqConfig &config) {
          hasRequiredValue("pipeCompEn", config.pipeCompEn, 0) &&
          hasRequiredValue("headLagEn", config.headLagEn, 0) &&
          hasRequiredValue("bypassEn", config.bypassEn, 1) &&
-         hasRequiredValue("BANBA", config.BANBA, true);
+         hasRequiredValue("BANBA", config.BANBA, true) &&
+         isAtLeastOne("numLoadPorts", config.numLoadPorts) &&
+         isAtLeastOne("numStorePorts", config.numStorePorts);
   // clang-format on
 }

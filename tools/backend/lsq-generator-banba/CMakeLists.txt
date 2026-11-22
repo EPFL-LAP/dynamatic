@@ -7,6 +7,12 @@ mlir_tablegen(BanbaAttrs.h.inc -gen-attrdef-decls -attrdefs-dialect=banba)
 mlir_tablegen(BanbaAttrs.cpp.inc -gen-attrdef-defs -attrdefs-dialect=banba)
 add_public_tablegen_target(MLIRBanbaAttrsIncGen)
 
+# Generate the C++ code of the dialect's interfaces
+set(LLVM_TARGET_DEFINITIONS BanbaInterfaces.td)
+mlir_tablegen(BanbaInterfaces.h.inc -gen-op-interface-decls)
+mlir_tablegen(BanbaInterfaces.cpp.inc -gen-op-interface-defs)
+add_public_tablegen_target(MLIRBanbaInterfacesIncGen)
+
 set(LLVM_LINK_COMPONENTS
   Support
 )
@@ -19,6 +25,7 @@ add_llvm_tool(lsq-generator-banba
   DEPENDS
   MLIRBanbaIncGen
   MLIRBanbaAttrsIncGen
+  MLIRBanbaInterfacesIncGen
 )
 
 llvm_update_compile_flags(lsq-generator-banba)
