@@ -60,25 +60,48 @@ void CountExtractOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
   ConfigAttr config = BanbaSugarScope::getConfig();
 
-  // ROM of the number of loads in each group
-  Value numLoadsRom =
-      BanbaSugar::arrayConstant(config.getNumLoads(), config.getLdCountWidth());
+  Value numLoads;
+  if (config.getNumBBs() > 1) {
+    // ROM of the number of loads in each group
+    Value numLoadsRom = BanbaSugar::arrayConstant(config.getNumLoads(),
+                                                  config.getLdCountWidth());
 
-  // Mux of the ROM by the one-hot group_allocate
-  OneHotMuxOp numLoads =
-      BanbaSugar::createOp<OneHotMuxOp>(getGroupAllocate(), numLoadsRom);
+    // Mux of the ROM by the one-hot group_allocate
+    OneHotMuxOp numLoadsMux =
+        BanbaSugar::createOp<OneHotMuxOp>(getGroupAllocate(), numLoadsRom);
+    numLoads = numLoadsMux.getSelected();
+  } else {
+    // With a single group there is nothing to select between:
+    // the number of loads is that group's when it allocates, otherwise zero
+    BanbaValue groupAllocate = getGroupAllocate();
+    BanbaValue groupNumLoads(config.getNumLoads()[0], config.getLdCountWidth());
+    BanbaValue zero(0, config.getLdCountWidth());
+    numLoads = BanbaSugar::select(groupAllocate[0], groupNumLoads, zero);
+  }
 
-  // ROM of the number of stores in each group
-  Value numStoresRom = BanbaSugar::arrayConstant(config.getNumStores(),
-                                                 config.getStCountWidth());
+  Value numStores;
+  if (config.getNumBBs() > 1) {
+    // ROM of the number of stores in each group
+    Value numStoresRom = BanbaSugar::arrayConstant(config.getNumStores(),
+                                                   config.getStCountWidth());
 
-  // Mux of the ROM by the one-hot group_allocate
-  OneHotMuxOp numStores =
-      BanbaSugar::createOp<OneHotMuxOp>(getGroupAllocate(), numStoresRom);
+    // Mux of the ROM by the one-hot group_allocate
+    OneHotMuxOp numStoresMux =
+        BanbaSugar::createOp<OneHotMuxOp>(getGroupAllocate(), numStoresRom);
+    numStores = numStoresMux.getSelected();
+  } else {
+    // With a single group there is nothing to select between:
+    // the number of stores is that group's when it allocates, otherwise zero
+    BanbaValue groupAllocate = getGroupAllocate();
+    BanbaValue groupNumStores(config.getNumStores()[0],
+                              config.getStCountWidth());
+    BanbaValue zero(0, config.getStCountWidth());
+    numStores = BanbaSugar::select(groupAllocate[0], groupNumStores, zero);
+  }
 
   // Results
-  driveNumLoads(numLoads.getSelected());
-  driveNumStores(numStores.getSelected());
+  driveNumLoads(numLoads);
+  driveNumStores(numStores);
 }
 
 void AllocatingGenOp::constructRegion() {
