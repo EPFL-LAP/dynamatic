@@ -49,6 +49,31 @@ void driveOperand(Operation *op, unsigned index, Value value);
 /// and removes the placeholder that was there
 void driveResult(Operation *op, unsigned index, Value value);
 
+/// Attribute name for specifying the output file in SystemVerilog
+inline constexpr StringLiteral outputFileAttrName = "banba.output_file";
+
+/// Store the specified output name (prefixed with the lsq name)
+/// as an attribute on the op
+inline void setOutputFile(Operation *op, StringRef file) {
+  auto module = op->getParentOfType<ModuleOp>();
+  auto config = module->getAttrOfType<ConfigAttr>(configAttrName);
+
+  // Get the lsq name without "handshake_lsq_" at the start
+  StringRef lsqName = config.getName();
+  lsqName.consume_front("handshake_lsq_");
+
+  // And store the prefixed name on the op
+  op->setAttr(
+      outputFileAttrName,
+      mlir::StringAttr::get(op->getContext(),
+                            ("handshake_" + lsqName + "_" + file).str()));
+}
+
+/// The output file stored on the op, or null if it has none
+inline mlir::StringAttr getOutputFile(Operation *op) {
+  return op->getAttrOfType<mlir::StringAttr>(outputFileAttrName);
+}
+
 } // namespace banba
 
 // The declarations of the dialect's interfaces,

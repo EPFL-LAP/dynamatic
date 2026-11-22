@@ -1,5 +1,6 @@
 #include "LowerToHw.h"
 #include "BanbaOps.h"
+#include "circt/Dialect/HW/HWAttributes.h"
 #include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HW/PortImplementation.h"
 #include "mlir/IR/Builders.h"
@@ -77,10 +78,20 @@ static std::string nameHWModule(Operation *op, StringRef lsqName,
   }
 }
 
+/// Set which SV file to emit an op to
+static void setOutputFileInHW(Operation *op, StringRef outputFile) {
+  // Make CIRCT's attribute for an output file,
+  // and store it on the op under the name CIRCT's export looks for
+  auto fileAttr =
+      circt::hw::OutputFileAttr::getFromFilename(op->getContext(), outputFile);
+  op->setAttr("output_file", fileAttr);
+}
+
 /// Create the hw.module for an op
 static circt::hw::HWModuleOp createHWModule(OpBuilder &builder, ModuleOp modOp,
                                             ConstructsRegion op,
-                                            StringRef moduleName) {
+                                            StringRef moduleName,
+                                            StringRef outputFile) {
   // MLIR stuff
   Block *banbaBody = op.getBodyBlock();
   Location loc = op->getLoc();
@@ -93,6 +104,8 @@ static circt::hw::HWModuleOp createHWModule(OpBuilder &builder, ModuleOp modOp,
       builder, loc, builder.getStringAttr(moduleName), makePortInfo(op));
   // Get its body
   Block *hwModuleBody = hwMod.getBodyBlock();
+
+  setOutputFileInHW(hwMod, outputFile);
 
   // Get both output operations
   Operation *banbaOutput = banbaBody->getTerminator();
@@ -182,17 +195,23 @@ static void eraseTopLevelOp(ConstructsRegion op) {
 /// handle sub-ops first, then create its hw module,
 /// then replace it with a hw instance
 static void handleOp(OpBuilder &builder, ModuleOp modOp, ConstructsRegion op,
-                     StringRef lsqName, llvm::StringMap<unsigned> &counts) {
+                     StringRef lsqName, llvm::StringMap<unsigned> &counts,
+                     StringRef outputFile) {
+  // Change the output file if an operation requests it
+  if (auto file = getOutputFile(op))
+    outputFile = file.getValue();
+
   // Lower all sub-ops before lowering the parent
   for (Operation &subOp : llvm::make_early_inc_range(*op.getBodyBlock()))
     if (auto subOpToLower = llvm::dyn_cast<ConstructsRegion>(&subOp))
-      handleOp(builder, modOp, subOpToLower, lsqName, counts);
+      handleOp(builder, modOp, subOpToLower, lsqName, counts, outputFile);
 
   // Get the uniqued module name for this op
   std::string moduleName = nameHWModule(op.getOperation(), lsqName, counts);
 
   // Create the hw module
-  circt::hw::HWModuleOp hwMod = createHWModule(builder, modOp, op, moduleName);
+  circt::hw::HWModuleOp hwMod =
+      createHWModule(builder, modOp, op, moduleName, outputFile);
 
   if (op->getParentOp() == modOp.getOperation()) {
     // An op directly in the builtin module has no hw.module around it,
@@ -215,9 +234,12 @@ void banba::lowerToHw(ModuleOp modOp) {
   StringRef lsqName = config.getName();
   lsqName.consume_front("handshake_lsq_");
 
+  // The base output file
+  std::string baseOutputFile = ("handshake_" + lsqName + "_lsq.sv").str();
+
   // Call handleOp on the contents of the module
   llvm::StringMap<unsigned> counts;
   for (Operation &op : llvm::make_early_inc_range(*modOp.getBody()))
     if (auto banbaOp = llvm::dyn_cast<ConstructsRegion>(&op))
-      handleOp(builder, modOp, banbaOp, lsqName, counts);
+      handleOp(builder, modOp, banbaOp, lsqName, counts, baseOutputFile);
 }
