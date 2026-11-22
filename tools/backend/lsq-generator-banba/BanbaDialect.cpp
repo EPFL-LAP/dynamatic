@@ -85,3 +85,21 @@ ConfigAttr ConfigAttr::get(MLIRContext *context, const LsqConfig &config) {
       toArrayAttrs(builder, config.stPortIdx));
   // clang-format on
 }
+
+void banba::replacePlaceholder(Value placeholder, Value value) {
+  Operation *op = placeholder.getDefiningOp();
+  assert(op && isa<PlaceholderOp>(op) && "expected a placeholder");
+  assert(value.getType() == placeholder.getType() &&
+         "the value's type differs from the placeholder's");
+  placeholder.replaceAllUsesWith(value);
+  op->erase();
+}
+
+void banba::driveOperand(Operation *op, unsigned index, Value value) {
+  replacePlaceholder(op->getOperand(index), value);
+}
+
+void banba::driveResult(Operation *op, unsigned index, Value value) {
+  Operation *terminator = op->getRegion(0).front().getTerminator();
+  replacePlaceholder(terminator->getOperand(index), value);
+}

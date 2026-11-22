@@ -28,12 +28,27 @@ def GraphRegion : TraitList<[
     NativeOpTrait<"HasOnlyGraphRegion">,
     RegionKindInterface]>;
 
+// Lets the code that creates a component
+// drive each of its operands by name: `fifo.driveClk(clk)`.
+// The functions are generated per operation by banba-tblgen
+def HasNamedOperandDrivers : NativeOpTrait<"HasNamedOperandDrivers"> {
+  let cppNamespace = "::banba::OpTrait";
+}
+
+// Lets the code that builds the inside of a component
+// drive each of its results by name: `driveEmpty(empty)`.
+// The functions are generated per operation by banba-tblgen
+def HasNamedResultDrivers : NativeOpTrait<"HasNamedResultDrivers"> {
+  let cppNamespace = "::banba::OpTrait";
+}
+
 // A hardware component with an inside:
 // one region that holds the operations it is made of.
 // Its types are checked against the config
 class BanbaComponent<string mnemonic, list<Trait> traits = []>
     : Op<Banba_Dialect, mnemonic,
          [GraphRegion, VerifyTypesByConfig,
+          HasNamedOperandDrivers, HasNamedResultDrivers,
           DeclareOpInterfaceMethods<ExpectedTypes>,
           DeclareOpInterfaceMethods<ConstructsRegion>] # traits> {
   let regions = (region SizedRegion<1>:$body);
@@ -149,6 +164,15 @@ def OutputOp : Op<Banba_Dialect, "output", [Terminator, ReturnLike, Pure]> {
   let summary = "Carries a component's output port values";
   let arguments = (ins Variadic<AnyType>:$outputs);
   let assemblyFormat = "($outputs^ `:` type($outputs))? attr-dict";
+}
+
+// Stands in for a value that does not exist yet.
+// Components are created with placeholders as their inputs,
+// and their insides start with placeholders as their outputs;
+// each is replaced once the real value exists
+def PlaceholderOp : Op<Banba_Dialect, "placeholder", [Pure]> {
+  let results = (outs AnyType:$value);
+  let assemblyFormat = "attr-dict `:` type($value)";
 }
 
 #endif // BANBA_COMMON_OPS_TD
