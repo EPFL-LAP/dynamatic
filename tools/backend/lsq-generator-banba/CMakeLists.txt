@@ -4,6 +4,7 @@ set(LLVM_LINK_COMPONENTS
 
 add_llvm_tool(lsq-generator-banba
   lsq-generator-banba.cpp
+  LsqConfig.cpp
 )
 
 llvm_update_compile_flags(lsq-generator-banba)
