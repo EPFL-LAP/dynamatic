@@ -3,6 +3,4 @@
 
 using namespace banba;
 
-void LsqOp::constructRegion() {
-  llvm::outs() << "Construct LSQ op region\n";
-}
+void LsqOp::constructRegion() { llvm::outs() << "Construct LSQ op region\n"; }

@@ -16,13 +16,13 @@
 namespace banba {
 // The names from MLIR, LLVM and CIRCT that the dialect's code,
 // including the generated code, uses without writing their namespace
-using mlir::DenseI32ArrayAttr;
+using circt::seq::ClockType;
 using llvm::cast;
 using llvm::isa;
 using llvm::Log2_32_Ceil;
 using llvm::SmallVector;
 using llvm::StringLiteral;
-using circt::seq::ClockType;
+using mlir::DenseI32ArrayAttr;
 using mlir::IntegerType;
 using mlir::LogicalResult;
 using mlir::MLIRContext;

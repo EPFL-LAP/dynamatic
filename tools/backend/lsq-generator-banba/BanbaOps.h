@@ -102,9 +102,8 @@ public:
       Operation *terminator = op->getRegion(0).front().getTerminator();
       TypeRange outputTypes = terminator->getOperandTypes();
       if (outputTypes.size() != resultTypes.size())
-        return op->emitOpError()
-               << "region returns " << outputTypes.size()
-               << " values, expected " << resultTypes.size();
+        return op->emitOpError() << "region returns " << outputTypes.size()
+                                 << " values, expected " << resultTypes.size();
       for (unsigned index = 0; index < resultTypes.size(); ++index)
         if (outputTypes[index] != resultTypes[index])
           return op->emitOpError()
