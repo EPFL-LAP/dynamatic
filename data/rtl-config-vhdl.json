@@ -76,7 +76,8 @@
     "parameters": [
       { "name": "BANBA", "type": "boolean", "eq": true, "generic": false }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/lsq-generator-banba\""
+    "generator": "\"$DYNAMATIC/bin/generators/lsq-generator-banba\" --config \"$OUTPUT_DIR/$MODULE_NAME.json\"",
+    "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json"
   },
   {
     "name": "handshake.ram",
