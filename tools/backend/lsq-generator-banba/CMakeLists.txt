@@ -64,9 +64,13 @@ target_include_directories(lsq-generator-banba PRIVATE
 target_link_libraries(lsq-generator-banba
   PRIVATE
   CIRCTComb
+  CIRCTExportVerilog
   CIRCTHW
+  CIRCTSV
   CIRCTSeq
+  CIRCTSeqToSV
 
   MLIRIR
+  MLIRPass
   MLIRSupport
   )

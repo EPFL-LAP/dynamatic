@@ -1,12 +1,16 @@
 #include "BanbaOps.h"
 #include "LowerToHw.h"
 #include "LsqConfig.h"
+#include "circt/Conversion/ExportVerilog.h"
+#include "circt/Conversion/SeqToSV.h"
 #include "circt/Dialect/Comb/CombDialect.h"
 #include "circt/Dialect/HW/HWDialect.h"
+#include "circt/Dialect/SV/SVDialect.h"
 #include "circt/Dialect/Seq/SeqDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/Pass/PassManager.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -17,6 +21,11 @@ static llvm::cl::OptionCategory banbaCategory("lsq-generator-banba options");
 static llvm::cl::opt<std::string>
     configFile("config", llvm::cl::desc("Path to the LSQ's JSON config file"),
                llvm::cl::Required, llvm::cl::cat(banbaCategory));
+
+static llvm::cl::opt<std::string> svDir(
+    "sv-dir",
+    llvm::cl::desc("Directory to write the generated SystemVerilog files to"),
+    llvm::cl::Required, llvm::cl::cat(banbaCategory));
 
 /// Creates an operation with a placeholder for each operand it expects,
 /// and constructs its region.
@@ -49,6 +58,7 @@ int main(int argc, char **argv) {
   context.loadDialect<circt::hw::HWDialect>();
   context.loadDialect<circt::comb::CombDialect>();
   context.loadDialect<circt::seq::SeqDialect>();
+  context.loadDialect<circt::sv::SVDialect>();
   context.loadDialect<banba::BanbaDialect>();
 
   // Read the config file
@@ -95,5 +105,24 @@ int main(int argc, char **argv) {
 
   // Print the module
   module->print(llvm::outs());
+
+  // Lower the seq dialect to sv before the export,
+  // which turns the clock type into a plain bit.
+  // CIRCT provides this lowering as an MLIR pass,
+  // which can only be run through a pass manager
+  mlir::PassManager seqPassManager(&context);
+  seqPassManager.addPass(circt::createLowerSeqToSVPass());
+
+  // Run the pass on the module, and stop if it fails
+  if (mlir::failed(seqPassManager.run(module->getOperation()))) {
+    llvm::errs() << "seq-to-sv lowering failed\n";
+    return 1;
+  }
+
+  // Write the hw modules as SystemVerilog files in the given directory
+  if (mlir::failed(circt::exportSplitVerilog(*module, svDir))) {
+    llvm::errs() << "SystemVerilog export failed\n";
+    return 1;
+  }
   return 0;
 }
