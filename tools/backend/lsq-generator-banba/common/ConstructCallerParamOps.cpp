@@ -204,22 +204,20 @@ LogicalResult CyclicLeftShiftOp::verify() {
 // Cyclic left rotate
 void CyclicLeftShiftOp::constructRegion() {
   BanbaSugarScope scope(getOperation());
+  OpBuilder &builder = BanbaSugarScope::getBuilder();
+  Location loc = BanbaSugarScope::getLoc();
 
   // Get inputs
-  BanbaValue data = getData();
   BanbaValue amount = getAmount();
 
   // Get the array info
   auto arrayType = cast<circt::hw::ArrayType>(getData().getType());
+  Type elementType = arrayType.getElementType();
   unsigned numElements = arrayType.getNumElements();
   unsigned amountWidth = cast<IntegerType>(getAmount().getType()).getWidth();
 
-  // Convert from one hw.array value
-  // to a C++ list holding the value of each of its elements,
-  // as the initial set of values to shift
-  SmallVector<Value> elements;
-  for (unsigned i = 0; i < numElements; ++i)
-    elements.push_back(data[i]);
+  // The array as shifted so far, which starts as the input
+  Value shifted = getData();
 
   // For each bit starting with the MSB
   // build a shift
@@ -227,30 +225,31 @@ void CyclicLeftShiftOp::constructRegion() {
     // Potentially shift by 2^n
     unsigned shift = (1u << bit);
 
-    // Get bit n of the amount to shift
-    BanbaValue selector = amount[bit];
+    // Shifting left by 2^n moves element i to position i + 2^n,
+    // so cut the array in two at 2^n elements from its top
+    unsigned cut = numElements - shift;
+    BanbaValue zeroIndex(0, Log2_32_Ceil(numElements));
+    BanbaValue cutIndex(cut, Log2_32_Ceil(numElements));
+    Value lower = circt::hw::ArraySliceOp::create(
+        builder, loc, circt::hw::ArrayType::get(elementType, cut), shifted,
+        zeroIndex);
+    Value upper = circt::hw::ArraySliceOp::create(
+        builder, loc, circt::hw::ArrayType::get(elementType, shift), shifted,
+        cutIndex);
 
-    // Make an output vector of the result of this shift
-    SmallVector<Value> shifted(numElements);
+    // And put the two pieces back in the other order.
+    // hw.array_concat expects the highest-indexed piece first,
+    // which is now the lower one
+    Value rotated = circt::hw::ArrayConcatOp::create(
+        builder, loc, ArrayRef<Value>{lower, upper});
 
-    // For each output
-    for (unsigned i = 0; i < numElements; ++i) {
-      // Annoying indexing from the python version:
-      // we calculate the reverse of the shift by 2^n
-      // and then index into the input at that point
-      unsigned source = (i + numElements - shift) % numElements;
-
-      // Use a multiplexer to select the shifted input or unshifted input
-      // based on whether bit n of amount is 1
-      shifted[i] = BanbaSugar::select(selector, elements[source], elements[i]);
-    }
-
-    // Set up the next shifter to use the output of the previous shifter
-    elements = shifted;
+    // Use a multiplexer to select the shifted array or the unshifted array
+    // based on whether bit n of amount is 1
+    shifted = BanbaSugar::select(amount[bit], rotated, shifted);
   }
 
-  // Pack into an array type, and drive the result
-  driveShifted(BanbaSugar::concatToArray(elements));
+  // Results
+  driveShifted(shifted);
 }
 
 } // namespace banba
