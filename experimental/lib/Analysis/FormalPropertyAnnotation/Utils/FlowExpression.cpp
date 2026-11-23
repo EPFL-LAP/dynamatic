@@ -64,7 +64,12 @@ std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
       return nullptr;
     }
     if (numValues == 1) {
-      return state->namer->tryConstrain(indexTokenTracker->getSingleValue());
+      // A state whose model does not hold the value of its token (e.g., a
+      // pipeline slot) has no annotater
+      if (!state->namer->canConstrain())
+        return nullptr;
+      return state->namer->constrainToValue(
+          indexTokenTracker->getSingleValue());
     }
     llvm::report_fatal_error(
         "Cannot get namer of variable with multiple tracked tokens");

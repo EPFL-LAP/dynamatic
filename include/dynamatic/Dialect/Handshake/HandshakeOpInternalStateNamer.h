@@ -68,7 +68,14 @@ struct InternalStateNamer {
 
   static inline bool classof(const InternalStateNamer *fp) { return true; }
 
-  std::unique_ptr<ConstrainedNamer> tryConstrain(int32_t value) const;
+  /// Whether the state can be restricted to the tokens of one value, i.e.,
+  /// whether its model holds the value of its token: only eager fork sents,
+  /// buffer slots, and effective slots do.
+  bool canConstrain() const;
+
+  /// Restricts the state to the tokens of the given value. Fails hard if the
+  /// state cannot be constrained (see canConstrain).
+  std::unique_ptr<ConstrainedNamer> constrainToValue(int32_t value) const;
 
   TYPE type;
   static constexpr llvm::StringLiteral TYPE_LIT = "type";
@@ -413,7 +420,7 @@ struct ConstrainedEffectiveSlotNamer : ConstrainedNamer {
   ConstrainedEffectiveSlotNamer() = default;
   ConstrainedEffectiveSlotNamer(EffectiveSlotNamer namer, int32_t value)
       : ConstrainedNamer(TYPE::EffectiveSlot, value) {
-    namer.slot = namer.slot->tryConstrain(value);
+    namer.slot = namer.slot->constrainToValue(value);
     inner = namer;
   }
   ~ConstrainedEffectiveSlotNamer() = default;

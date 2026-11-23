@@ -155,8 +155,12 @@ bool fromJSON(const llvm::json::Value &value,
   return true;
 }
 
+bool InternalStateNamer::canConstrain() const {
+  return isa<EagerForkSentNamer, BufferSlotFullNamer, EffectiveSlotNamer>(this);
+}
+
 std::unique_ptr<ConstrainedNamer>
-InternalStateNamer::tryConstrain(int32_t value) const {
+InternalStateNamer::constrainToValue(int32_t value) const {
   if (auto *namer = dyn_cast<EagerForkSentNamer>(this)) {
     return std::make_unique<ConstrainedEagerForkSentNamer>(
         namer->constrain(value));
@@ -168,8 +172,8 @@ InternalStateNamer::tryConstrain(int32_t value) const {
   if (auto *namer = dyn_cast<EffectiveSlotNamer>(this)) {
     return namer->constrain(value);
   }
-
-  return nullptr;
+  llvm::report_fatal_error(llvm::Twine("state ") + getSMVName() +
+                           " cannot be constrained to a token value");
 }
 
 bool fromJSON(const llvm::json::Value &value, EagerForkSentNamer &namer,
@@ -236,7 +240,7 @@ bool fromJSON(const llvm::json::Value &value, ConstrainedNamer &namer,
   if (!mapper || !mapper.map(ConstrainedNamer::CONSTRAINT_VALUE_LIT, val) ||
       !mapper.map(ConstrainedNamer::INNER_LIT, inner))
     return false;
-  namer = *inner->tryConstrain(val);
+  namer = *inner->constrainToValue(val);
   return true;
 }
 
