@@ -300,6 +300,31 @@ if [[ $PREBUILT_LLVM -eq 1 ]]; then
     echo "$PREBUILT_LLVM_NAME" > "$PREBUILT_LLVM_STAMP"
   fi
 
+else
+  #### llvm-project (from source) ####
+  # Do not build on top of a prebuilt LLVM extracted here earlier
+  if [ -f "$LLVM_DIR/.prebuilt-llvm" ]; then
+    rm -rf "$LLVM_DIR"
+  fi
+  prepare_to_build_project "LLVM" "build/llvm-project"
+
+  # CMake
+  if should_run_cmake ; then
+    cmake -G Ninja ../../llvm-project/llvm \
+        -DLLVM_ENABLE_PROJECTS="mlir;clang;polly" \
+        -DLLVM_TARGETS_TO_BUILD="host" \
+        -DLLVM_ENABLE_RTTI=ON \
+        -DLLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+        $CMAKE_COMPILERS \
+        $CMAKE_LLVM_BUILD_OPTIMIZATIONS \
+        $CMAKE_LLVM_ENABLE_ASSERTIONS
+    exit_on_fail "Failed to cmake llvm"
+  fi
+
+  # Build
+  run_ninja
+  exit_on_fail "Failed to build llvm"
 fi
 
 #### XLS ####
@@ -362,37 +387,20 @@ fi
 
 # CMake
 if should_run_cmake ; then
-  if [[ $PREBUILT_LLVM -eq 0 ]]; then
-    cmake -G Ninja .. \
-            -DDYNAMATIC_BUILD_LLVM=ON \
-            -DLLVM_ENABLE_RTTI=ON \
-            -DDYNAMATIC_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
-            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
-            $CMAKE_COMPILERS \
-            $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS \
-            $CMAKE_LLVM_BUILD_OPTIMIZATIONS \
-            $CMAKE_DYNAMATIC_ENABLE_XLS \
-            $CMAKE_DYNAMATIC_ENABLE_CBC \
-            $CMAKE_DYNAMATIC_ENABLE_ABC \
-            $CMAKE_LLVM_ENABLE_ASSERTIONS \
-            $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
-  else
-    cmake -G Ninja .. \
-        -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
-        -DLLVM_DIR="$LLVM_DIR/lib/cmake/llvm" \
-        -DCLANG_DIR="$LLVM_DIR/lib/cmake/clang" \
-        -DPolly_DIR="$POLLY_CMAKE_DIR" \
-        -DLLVM_TARGETS_TO_BUILD="host" \
-        -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-        -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
-        $CMAKE_COMPILERS \
-        $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS \
-        $CMAKE_DYNAMATIC_ENABLE_XLS \
-        $CMAKE_DYNAMATIC_ENABLE_CBC \
-        $CMAKE_DYNAMATIC_ENABLE_ABC \
-        $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
-  fi
+  cmake -G Ninja .. \
+      -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
+      -DLLVM_DIR="$LLVM_DIR/lib/cmake/llvm" \
+      -DCLANG_DIR="$LLVM_DIR/lib/cmake/clang" \
+      -DPolly_DIR="$POLLY_CMAKE_DIR" \
+      -DLLVM_TARGETS_TO_BUILD="host" \
+      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+      -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
+      $CMAKE_COMPILERS \
+      $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS \
+      $CMAKE_DYNAMATIC_ENABLE_XLS \
+      $CMAKE_DYNAMATIC_ENABLE_CBC \
+      $CMAKE_DYNAMATIC_ENABLE_ABC \
+      $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
   exit_on_fail "Failed to cmake dynamatic"
 fi
 
