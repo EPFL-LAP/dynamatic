@@ -372,9 +372,7 @@ CFDFCNodeId CFDFC::Graph::addNode(Operation *unit) {
   CFDFCNodeId id = nodes.size();
   [[maybe_unused]] bool inserted = nodeOfUnit.try_emplace(unit, id).second;
   assert(inserted && "unit added twice to the CFDFC");
-  CFDFCNode &node = nodes.emplace_back();
-  node.unit = unit;
-  node.id = id;
+  nodes.push_back(CFDFCNode(unit, id));
   return id;
 }
 
