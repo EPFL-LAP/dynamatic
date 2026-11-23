@@ -37,12 +37,15 @@ These are optional tools which you can see how to [install](../UserGuide/Advance
 > Before moving on to the next step, refresh your environment variables in your current terminal to make sure that all newly installed tools are visible in your PATH. Alternatively, open a new terminal and proceed to cloning the project.
 
 **2. Cloning the Project and Its Submodules**  
-Dynamatic depends on [LLVM/MLIR](https://github.com/llvm/llvm-project). It is a git submodule: a separate repository that git downloads into Dynamatic's folder. Clone Dynamatic, then download its submodules:  
+Dynamatic depends on [LLVM/MLIR](https://github.com/llvm/llvm-project) and [CIRCT](https://github.com/llvm/circt). Both are git submodules: separate repositories that git downloads into Dynamatic's folder. Clone Dynamatic, then download its submodules:  
 ```sh
 git clone https://github.com/EPFL-LAP/dynamatic.git
 git -C dynamatic submodule update --init --depth 1
 ```
 This creates a `dynamatic` folder in your current working directory. `--depth 1` makes git download only the commit of each submodule that Dynamatic uses, without its history.
+
+> [!NOTE]
+> Do not clone with `--recurse-submodules`. It would also download an additional copy of LLVM, inside CIRCT, which Dynamatic does not use.
 
 **3. Build the Project**  
 

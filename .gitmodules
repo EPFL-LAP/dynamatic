@@ -10,3 +10,6 @@
 	path = llvm-project
   url = https://github.com/llvm/llvm-project.git
   shallow = true
+[submodule "circt"]
+	path = circt
+	url = https://github.com/llvm/circt.git

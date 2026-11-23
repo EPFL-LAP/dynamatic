@@ -130,13 +130,15 @@ should_run_cmake() {
   return 0
 }
 
-# Run ninja using the number of threads provided as argument, if any. Otherwise,
-# let ninja pick the number of threads to use
+# Run ninja using the number of threads provided as argument, if any.
+# Otherwise, let ninja pick the number of threads to use.
+# Arguments given to this function are passed to ninja as the targets to build.
+# Without any, everything is built.
 run_ninja() {
   if [[ $NUM_THREADS -eq 0 ]]; then
-    ninja
+    ninja "$@"
   else
-    ninja -j "$NUM_THREADS"
+    ninja -j "$NUM_THREADS" "$@"
   fi
 }
 
@@ -325,6 +327,28 @@ else
   # Build
   run_ninja
   exit_on_fail "Failed to build llvm"
+
+  #### circt (from source) ####
+  prepare_to_build_project "CIRCT" "build/circt"
+
+  # CMake
+  if should_run_cmake ; then
+    # VERILATOR_DISABLE allows the build to succeed even if a version of
+    # Verilator incompatible with CIRCT is installed:
+    # CIRCT's Verilator-based tests are then skipped,
+    # but Dynamatic does not run CIRCT's tests
+    cmake -G Ninja ../../circt \
+        -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
+        -DLLVM_DIR="$LLVM_DIR/lib/cmake/llvm" \
+        -DVERILATOR_DISABLE=ON \
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+        $CMAKE_COMPILERS
+    exit_on_fail "Failed to cmake circt"
+  fi
+
+  # Build only the CIRCT libraries that Dynamatic uses
+  run_ninja CIRCTHW CIRCTComb CIRCTSeq CIRCTSV CIRCTSeqToSV CIRCTExportVerilog
+  exit_on_fail "Failed to build circt"
 fi
 
 #### XLS ####
