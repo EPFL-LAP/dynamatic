@@ -366,9 +366,10 @@ static void logFuncInfo(FuncInfo &info) {
     os << cf->cycle.back() << "\n";
     os.indent();
     os << "- Number of executions: " << cf->numExecs << "\n";
-    os << "- Number of units: " << cf->units.size() << "\n";
-    os << "- Number of channels: " << cf->channels.size() << "\n";
-    os << "- Number of backedges: " << cf->backedges.size() << "\n\n";
+    os << "- Number of units: " << cf->getNumUnits() << "\n";
+    os << "- Number of channels: " << cf->getNumChannels() << "\n";
+    os << "- Number of backedges: "
+       << cf->getNumBackedges() + cf->getFTDBackwardEdges().size() << "\n\n";
     os.unindent();
   }
 
@@ -563,10 +564,10 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
 
     // Collect all selects in the CFDFC
     SmallVector<handshake::SelectOp> selects;
-    for (Operation *unit : cf.units) {
+    for (Operation *unit : cf.getUnits()) {
       auto selOp = dyn_cast<handshake::SelectOp>(unit);
-      if (selOp && (cf.channels.contains(selOp.getTrueValue()) ||
-                    cf.channels.contains(selOp.getFalseValue())))
+      if (selOp && (cf.contains(selOp.getTrueValue()) ||
+                    cf.contains(selOp.getFalseValue())))
         selects.push_back(selOp);
     }
 
@@ -586,7 +587,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
         /// executed. Temporarily, emulate the same behavior obtained from
         /// passing our DOTs to the old buffer pass by assuming the "false"
         /// input is always the least executed one
-        cf.channels.remove(selOp.getFalseValue());
+        cf.removeChannel(selOp.getFalseValue());
 
       // First we move `cf`, then the copy, such that the "complete" CFDFC has a
       // lower index
@@ -827,7 +828,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
 }
 
 /// Adding a new buffer op changes the CFDFC graph. This function updates the
-/// cfdfc that contain the channel.
+/// cfdfc that contain the channel. The buffer must already be in the CFDFC.
 /// - bufOp: The buffer to be inserted into the CFDFC.
 /// - CFDFC: The CFDFC.
 /// - totalChannelLatency: The total number of sequential latency on DV path.
@@ -842,12 +843,6 @@ static void insertBufferOpAndOccupancyInCFDFC(
   auto effectiveCapacity = (bufOp.getBufferType() == BufferType::COUNTER_BUFFER)
                                ? 1u
                                : bufOp.getNumSlots();
-
-  // When we add a new buffer op, the value remains the same object (now
-  // used by a different user). Therefore, we just need to add the newly
-  // added operation and channel.
-  cfdfc.units.insert(bufOp.getOperation());
-  cfdfc.channels.insert(bufOp.getResult());
 
   double tokensInBufOp;
   // The MILP solution returns the token occupancy per each channel in the
@@ -965,12 +960,20 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
       totalChannelLatency += bufOp.getLatencyDV();
     }
 
+    SmallVector<Operation *, 2> placedUnits;
+    for (handshake::BufferOp bufOp : placedBuffers)
+      placedUnits.push_back(bufOp);
+
     // Insert the buffers and their token occupancy into the CFDFCs that
     // contain them.
     for (auto &cfdfc : cfdfcs) {
       // Skipping the CFDFCs that do not contain the channel.
-      if (!cfdfc.channels.contains(channel))
+      if (!cfdfc.contains(channel))
         continue;
+
+      // The buffers sit between the channel's producer and its original
+      // consumer
+      cfdfc.insertUnitsOnChannel(channel, placedUnits);
 
       // How many tokens are distributed into the buffers placed on the
       // channel? This variable is updated after every buffer placed.

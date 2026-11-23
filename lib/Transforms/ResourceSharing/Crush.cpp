@@ -116,10 +116,11 @@ void loadFuncPerfInfoFromAnalysis(handshake::FuncOp funcOp,
 
   for (auto &cfdfc : analysis.mapFuncOpToCFDFCs[funcOp]) {
     sharingInfo[funcOp].cfThroughput[cfIndices[&cfdfc]] = cfdfc.throughput;
+    auto units = cfdfc.getUnits();
     sharingInfo[funcOp].cfUnits[cfIndices[&cfdfc]] =
-        std::set(cfdfc.units.begin(), cfdfc.units.end());
+        std::set<Operation *>(units.begin(), units.end());
     // Track the channels of the CFC
-    for (Value val : cfdfc.channels) {
+    for (Value val : cfdfc.getChannels()) {
       Channel *ch = new Channel(val);
       sharingInfo[funcOp].cfChannels[cfIndices[&cfdfc]].insert(ch);
     }

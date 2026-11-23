@@ -20,6 +20,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -159,6 +160,7 @@ CFDFC CFDFC::create(handshake::FuncOp funcOp, ArchSet &archs,
                     unsigned numExec) {
   CFDFC cfdfc(funcOp, archs, numExec);
   cfdfc.collectChannels();
+  cfdfc.graph.rebuild();
   return cfdfc;
 }
 
@@ -167,6 +169,7 @@ CFDFC CFDFC::createFTD(handshake::FuncOp funcOp, ArchSet &archs,
                        const DenseSet<Value> &backwardChannels) {
   CFDFC cfdfc(funcOp, archs, numExec);
   cfdfc.collectChannelsFTD(backwardChannels);
+  cfdfc.graph.rebuild();
   return cfdfc;
 }
 
@@ -216,14 +219,14 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
       continue;
 
     // Add the unit to the CFDFC
-    units.insert(&op);
+    graph.addNode(&op);
   }
 }
 
 void CFDFC::collectChannels() {
   // Iterate over the pre-collected units which have been filtered to just
   // this CFDFC
-  for (Operation *op : units) {
+  for (Operation *op : getUnits()) {
     unsigned srcBB = *getLogicBB(op);
 
     // Add each handshake channel to the CFDFC, and additionally to backedges
@@ -250,9 +253,7 @@ void CFDFC::collectChannels() {
 
             // check if a matching arch is found
             if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
-              channels.insert(res);
-              if (isCFDFCBackedge(res))
-                backedges.insert(res);
+              addChannel(res, isCFDFCBackedge(res));
 
               // stop if a matching arch is found
               break;
@@ -261,13 +262,11 @@ void CFDFC::collectChannels() {
         } else if (cycle.size() == 1) {
           // The channel is in the CFDFC if its producer/consumer belong to the
           // same basic block and the CFDFC is just a block looping to itself
-          channels.insert(res);
-          if (isCFDFCBackedge(res))
-            backedges.insert(res);
+          addChannel(res, isCFDFCBackedge(res));
         } else if (!isBackedge(res)) {
           // The channel is in the CFDFC if its producer/consumer belong to the
           // same basic block and the channel is not a backedge
-          channels.insert(res);
+          addChannel(res, /*isBackedge=*/false);
         }
       }
     }
@@ -277,7 +276,7 @@ void CFDFC::collectChannels() {
 void CFDFC::collectChannelsFTD(const DenseSet<Value> &backwardChannels) {
   // Iterate over the pre-collected units which have been filtered to just
   // this CFDFC
-  for (Operation *op : units) {
+  for (Operation *op : getUnits()) {
     unsigned srcBB = *getLogicBB(op);
 
     // Add each handshake channel to the CFDFC, and additionally to backedges
@@ -300,14 +299,17 @@ void CFDFC::collectChannelsFTD(const DenseSet<Value> &backwardChannels) {
           // CFG edge. Include every non-backward channel whose endpoints belong
           // to the cycle. Include backward channels only when they correspond
           // to an edge in the CFG cycle currently being modeled.
-          if (!backwardChannels.contains(res))
-            channels.insert(res);
-          else {
-            // Record all identified backward channels as backedges, but include
-            // them as CFDFC channels only if they are compliant with the CFG.
-            backedges.insert(res);
-            if (isCFGCompliant(srcBB, dstBB))
-              channels.insert(res);
+          if (!backwardChannels.contains(res)) {
+            addChannel(res, /*isBackedge=*/false);
+          } else if (isCFGCompliant(srcBB, dstBB)) {
+            // Backward channels that are compliant with the CFG are CFDFC
+            // channels and backedges
+            addChannel(res, /*isBackedge=*/true);
+          } else {
+            // Other backward channels are recorded as backedges, but are not
+            // CFDFC channels
+            graph.ftdBackwardEdges.push_back(
+                CFDFCEdge(res, *lookup(op), *lookup(user), /*backedge=*/true));
           }
         }
       }
@@ -326,7 +328,7 @@ bool CFDFC::isCFGCompliant(unsigned srcBB, unsigned dstBB) const {
 
 bool CFDFC::isCFDFCBackedge(Value val) {
   // A CFDFC backedge is a backedge
-  if (!isBackedge(val))
+  if (!dynamatic::isBackedge(val))
     return false;
 
   Operation *defOp = val.getDefiningOp();
@@ -338,9 +340,149 @@ bool CFDFC::isCFDFCBackedge(Value val) {
   if (srcBB.has_value() && dstBB.has_value() && *srcBB == *dstBB)
     return isa<handshake::ConditionalBranchOp>(defOp);
 
-  // Otherwise the edge must be between different blocks, where the destination
-  // can be out of all blocks
+  // Otherwise the edge must be between different blocks, where the
+  // destination can be out of all blocks
   return srcBB.has_value() && (!dstBB.has_value() || *srcBB != *dstBB);
+}
+
+//===----------------------------------------------------------------------===//
+// CFDFC graph
+//===----------------------------------------------------------------------===//
+
+CFDFC::Graph::Graph(const Graph &other)
+    : nodes(other.nodes), edges(other.edges),
+      ftdBackwardEdges(other.ftdBackwardEdges), nodeOfUnit(other.nodeOfUnit),
+      edgeOfChannel(other.edgeOfChannel) {
+  rebuild();
+}
+
+CFDFC::Graph &CFDFC::Graph::operator=(const Graph &other) {
+  if (this == &other)
+    return *this;
+  nodes = other.nodes;
+  edges = other.edges;
+  ftdBackwardEdges = other.ftdBackwardEdges;
+  nodeOfUnit = other.nodeOfUnit;
+  edgeOfChannel = other.edgeOfChannel;
+  rebuild();
+  return *this;
+}
+
+CFDFCNodeId CFDFC::Graph::addNode(Operation *unit) {
+  CFDFCNodeId id = nodes.size();
+  [[maybe_unused]] bool inserted = nodeOfUnit.try_emplace(unit, id).second;
+  assert(inserted && "unit added twice to the CFDFC");
+  CFDFCNode &node = nodes.emplace_back();
+  node.unit = unit;
+  node.id = id;
+  return id;
+}
+
+CFDFCEdgeId CFDFC::Graph::addEdge(Value channel, CFDFCNodeId src,
+                                  CFDFCNodeId dst, bool isBackedge) {
+  CFDFCEdgeId id = edges.size();
+  [[maybe_unused]] bool inserted =
+      edgeOfChannel.try_emplace(channel, id).second;
+  assert(inserted && "channel added twice to the CFDFC");
+  edges.push_back(CFDFCEdge(channel, src, dst, isBackedge));
+  nodes[src].outEdges.push_back(id);
+  nodes[dst].inEdges.push_back(id);
+  return id;
+}
+
+void CFDFC::Graph::rebuild() {
+  for (CFDFCNode &node : nodes) {
+    node.succs.clear();
+    node.preds.clear();
+  }
+  for (const CFDFCEdge &edge : edges) {
+    nodes[edge.getSrc()].succs.push_back(&nodes[edge.getDst()]);
+    nodes[edge.getDst()].preds.push_back(&nodes[edge.getSrc()]);
+  }
+  entry.id = nodes.size();
+  entry.succs.clear();
+  for (const CFDFCNode &node : nodes)
+    entry.succs.push_back(&node);
+}
+
+void CFDFC::addChannel(Value channel, bool isBackedge) {
+  std::optional<CFDFCNodeId> src = lookup(channel.getDefiningOp());
+  std::optional<CFDFCNodeId> dst = lookup(*channel.getUsers().begin());
+  assert(src && dst && "channel endpoints must be units of the CFDFC");
+  graph.addEdge(channel, *src, *dst, isBackedge);
+}
+
+size_t CFDFC::getNumBackedges() const {
+  return llvm::count_if(
+      graph.edges, [](const CFDFCEdge &edge) { return edge.isBackedge(); });
+}
+
+std::optional<CFDFCNodeId> CFDFC::lookup(Operation *unit) const {
+  if (auto it = graph.nodeOfUnit.find(unit); it != graph.nodeOfUnit.end())
+    return it->second;
+  return std::nullopt;
+}
+
+std::optional<CFDFCEdgeId> CFDFC::lookup(Value channel) const {
+  if (auto it = graph.edgeOfChannel.find(channel);
+      it != graph.edgeOfChannel.end())
+    return it->second;
+  return std::nullopt;
+}
+
+bool CFDFC::isBackedge(Value channel) const {
+  std::optional<CFDFCEdgeId> edge = lookup(channel);
+  return edge && graph.edges[*edge].isBackedge();
+}
+
+void CFDFC::insertUnitsOnChannel(Value channel,
+                                 ArrayRef<Operation *> newUnits) {
+  if (newUnits.empty())
+    return;
+  std::optional<CFDFCEdgeId> channelEdge = lookup(channel);
+  assert(channelEdge && "channel must be in the CFDFC");
+  CFDFCNodeId originalDst = graph.edges[*channelEdge].getDst();
+
+  // Units and their result channels are added from the consumer side to the
+  // producer side, the order in which buffer placement used to add them
+  CFDFCNodeId next = originalDst;
+  for (Operation *unit : llvm::reverse(newUnits)) {
+    assert(unit->getNumResults() >= 1 && unit->getResult(0).hasOneUse() &&
+           "inserted unit must have a single-use first result");
+    CFDFCNodeId node = graph.addNode(unit);
+    graph.addEdge(unit->getResult(0), node, next, /*isBackedge=*/false);
+    next = node;
+  }
+
+  // The original channel now ends at the first new unit
+  llvm::erase(graph.nodes[originalDst].inEdges, *channelEdge);
+  graph.edges[*channelEdge].dst = next;
+  graph.nodes[next].inEdges.push_back(*channelEdge);
+  graph.rebuild();
+}
+
+void CFDFC::removeChannel(Value channel) {
+  std::optional<CFDFCEdgeId> removed = lookup(channel);
+  assert(removed && "channel must be in the CFDFC");
+
+  // Detach the edge from its endpoints
+  const CFDFCEdge &edge = graph.edges[*removed];
+  llvm::erase(graph.nodes[edge.getSrc()].outEdges, *removed);
+  llvm::erase(graph.nodes[edge.getDst()].inEdges, *removed);
+  graph.edgeOfChannel.erase(channel);
+
+  // Move the last edge into the hole, and point its references to the new
+  // index
+  CFDFCEdgeId last = graph.edges.size() - 1;
+  if (*removed != last) {
+    graph.edges[*removed] = graph.edges[last];
+    const CFDFCEdge &moved = graph.edges[*removed];
+    llvm::replace(graph.nodes[moved.getSrc()].outEdges, last, *removed);
+    llvm::replace(graph.nodes[moved.getDst()].inEdges, last, *removed);
+    graph.edgeOfChannel[moved.getChannel()] = *removed;
+  }
+  graph.edges.pop_back();
+  graph.rebuild();
 }
 
 CFDFCUnion::CFDFCUnion(ArrayRef<CFDFC *> cfdfcs) {
@@ -350,14 +492,16 @@ CFDFCUnion::CFDFCUnion(ArrayRef<CFDFC *> cfdfcs) {
     for (unsigned bb : cf->cycle)
       blocks.insert(bb);
     // Units
-    for (Operation *op : cf->units)
+    for (Operation *op : cf->getUnits())
       units.insert(op);
     // Channels
-    for (Value val : cf->channels)
+    for (Value val : cf->getChannels())
       channels.insert(val);
     // Backedges
-    for (Value val : cf->backedges)
+    for (Value val : cf->getBackedges())
       backedges.insert(val);
+    for (const CFDFCEdge &edge : cf->getFTDBackwardEdges())
+      backedges.insert(edge.getChannel());
 
     this->cfdfcs.push_back(cf);
   }

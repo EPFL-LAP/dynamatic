@@ -705,11 +705,11 @@ void SynchronizingCyclesFinderGraph::buildFromCFDFC(
     handshake::FuncOp funcOp, const buffer::CFDFC &cfdfc) {
   this->funcOp = funcOp;
 
-  for (mlir::Operation *op : cfdfc.units) {
+  for (mlir::Operation *op : cfdfc.getUnits()) {
     getOrAddNode(op);
   }
 
-  for (mlir::Value channel : cfdfc.channels) {
+  for (mlir::Value channel : cfdfc.getChannels()) {
     mlir::Operation *producer = channel.getDefiningOp();
     assert(producer && "CFDFC channel must have a defining operation");
 
