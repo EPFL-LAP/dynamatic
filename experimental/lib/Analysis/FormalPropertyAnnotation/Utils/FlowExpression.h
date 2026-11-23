@@ -281,6 +281,7 @@ struct FlowEquationExtractor {
   LogicalResult extractLazyForkOp(LazyForkOp lazyForkOp);
   LogicalResult extractLoadOp(LoadOp loadOp);
   LogicalResult extractMemoryControllerOp(MemoryControllerOp memCon);
+  LogicalResult extractLSQOp(LSQOp lsqOp);
   LogicalResult extractMuxOp(MuxOp muxOp);
   LogicalResult extractMergeOp(MergeOp mergeOp);
   LogicalResult extractPipeline(LatencyInterface op, FlowVariable &internal);

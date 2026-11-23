@@ -254,6 +254,10 @@ LogicalResult FlowEquationExtractor::extractAll(ModuleOp modOp) {
         if (failed(extractMemoryControllerOp(memCon))) {
           res = failure();
         }
+      } else if (auto lsqOp = dyn_cast<handshake::LSQOp>(op)) {
+        if (failed(extractLSQOp(lsqOp))) {
+          res = failure();
+        }
       } else {
         op.emitError("Not handled yet!");
         res = failure();
@@ -684,6 +688,69 @@ FlowEquationExtractor::extractMemoryControllerOp(MemoryControllerOp memCon) {
       BufferSlotFullNamer(name, control + ".fsm_running", "", /*slotSize=*/0)));
   FlowVariable noMoreRequest(FlowInternalState(BufferSlotFullNamer(
       name, control + ".no_more_request", "", /*slotSize=*/0)));
+  equations.push_back(memStart - memEnd - running);
+  equations.push_back(ctrlEnd - memEnd - noMoreRequest);
+  return success();
+}
+
+LogicalResult FlowEquationExtractor::extractLSQOp(LSQOp lsqOp) {
+  // Each load port of the LSQ holds its tokens in a queue (the ND-wires before
+  // and after the queue hold no token):
+  //   ldAddr -> queue -> ldData
+  // lambda_ldAddr = lambda_ldData + queue slots
+  // A store port consumes the address and the data independently, so they are
+  // not related.
+  auto sumOfSlots = [](ArrayRef<BufferSlotFullNamer> slots) {
+    FlowExpression sum;
+    for (const BufferSlotFullNamer &slot : slots)
+      sum += FlowVariable(FlowInternalState(slot));
+    return sum;
+  };
+
+  LSQPorts ports = lsqOp.getPorts();
+  for (const GroupMemoryPorts &group : ports.groups) {
+    for (const MemoryPort &accessPort : group.accessPorts) {
+      if (std::optional<LoadPort> load = dyn_cast<LoadPort>(accessPort)) {
+        LoadOp loadOp = load->getLoadOp();
+        FlowVariable addr(indexChannelAnalysis,
+                          ChannelLambda(loadOp.getAddressResult()));
+        FlowVariable data(indexChannelAnalysis,
+                          ChannelLambda(loadOp.getData()));
+        // The memory gives the data a value that is unrelated to the address
+        if (addr.isIndex() || data.isIndex()) {
+          lsqOp.emitError("the address and the data of a load port of an LSQ "
+                          "cannot hold tracked values");
+          return failure();
+        }
+        // Example (load2 on load port 0 of lsq1, queue depth 16):
+        // lambda_load2.addrOut = lambda_lsq1.ldData_0
+        //   + lsq1.inner_load_access_0.inner_fifo.fifo.b0.full + ...
+        //   + lsq1.inner_load_access_0.inner_fifo.fifo.b14.full
+        //   + lsq1.inner_load_access_0.inner_fifo.break_dv.outs_valid_i
+        equations.push_back(addr - data -
+                            sumOfSlots(lsqOp.getLoadPortSlotNamers(loadOp)));
+      }
+    }
+  }
+
+  // An LSQ connected to an MC has no control of its own
+  if (lsqOp.isConnectedToMC())
+    return success();
+  // The control of the LSQ is the same as that of a memory controller (see
+  // `extractMemoryControllerOp`):
+  // lambda_memStart = lambda_memEnd + running
+  // lambda_ctrlEnd = lambda_memEnd + no_more_request
+  std::string name = getUniqueName(lsqOp).str();
+  FlowVariable memStart(indexChannelAnalysis,
+                        ChannelLambda(lsqOp.getOwnMemStart()));
+  FlowVariable ctrlEnd(indexChannelAnalysis,
+                       ChannelLambda(lsqOp.getOwnCtrlEnd()));
+  FlowVariable memEnd(indexChannelAnalysis,
+                      ChannelLambda(lsqOp.getOwnMemEnd()));
+  FlowVariable running(FlowInternalState(BufferSlotFullNamer(
+      name, "inner_mc_control.fsm_running", "", /*slotSize=*/0)));
+  FlowVariable noMoreRequest(FlowInternalState(BufferSlotFullNamer(
+      name, "inner_mc_control.no_more_request", "", /*slotSize=*/0)));
   equations.push_back(memStart - memEnd - running);
   equations.push_back(ctrlEnd - memEnd - noMoreRequest);
   return success();
