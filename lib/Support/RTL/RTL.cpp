@@ -313,8 +313,6 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.subi" ||
       handshakeOp == "handshake.shli" ||
       handshakeOp == "handshake.blocker" ||
-      handshakeOp == "handshake.uitofp" ||
-      handshakeOp == "handshake.sitofp" ||
       handshakeOp == "handshake.fptosi" ||
       handshakeOp == "handshake.rigidifier" ||
       handshakeOp == "handshake.ori" ||
@@ -355,6 +353,13 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["INDEX_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(1));
+  } else if (handshakeOp == "handshake.uitofp" ||
+             handshakeOp == "handshake.sitofp") {
+    // The VHDL generators take the width of the integer input, the SMV
+    // generators the width of the float result
+    serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+    serializedParams["OUTPUT_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(0));
   } else if (handshakeOp == "handshake.extsi" ||
              handshakeOp == "handshake.trunci" ||
              handshakeOp == "handshake.extui") {

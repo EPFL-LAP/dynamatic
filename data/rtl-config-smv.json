@@ -286,7 +286,7 @@
   {
     "name": "handshake.sitofp",
     "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sitofp --abstract-data -p latency=$LATENCY bitwidth=$BITWIDTH",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sitofp --abstract-data -p latency=$LATENCY bitwidth=$OUTPUT_BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -322,7 +322,7 @@
   {
     "name": "handshake.uitofp",
     "parameters": [{ "name": "LATENCY", "type": "unsigned" }],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t uitofp --abstract-data -p latency=$LATENCY bitwidth=$BITWIDTH",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t uitofp --abstract-data -p latency=$LATENCY bitwidth=$OUTPUT_BITWIDTH",
     "hdl": "smv"
   },
   {
