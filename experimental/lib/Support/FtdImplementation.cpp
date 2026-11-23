@@ -820,6 +820,18 @@ LogicalResult experimental::ftd::addGsaGates(
         operandIndex++;
       }
 
+      // A phi with one distinct incoming value is a wire, not a selection.
+      // Keep a one-input merge until missing GSA inputs have been reconnected.
+      if (gate->gsaGateFunction == PhiGate) {
+        assert(operands.size() == 1 && gate->isRoot &&
+               "only passthrough phis survive GSA conversion");
+        auto merge = rewriter.create<handshake::MergeOp>(
+            loc, ftd::channelifyType(gate->result.getType()), operands);
+        rewriter.replaceAllUsesWith(gate->result, merge.getResult());
+        gsaList.insert({gate->index, merge});
+        continue;
+      }
+
       // Get the condition for the block exiting
       Value conditionValue;
 
@@ -836,7 +848,7 @@ LogicalResult experimental::ftd::addGsaGates(
         if (size(gate->cofactorList) > 1) {
           // Apply a BDD expansion to the loop exit expression and the list of
           // cofactors
-          BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
+          BDD *bdd = ftd::buildRoutingBDD(gate->condition, gate->cofactorList);
           // Convert the boolean expression obtained through BDD to a circuit
           // We pass an empty registry, since this is not an expression for
           // suppression and does not require distribution.
@@ -909,7 +921,8 @@ LogicalResult experimental::ftd::addGsaGates(
     auto *operandMerge = gsaList[missingMerge.phiIndex];
     auto *resultMerge = gsaList[missingMerge.edgeIndex];
 
-    operandMerge->setOperand(missingMerge.operandInput + 1,
+    unsigned offset = isa<handshake::MuxOp>(operandMerge) ? 1 : 0;
+    operandMerge->setOperand(missingMerge.operandInput + offset,
                              resultMerge->getResult(0));
 
     // In case of a one-input gamma, the other input must be replaced as well,
