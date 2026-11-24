@@ -25,9 +25,10 @@
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/StdProfiler.h"
 #include "llvm/ADT/GraphTraits.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/iterator.h"
-#include <optional>
+#include "llvm/ADT/iterator_range.h"
+#include <memory>
 #include <vector>
 
 namespace dynamatic {
@@ -37,93 +38,91 @@ namespace buffer {
 using ArchSet = mlir::SetVector<dynamatic::experimental::ArchBB *>;
 /// A set of basic block IDs with a deterministic iteration order.
 using BBSet = mlir::SetVector<unsigned>;
-/// Index of a node (unit) in a CFDFC.
-using CFDFCNodeId = unsigned;
-/// Index of an edge (channel) in a CFDFC.
-using CFDFCEdgeId = unsigned;
+
+struct CFDFC;
+class CFDFCChannel;
 
 /// A unit of a CFDFC together with the CFDFC channels that enter and leave it.
-/// Nodes are owned by their CFDFC and only ever built by it.
-class CFDFCNode {
+/// Units are owned by their CFDFC and only ever built and modified by it.
+class CFDFCUnit {
 public:
-  /// Returns the unit this node stands for, or nullptr for the CFDFC's ghost
-  /// entry node.
-  Operation *getUnit() const { return unit; }
+  /// Units should never be copied, as they're handled through pointers in
+  /// CFDFC, so we remove its copy constructor and copy assignment.
+  CFDFCUnit(const CFDFCUnit &) = delete;
+  CFDFCUnit &operator=(const CFDFCUnit &) = delete;
 
-  /// Returns the index of the node in its CFDFC. The ghost entry node's index
-  /// is the number of nodes of the CFDFC.
-  CFDFCNodeId getId() const { return id; }
+  /// Returns the operation this unit stands for, or nullptr for the CFDFC's
+  /// ghost entry unit.
+  Operation *getOp() const { return op; }
 
-  /// Returns the CFDFC edges entering the node.
-  ArrayRef<CFDFCEdgeId> getInEdges() const { return inEdges; }
+  /// Returns the CFDFC channels entering the unit.
+  ArrayRef<const CFDFCChannel *> getInChannels() const { return inChannels; }
 
-  /// Returns the CFDFC edges leaving the node.
-  ArrayRef<CFDFCEdgeId> getOutEdges() const { return outEdges; }
+  /// Returns the CFDFC channels leaving the unit.
+  ArrayRef<const CFDFCChannel *> getOutChannels() const { return outChannels; }
 
-  /// Returns the nodes this one has a CFDFC edge to.
-  ArrayRef<const CFDFCNode *> getSuccessors() const { return succs; }
+  /// Returns the consumers of the unit's out channels.
+  ArrayRef<const CFDFCUnit *> getSuccessors() const { return succs; }
 
-  /// Returns the nodes that have a CFDFC edge to this one.
-  ArrayRef<const CFDFCNode *> getPredecessors() const { return preds; }
+  /// Returns the producers of the unit's in channels.
+  ArrayRef<const CFDFCUnit *> getPredecessors() const { return preds; }
 
 private:
-  /// The CFDFC is the only builder of nodes and edges.
+  /// The CFDFC is the only builder of units and channels.
   friend struct CFDFC;
 
-  /// Builds the CFDFC's ghost entry node.
-  CFDFCNode() = default;
-  CFDFCNode(Operation *unit, CFDFCNodeId id) : unit(unit), id(id) {}
+  explicit CFDFCUnit(Operation *op) : op(op) {}
 
-  Operation *unit = nullptr;
-  CFDFCNodeId id = 0;
-  SmallVector<CFDFCEdgeId, 4> inEdges;
-  SmallVector<CFDFCEdgeId, 4> outEdges;
-  /// Derived from the edges by the owning CFDFC, which rebuilds them whenever
-  /// the nodes may have moved in memory.
-  SmallVector<const CFDFCNode *, 4> succs;
-  SmallVector<const CFDFCNode *, 4> preds;
+  Operation *op;
+  SmallVector<CFDFCChannel *, 4> inChannels;
+  SmallVector<CFDFCChannel *, 4> outChannels;
+
+  SmallVector<CFDFCUnit *, 4> succs;
+  SmallVector<CFDFCUnit *, 4> preds;
 };
 
-/// A channel of a CFDFC, from the node of its producer to the node of its
-/// consumer. Edges are owned by their CFDFC and only ever built and modified by
-/// it.
-class CFDFCEdge {
+/// A channel of a CFDFC, from the unit of its producer to the unit of its
+/// consumer. Channels are owned by their CFDFC and only ever built and modified
+/// by it.
+class CFDFCChannel {
 public:
-  /// Returns the channel this edge stands for.
-  Value getChannel() const { return channel; }
+  /// Channels should never be copied, as they're handled through pointers in
+  /// CFDFC, so we remove its copy constructor and copy assignment.
+  CFDFCChannel(const CFDFCChannel &) = delete;
+  CFDFCChannel &operator=(const CFDFCChannel &) = delete;
 
-  /// Returns the node of the edge's producer.
-  CFDFCNodeId getSrc() const { return src; }
+  /// Returns the MLIR value this channel stands for.
+  Value getValue() const { return value; }
 
-  /// Returns the node of the edge's consumer.
-  CFDFCNodeId getDst() const { return dst; }
+  /// Returns the unit of the channel's producer.
+  const CFDFCUnit *getSrc() const { return src; }
+
+  /// Returns the unit of the channel's consumer.
+  const CFDFCUnit *getDst() const { return dst; }
 
   /// Returns whether the channel is a "CFDFC backedge" (see
   /// CFDFC::isCFDFCBackedge).
   bool isBackedge() const { return backedge; }
 
 private:
-  /// The CFDFC is the only builder of nodes and edges.
+  /// The CFDFC is the only builder of units and channels.
   friend struct CFDFC;
 
-  CFDFCEdge(Value channel, CFDFCNodeId src, CFDFCNodeId dst, bool backedge)
-      : channel(channel), src(src), dst(dst), backedge(backedge) {}
+  CFDFCChannel(Value value, CFDFCUnit *src, CFDFCUnit *dst, bool backedge)
+      : value(value), src(src), dst(dst), backedge(backedge) {}
 
-  Value channel;
-  CFDFCNodeId src;
-  CFDFCNodeId dst;
+  Value value;
+  CFDFCUnit *src;
+  CFDFCUnit *dst;
   bool backedge;
-  bool ignoredForThroughput = false;
 };
 
-/// Represents a CFDFC i.e., a set of control-free units and channels from a
-/// dataflow circuit accompanied by the number of times it was executed.
-/// The units and channels form a directed graph.
-struct CFDFC {
+/// The data of a CFDFC apart from its units and channels.
+struct CFDFCInfo {
   /// The list of basic blocks that make up the CFDFC.
   mlir::SetVector<unsigned> cycle;
   /// Number of executions of the CFDFC.
-  unsigned numExecs;
+  unsigned numExecs = 0;
 
   /// (Available after placement) The achieved throughput after the placement
   double throughput = 0.0;
@@ -134,11 +133,33 @@ struct CFDFC {
   /// instantiating the buffers, this value is cleared and transferred to the
   /// buffer(s).
   mlir::DenseMap<Value, double> channelOccupancy;
+};
 
-  /// Removes a channel from the CFDFC. Its producer and consumer stay in the
-  /// CFDFC. The order of the `channels` returned by `getChannels()` is not
-  /// preservedby this method.
-  void removeChannel(Value channel);
+/// Represents a CFDFC i.e., a set of control-free units and channels from a
+/// dataflow circuit accompanied by the number of times it was executed.
+/// The units and channels form a directed graph.
+///
+/// A CFDFC owns its units and channels, which keep their address for the
+/// CFDFC's whole lifetime, including when the CFDFC is moved. CFDFCs cannot be
+/// copied implicitly; use `clone` to duplicate one.
+struct CFDFC : public CFDFCInfo {
+private:
+  using UnitMap = llvm::MapVector<Operation *, std::unique_ptr<CFDFCUnit>>;
+  using ChannelMap = llvm::MapVector<Value, std::unique_ptr<CFDFCChannel>>;
+
+  static const CFDFCUnit *getUnitPtr(const UnitMap::value_type &entry) {
+    return entry.second.get();
+  }
+  static const CFDFCChannel *
+  getChannelPtr(const ChannelMap::value_type &entry) {
+    return entry.second.get();
+  }
+
+public:
+  using unit_iterator =
+      llvm::mapped_iterator<UnitMap::const_iterator, decltype(&getUnitPtr)>;
+  using channel_iterator = llvm::mapped_iterator<ChannelMap::const_iterator,
+                                                 decltype(&getChannelPtr)>;
 
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
   /// function using the traditional channel selection.
@@ -152,74 +173,91 @@ struct CFDFC {
                          unsigned numExec,
                          const DenseSet<Value> &backwardChannels);
 
+  CFDFC(const CFDFC &) = delete;
+  CFDFC &operator=(const CFDFC &) = delete;
+  CFDFC(CFDFC &&) = default;
+  CFDFC &operator=(CFDFC &&) = default;
+
+  /// Returns a copy of the CFDFC with its own units and channels.
+  CFDFC clone() const;
+
   //===--------------------------------------------------------------------===//
   // Graph access
   //===--------------------------------------------------------------------===//
 
-  /// Returns the nodes of the CFDFC, indexed by their ID.
-  ArrayRef<CFDFCNode> getNodes() const { return graph.nodes; }
-  /// Returns the edges (channels) of the CFDFC, indexed by their ID.
-  ArrayRef<CFDFCEdge> getEdges() const { return graph.edges; }
-  const CFDFCNode &getNode(CFDFCNodeId id) const { return graph.nodes[id]; }
-  const CFDFCEdge &getEdge(CFDFCEdgeId id) const { return graph.edges[id]; }
+  /// Returns the units of the CFDFC, in insertion order.
+  llvm::iterator_range<unit_iterator> getCFDFCUnits() const {
+    return {unit_iterator(units.begin(), &getUnitPtr),
+            unit_iterator(units.end(), &getUnitPtr)};
+  }
+  /// Returns the channels of the CFDFC, in insertion order.
+  llvm::iterator_range<channel_iterator> getCFDFCChannels() const {
+    return {channel_iterator(channels.begin(), &getChannelPtr),
+            channel_iterator(channels.end(), &getChannelPtr)};
+  }
 
-  /// Returns the units of the CFDFC, in node order.
-  auto getUnits() const {
-    return llvm::map_range(
-        graph.nodes, [](const CFDFCNode &node) { return node.getUnit(); });
-  }
-  /// Returns the channels of the CFDFC, in edge order.
-  auto getChannels() const {
-    return llvm::map_range(
-        graph.edges, [](const CFDFCEdge &edge) { return edge.getChannel(); });
-  }
-  /// Returns the backedges of the CFDFC, in edge order. In FTD mode, see also
-  /// getFTDBackedges.
+  /// Returns the operations of the CFDFC's units, in insertion order.
+  auto getUnits() const { return llvm::make_first_range(units); }
+  /// Returns the values of the CFDFC's channels, in insertion order.
+  auto getChannels() const { return llvm::make_first_range(channels); }
+  /// Returns the values of the CFDFC's backedges, in insertion order. In FTD
+  /// mode, see also getFTDBackedges.
   auto getBackedges() const {
     return llvm::map_range(
         llvm::make_filter_range(
-            graph.edges,
-            [](const CFDFCEdge &edge) { return edge.isBackedge(); }),
-        [](const CFDFCEdge &edge) { return edge.getChannel(); });
+            getCFDFCChannels(),
+            [](const CFDFCChannel *channel) { return channel->isBackedge(); }),
+        [](const CFDFCChannel *channel) { return channel->getValue(); });
   }
 
-  size_t getNumUnits() const { return graph.nodes.size(); }
-  size_t getNumChannels() const { return graph.edges.size(); }
+  size_t getNumUnits() const { return units.size(); }
+  size_t getNumChannels() const { return channels.size(); }
   size_t getNumBackedges() const;
 
   /// (FTD only) Backward channels between units of the CFDFC that are not
   /// channels of the CFDFC because they do not follow an edge of the CFDFC's
-  /// block cycle. They are not part of the graph: their nodes do not list them.
-  ArrayRef<CFDFCEdge> getFTDBackedges() const { return graph.ftdBackedges; }
+  /// block cycle. They are not part of the graph.
+  ArrayRef<Value> getFTDBackedges() const { return ftdBackedges; }
 
-  /// Returns the node of a unit, if the unit is in the CFDFC.
-  std::optional<CFDFCNodeId> lookup(Operation *unit) const;
-  /// Returns the edge of a channel, if the channel is in the CFDFC.
-  std::optional<CFDFCEdgeId> lookup(Value channel) const;
+  /// Returns the unit standing for the operation, or nullptr if the operation
+  /// is not in the CFDFC.
+  const CFDFCUnit *lookup(Operation *op) const;
+  /// Returns the channel standing for the value, or nullptr if the value is not
+  /// in the CFDFC.
+  const CFDFCChannel *lookup(Value value) const;
 
-  bool contains(Operation *unit) const { return lookup(unit).has_value(); }
-  bool contains(Value channel) const { return lookup(channel).has_value(); }
+  bool contains(Operation *op) const { return units.count(op); }
+  bool contains(Value value) const { return channels.count(value); }
 
-  /// Returns whether the channel is a backedge of the CFDFC. Channels outside
-  /// the CFDFC are not.
-  bool isBackedge(Value channel) const;
+  /// Returns whether the value is a backedge of the CFDFC.
+  bool isBackedge(Value value) const;
 
-  /// Returns the ghost root node, which is not part of getNodes(), with an edge
-  /// to every node and no incoming edge. Algorithms that start from a single
-  /// entry node (e.g., llvm::scc_iterator) reach the whole CFDFC from it.
-  const CFDFCNode *getEntryNode() const { return &graph.entry; }
+  /// Returns the ghost entry unit, which is not part of the CFDFC's units, with
+  /// an edge to every unit and no incoming edge. Algorithms that start from a
+  /// single entry node (e.g., llvm::scc_iterator) reach the whole CFDFC from
+  /// it.
+  const CFDFCUnit *getEntryNode() const { return entry.get(); }
+
+  /// Returns the strongly connected components of the CFDFC, each as the list
+  /// of the operations of its units, in reverse topological order (as
+  /// llvm::scc_iterator).
+  std::vector<SmallVector<Operation *>> getSCCs() const;
 
   //===--------------------------------------------------------------------===//
   // Graph modification
   //===--------------------------------------------------------------------===//
 
+  /// Removes a channel from the CFDFC. Its producer and consumer stay in the
+  /// CFDFC.
+  void removeChannel(Value value);
+
   /// Adds units placed on a channel of the CFDFC (e.g., buffers) to the CFDFC.
   /// The units must form a chain from the channel's producer to its original
-  /// consumer: the first unit consumes `channel` and each unit's first result
+  /// consumer: the first unit consumes `value` and each unit's first result
   /// is the only input of the next unit or of the original consumer. The
-  /// channel's edge then ends at the first unit, and the results of the units
-  /// become new, non-backedge channels.
-  void insertUnitsOnChannel(Value channel, ArrayRef<Operation *> newUnits);
+  /// channel then ends at the first unit, and the results of the units become
+  /// new, non-backedge channels.
+  void insertUnitsOnChannel(Value value, ArrayRef<Operation *> newOps);
 
   //===--------------------------------------------------------------------===//
   // Helpers
@@ -236,44 +274,24 @@ struct CFDFC {
   static bool isCFDFCBackedge(Value val);
 
 private:
-  /// Storage of the CFDFC's graph. Nodes point to each other, so a copy
-  /// rebuilds these pointers to point into the copy. Moves keep the nodes at
-  /// the same address and need nothing special.
-  struct Graph {
-    Graph() = default;
-    Graph(const Graph &other);
-    Graph &operator=(const Graph &other);
-    Graph(Graph &&) = default;
-    Graph &operator=(Graph &&) = default;
-
-    /// Appends a node for the unit, which must not be in the graph yet.
-    CFDFCNodeId addNode(Operation *unit);
-    /// Appends an edge for the channel, which must not be in the graph yet,
-    /// between two existing nodes.
-    CFDFCEdgeId addEdge(Value channel, CFDFCNodeId src, CFDFCNodeId dst,
-                        bool isBackedge);
-    /// Recomputes the nodes' successor and predecessor pointers and the entry
-    /// node's successors from the edges. Must be called after any change to the
-    /// CFDFC.
-    void rebuild();
-
-    /// A std::vector rather than a SmallVector so that a move never relocates
-    /// the nodes.
-    std::vector<CFDFCNode> nodes;
-    std::vector<CFDFCEdge> edges;
-    std::vector<CFDFCEdge> ftdBackedges;
-    DenseMap<Operation *, CFDFCNodeId> nodeOfUnit;
-    DenseMap<Value, CFDFCEdgeId> edgeOfChannel;
-    CFDFCNode entry;
-  };
+  /// Builds an empty CFDFC, with only its ghost entry unit.
+  CFDFC();
 
   /// Builds the block cycle from the selected archs and collects the units
   /// belonging to it. Channels are collected afterwards by one of the
   /// collect functions.
   CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
 
-  /// Adds a channel between two units of the CFDFC to the graph.
-  void addChannel(Value channel, bool isBackedge);
+  /// Adds a unit for the operation, which must not be in the CFDFC yet.
+  CFDFCUnit *addUnit(Operation *op);
+
+  /// Adds a channel for the value, which must not be in the CFDFC yet, between
+  /// two units of the CFDFC.
+  void addChannel(Value value, CFDFCUnit *src, CFDFCUnit *dst, bool isBackedge);
+
+  /// Adds a channel for the value between the units of its producer and of its
+  /// consumer, which must be in the CFDFC.
+  void addChannel(Value value, bool isBackedge);
 
   /// Collects the channels and backedges of the units using the traditional
   /// channel selection.
@@ -283,7 +301,13 @@ private:
   /// channel selection.
   void collectChannelsFTD(const DenseSet<Value> &backwardChannels);
 
-  Graph graph;
+  UnitMap units;
+  ChannelMap channels;
+  /// Not part of `CFDFCInfo` because it is set together with the channels;
+  /// `clone` copies it explicitly.
+  SmallVector<Value> ftdBackedges;
+  /// "Ghost" entry node, heap-allocated like the other units.
+  std::unique_ptr<CFDFCUnit> entry;
 };
 
 /// Represents a union of CFDFCs. Its blocks, units, channels, and backedges are
@@ -335,34 +359,32 @@ LogicalResult extractCFDFC(handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
 
 namespace llvm {
 template <>
-struct GraphTraits<const dynamatic::buffer::CFDFCNode *> {
-  using NodeRef = const dynamatic::buffer::CFDFCNode *;
-  using ChildIteratorType =
-      ArrayRef<const dynamatic::buffer::CFDFCNode *>::iterator;
-  static NodeRef getEntryNode(NodeRef node) { return node; }
-  static ChildIteratorType child_begin(NodeRef node) {
-    return node->getSuccessors().begin();
+struct GraphTraits<const dynamatic::buffer::CFDFCUnit *> {
+  using NodeRef = const dynamatic::buffer::CFDFCUnit *;
+  using ChildIteratorType = ArrayRef<NodeRef>::iterator;
+  static NodeRef getEntryNode(NodeRef unit) { return unit; }
+  static ChildIteratorType child_begin(NodeRef unit) {
+    return unit->getSuccessors().begin();
   }
-  static ChildIteratorType child_end(NodeRef node) {
-    return node->getSuccessors().end();
+  static ChildIteratorType child_end(NodeRef unit) {
+    return unit->getSuccessors().end();
   }
 };
 
-/// Walking a CFDFC starts from its ghost root, from which every nod eis
-/// guaranteed ot be reachable.
+/// Walking a CFDFC starts from its ghost entry unit, from which every unit is
+/// guaranteed to be reachable.
 template <>
 struct GraphTraits<const dynamatic::buffer::CFDFC *>
-    : public GraphTraits<const dynamatic::buffer::CFDFCNode *> {
-  using nodes_iterator =
-      pointer_iterator<ArrayRef<dynamatic::buffer::CFDFCNode>::iterator>;
+    : public GraphTraits<const dynamatic::buffer::CFDFCUnit *> {
+  using nodes_iterator = dynamatic::buffer::CFDFC::unit_iterator;
   static NodeRef getEntryNode(const dynamatic::buffer::CFDFC *cfdfc) {
     return cfdfc->getEntryNode();
   }
   static nodes_iterator nodes_begin(const dynamatic::buffer::CFDFC *cfdfc) {
-    return nodes_iterator(cfdfc->getNodes().begin());
+    return cfdfc->getCFDFCUnits().begin();
   }
   static nodes_iterator nodes_end(const dynamatic::buffer::CFDFC *cfdfc) {
-    return nodes_iterator(cfdfc->getNodes().end());
+    return cfdfc->getCFDFCUnits().end();
   }
   static unsigned size(const dynamatic::buffer::CFDFC *cfdfc) {
     return cfdfc->getNumUnits();

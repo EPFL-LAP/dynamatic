@@ -769,8 +769,8 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
 void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
-  for (const CFDFCEdge &edge : cfdfc.getEdges()) {
-    Value channel = edge.getChannel();
+  for (const CFDFCChannel *cfChannel : cfdfc.getCFDFCChannels()) {
+    Value channel = cfChannel->getValue();
     // Get the operations, operand number, and result number
     // of this channel
     Operation *srcOp = channel.getDefiningOp();
@@ -804,7 +804,7 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     CPVar &retDst = dstVars.getRetIn(dstOperandIdx);
 
     // get if the channel is a backedge as an integer
-    unsigned backedge = edge.isBackedge() ? 1 : 0;
+    unsigned backedge = cfChannel->isBackedge() ? 1 : 0;
 
     // If the channel isn't a backedge, its steady-state occupancy
     // equals the difference between the fluid retiming variables
@@ -1759,8 +1759,8 @@ void BufferPlacementMILP::addBackedgeConstraints(
     };
     for (Value channel : cfdfc->getBackedges())
       addBackedgeConstraint(channel);
-    for (const CFDFCEdge &edge : cfdfc->getFTDBackedges())
-      addBackedgeConstraint(edge.getChannel());
+    for (Value channel : cfdfc->getFTDBackedges())
+      addBackedgeConstraint(channel);
   }
 }
 

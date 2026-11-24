@@ -577,7 +577,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
       // "Duplicate" this CFDFC in two, leaving one untouched but with 0 impact
       // on TP (`cfCopy`), the other with one input edge deleted (`cf`)
       std::optional<CFDFC> cfNoTP;
-      cfNoTP = cf;
+      cfNoTP = cf.clone();
       // Set `numExecs` to 0 so the copy has no impact on TP
       cfNoTP->numExecs = 0;
 
