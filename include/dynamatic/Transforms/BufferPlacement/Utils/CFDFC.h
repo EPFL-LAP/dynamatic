@@ -206,9 +206,9 @@ struct CFDFC {
   /// the CFDFC are not.
   bool isBackedge(Value channel) const;
 
-  /// Returns a ghost node, which is not part of getNodes(), with an edge to
-  /// every node and no incoming edge. Algorithms that start from a single entry
-  /// node (e.g., llvm::scc_iterator) reach the whole CFDFC from it.
+  /// Returns the ghost root node, which is not part of getNodes(), with an edge
+  /// to every node and no incoming edge. Algorithms that start from a single
+  /// entry node (e.g., llvm::scc_iterator) reach the whole CFDFC from it.
   const CFDFCNode *getEntryNode() const { return &graph.entry; }
 
   //===--------------------------------------------------------------------===//

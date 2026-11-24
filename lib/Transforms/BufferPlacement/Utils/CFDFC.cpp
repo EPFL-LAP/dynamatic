@@ -441,18 +441,13 @@ void CFDFC::insertUnitsOnChannel(Value channel,
   assert(channelEdge && "channel must be in the CFDFC");
   CFDFCNodeId originalDst = graph.edges[*channelEdge].getDst();
 
-  // Units and their result channels are added from the consumer side to the
-  // producer side, the order in which buffer placement used to add them
   CFDFCNodeId next = originalDst;
   for (Operation *unit : llvm::reverse(newUnits)) {
-    assert(unit->getNumResults() >= 1 && unit->getResult(0).hasOneUse() &&
-           "inserted unit must have a single-use first result");
     CFDFCNodeId node = graph.addNode(unit);
     graph.addEdge(unit->getResult(0), node, next, /*isBackedge=*/false);
     next = node;
   }
 
-  // The original channel now ends at the first new unit
   llvm::erase(graph.nodes[originalDst].inEdges, *channelEdge);
   graph.edges[*channelEdge].dst = next;
   graph.nodes[next].inEdges.push_back(*channelEdge);
@@ -469,8 +464,7 @@ void CFDFC::removeChannel(Value channel) {
   llvm::erase(graph.nodes[edge.getDst()].inEdges, *removed);
   graph.edgeOfChannel.erase(channel);
 
-  // Move the last edge into the hole, and point its references to the new
-  // index
+  // Pop-and-swap
   CFDFCEdgeId last = graph.edges.size() - 1;
   if (*removed != last) {
     graph.edges[*removed] = graph.edges[last];
