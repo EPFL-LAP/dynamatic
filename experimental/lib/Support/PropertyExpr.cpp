@@ -192,9 +192,7 @@ std::string PropertyExpr::toSMV() const {
             if (!state.getConstraint())
               return state.getNamer()->getSMVName();
             std::unique_ptr<ConstrainedNamer> constrained =
-                state.getNamer()->tryConstrain(*state.getConstraint());
-            assert(constrained &&
-                   "state cannot be constrained to a token value");
+                state.getNamer()->constrainToValue(*state.getConstraint());
             // The name of a constrained state is a conjunction (e.g.,
             // `fork0.outs_0_sent & (fork0.ins = TRUE)`), so it is
             // parenthesized like any other operation

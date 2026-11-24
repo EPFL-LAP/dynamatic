@@ -88,7 +88,7 @@ bool fromJSON(const llvm::json::Value &value, PropertyExpr &expr,
 class State {
 public:
   /// If `constraint` is set, the state only counts if it holds a token of that
-  /// value (see `InternalStateNamer::tryConstrain`).
+  /// value (see `InternalStateNamer::constrainToValue`).
   State(std::shared_ptr<handshake::InternalStateNamer> namer,
         std::optional<int32_t> constraint = std::nullopt)
       : namer(std::move(namer)), constraint(constraint) {
