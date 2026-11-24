@@ -40,65 +40,65 @@ using ArchSet = mlir::SetVector<dynamatic::experimental::ArchBB *>;
 using BBSet = mlir::SetVector<unsigned>;
 
 struct CFDFC;
-class CFDFCChannel;
+class CFChannel;
 
 /// A unit of a CFDFC together with the CFDFC channels that enter and leave it.
 /// Units are owned by their CFDFC and only ever built and modified by it.
-class CFDFCUnit {
+class CFUnit {
 public:
   /// Units should never be copied, as they're handled through pointers in
   /// CFDFC, so we remove its copy constructor and copy assignment.
-  CFDFCUnit(const CFDFCUnit &) = delete;
-  CFDFCUnit &operator=(const CFDFCUnit &) = delete;
+  CFUnit(const CFUnit &) = delete;
+  CFUnit &operator=(const CFUnit &) = delete;
 
   /// Returns the operation this unit stands for, or nullptr for the CFDFC's
   /// ghost entry unit.
   Operation *getOp() const { return op; }
 
   /// Returns the CFDFC channels entering the unit.
-  ArrayRef<const CFDFCChannel *> getInChannels() const { return inChannels; }
+  ArrayRef<const CFChannel *> getInChannels() const { return inChannels; }
 
   /// Returns the CFDFC channels leaving the unit.
-  ArrayRef<const CFDFCChannel *> getOutChannels() const { return outChannels; }
+  ArrayRef<const CFChannel *> getOutChannels() const { return outChannels; }
 
   /// Returns the consumers of the unit's out channels.
-  ArrayRef<const CFDFCUnit *> getSuccessors() const { return succs; }
+  ArrayRef<const CFUnit *> getSuccessors() const { return succs; }
 
   /// Returns the producers of the unit's in channels.
-  ArrayRef<const CFDFCUnit *> getPredecessors() const { return preds; }
+  ArrayRef<const CFUnit *> getPredecessors() const { return preds; }
 
 private:
   /// The CFDFC is the only builder of units and channels.
   friend struct CFDFC;
 
-  explicit CFDFCUnit(Operation *op) : op(op) {}
+  explicit CFUnit(Operation *op) : op(op) {}
 
   Operation *op;
-  SmallVector<CFDFCChannel *, 4> inChannels;
-  SmallVector<CFDFCChannel *, 4> outChannels;
+  SmallVector<CFChannel *, 4> inChannels;
+  SmallVector<CFChannel *, 4> outChannels;
 
-  SmallVector<CFDFCUnit *, 4> succs;
-  SmallVector<CFDFCUnit *, 4> preds;
+  SmallVector<CFUnit *, 4> succs;
+  SmallVector<CFUnit *, 4> preds;
 };
 
 /// A channel of a CFDFC, from the unit of its producer to the unit of its
 /// consumer. Channels are owned by their CFDFC and only ever built and modified
 /// by it.
-class CFDFCChannel {
+class CFChannel {
 public:
   /// Channels should never be copied, as they're handled through pointers in
   /// CFDFC, so we remove its copy constructor and copy assignment.
-  CFDFCChannel(const CFDFCChannel &) = delete;
-  CFDFCChannel &operator=(const CFDFCChannel &) = delete;
+  CFChannel(const CFChannel &) = delete;
+  CFChannel &operator=(const CFChannel &) = delete;
 
   /// Returns the MLIR value this channel stands for.
   Value getValue() const { return value; }
 
   /// Returns the unit of the channel's producer.
-  const CFDFCUnit *getSrc() const { return src; }
+  const CFUnit *getSrc() const { return src; }
 
   /// Returns the unit of the channel's consumer.
-  const CFDFCUnit *getDst() const { return dst; }
+  const CFUnit *getDst() const { return dst; }
 
   /// Returns whether the channel is a "CFDFC backedge" (see
   /// CFDFC::isCFDFCBackedge).
@@ -108,12 +108,12 @@ private:
   /// The CFDFC is the only builder of units and channels.
   friend struct CFDFC;
 
-  CFDFCChannel(Value value, CFDFCUnit *src, CFDFCUnit *dst, bool backedge)
+  CFChannel(Value value, CFUnit *src, CFUnit *dst, bool backedge)
       : value(value), src(src), dst(dst), backedge(backedge) {}
 
   Value value;
-  CFDFCUnit *src;
-  CFDFCUnit *dst;
+  CFUnit *src;
+  CFUnit *dst;
   bool backedge;
 };
 
@@ -144,14 +144,13 @@ struct CFDFCInfo {
 /// copied implicitly; use `clone` to duplicate one.
 struct CFDFC : public CFDFCInfo {
 private:
-  using UnitMap = llvm::MapVector<Operation *, std::unique_ptr<CFDFCUnit>>;
-  using ChannelMap = llvm::MapVector<Value, std::unique_ptr<CFDFCChannel>>;
+  using UnitMap = llvm::MapVector<Operation *, std::unique_ptr<CFUnit>>;
+  using ChannelMap = llvm::MapVector<Value, std::unique_ptr<CFChannel>>;
 
-  static const CFDFCUnit *getUnitPtr(const UnitMap::value_type &entry) {
+  static const CFUnit *getUnitPtr(const UnitMap::value_type &entry) {
     return entry.second.get();
   }
-  static const CFDFCChannel *
-  getChannelPtr(const ChannelMap::value_type &entry) {
+  static const CFChannel *getChannelPtr(const ChannelMap::value_type &entry) {
     return entry.second.get();
   }
 
@@ -186,12 +185,12 @@ public:
   //===--------------------------------------------------------------------===//
 
   /// Returns the units of the CFDFC, in insertion order.
-  llvm::iterator_range<unit_iterator> getCFDFCUnits() const {
+  llvm::iterator_range<unit_iterator> getCFUnits() const {
     return {unit_iterator(units.begin(), &getUnitPtr),
             unit_iterator(units.end(), &getUnitPtr)};
   }
   /// Returns the channels of the CFDFC, in insertion order.
-  llvm::iterator_range<channel_iterator> getCFDFCChannels() const {
+  llvm::iterator_range<channel_iterator> getCFChannels() const {
     return {channel_iterator(channels.begin(), &getChannelPtr),
             channel_iterator(channels.end(), &getChannelPtr)};
   }
@@ -205,9 +204,9 @@ public:
   auto getBackedges() const {
     return llvm::map_range(
         llvm::make_filter_range(
-            getCFDFCChannels(),
-            [](const CFDFCChannel *channel) { return channel->isBackedge(); }),
-        [](const CFDFCChannel *channel) { return channel->getValue(); });
+            getCFChannels(),
+            [](const CFChannel *channel) { return channel->isBackedge(); }),
+        [](const CFChannel *channel) { return channel->getValue(); });
   }
 
   size_t getNumUnits() const { return units.size(); }
@@ -221,10 +220,10 @@ public:
 
   /// Returns the unit standing for the operation, or nullptr if the operation
   /// is not in the CFDFC.
-  const CFDFCUnit *lookup(Operation *op) const;
+  const CFUnit *lookup(Operation *op) const;
   /// Returns the channel standing for the value, or nullptr if the value is not
   /// in the CFDFC.
-  const CFDFCChannel *lookup(Value value) const;
+  const CFChannel *lookup(Value value) const;
 
   bool contains(Operation *op) const { return units.count(op); }
   bool contains(Value value) const { return channels.count(value); }
@@ -236,7 +235,7 @@ public:
   /// an edge to every unit and no incoming edge. Algorithms that start from a
   /// single entry node (e.g., llvm::scc_iterator) reach the whole CFDFC from
   /// it.
-  const CFDFCUnit *getEntryNode() const { return entry.get(); }
+  const CFUnit *getEntryNode() const { return entry.get(); }
 
   /// Returns the strongly connected components of the CFDFC, each as the list
   /// of the operations of its units, in reverse topological order (as
@@ -252,10 +251,10 @@ public:
   void removeChannel(Value value);
 
   /// Adds units placed on a channel of the CFDFC (e.g., buffers) to the CFDFC.
-  /// The units must form a chain from the channel's producer to its original
-  /// consumer: the first unit consumes `value` and each unit's first result
-  /// is the only input of the next unit or of the original consumer. The
-  /// channel then ends at the first unit, and the results of the units become
+  /// The IR must already be rewired through the units, in order: the first
+  /// unit consumes `value`, and each unit's first result is the only input of
+  /// the next unit or, for the last one, of the channel's original consumer.
+  /// The channel then ends at the first unit, and the units' results become
   /// new, non-backedge channels.
   void insertUnitsOnChannel(Value value, ArrayRef<Operation *> newOps);
 
@@ -283,11 +282,7 @@ private:
   CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
 
   /// Adds a unit for the operation, which must not be in the CFDFC yet.
-  CFDFCUnit *addUnit(Operation *op);
-
-  /// Adds a channel for the value, which must not be in the CFDFC yet, between
-  /// two units of the CFDFC.
-  void addChannel(Value value, CFDFCUnit *src, CFDFCUnit *dst, bool isBackedge);
+  CFUnit *addUnit(Operation *op);
 
   /// Adds a channel for the value between the units of its producer and of its
   /// consumer, which must be in the CFDFC.
@@ -307,7 +302,9 @@ private:
   /// `clone` copies it explicitly.
   SmallVector<Value> ftdBackedges;
   /// "Ghost" entry node, heap-allocated like the other units.
-  std::unique_ptr<CFDFCUnit> entry;
+  /// We need such a node so that algorithms that start from a single entry node
+  /// (e.g., llvm::scc_iterator) can reach the whole CFDFC.
+  std::unique_ptr<CFUnit> entry;
 };
 
 /// Represents a union of CFDFCs. Its blocks, units, channels, and backedges are
@@ -359,8 +356,8 @@ LogicalResult extractCFDFC(handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
 
 namespace llvm {
 template <>
-struct GraphTraits<const dynamatic::buffer::CFDFCUnit *> {
-  using NodeRef = const dynamatic::buffer::CFDFCUnit *;
+struct GraphTraits<const dynamatic::buffer::CFUnit *> {
+  using NodeRef = const dynamatic::buffer::CFUnit *;
   using ChildIteratorType = ArrayRef<NodeRef>::iterator;
   static NodeRef getEntryNode(NodeRef unit) { return unit; }
   static ChildIteratorType child_begin(NodeRef unit) {
@@ -375,16 +372,16 @@ struct GraphTraits<const dynamatic::buffer::CFDFCUnit *> {
 /// guaranteed to be reachable.
 template <>
 struct GraphTraits<const dynamatic::buffer::CFDFC *>
-    : public GraphTraits<const dynamatic::buffer::CFDFCUnit *> {
+    : public GraphTraits<const dynamatic::buffer::CFUnit *> {
   using nodes_iterator = dynamatic::buffer::CFDFC::unit_iterator;
   static NodeRef getEntryNode(const dynamatic::buffer::CFDFC *cfdfc) {
     return cfdfc->getEntryNode();
   }
   static nodes_iterator nodes_begin(const dynamatic::buffer::CFDFC *cfdfc) {
-    return cfdfc->getCFDFCUnits().begin();
+    return cfdfc->getCFUnits().begin();
   }
   static nodes_iterator nodes_end(const dynamatic::buffer::CFDFC *cfdfc) {
-    return cfdfc->getCFDFCUnits().end();
+    return cfdfc->getCFUnits().end();
   }
   static unsigned size(const dynamatic::buffer::CFDFC *cfdfc) {
     return cfdfc->getNumUnits();

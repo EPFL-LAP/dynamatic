@@ -769,7 +769,7 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
 void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
-  for (const CFDFCChannel *cfChannel : cfdfc.getCFDFCChannels()) {
+  for (const CFChannel *cfChannel : cfdfc.getCFChannels()) {
     Value channel = cfChannel->getValue();
     // Get the operations, operand number, and result number
     // of this channel

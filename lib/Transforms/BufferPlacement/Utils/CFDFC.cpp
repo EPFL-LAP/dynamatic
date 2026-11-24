@@ -336,39 +336,26 @@ bool CFDFC::isCFDFCBackedge(Value val) {
   return srcBB.has_value() && (!dstBB.has_value() || *srcBB != *dstBB);
 }
 
-CFDFC::CFDFC() : entry(new CFDFCUnit(/*op=*/nullptr)) {}
+CFDFC::CFDFC() : entry(new CFUnit(/*op=*/nullptr)) {}
 
 CFDFC CFDFC::clone() const {
   CFDFC copy;
   static_cast<CFDFCInfo &>(copy) = *this;
   for (Operation *op : getUnits())
     copy.addUnit(op);
-  for (const CFDFCChannel *channel : getCFDFCChannels())
+  for (const CFChannel *channel : getCFChannels())
     copy.addChannel(channel->getValue(), channel->isBackedge());
   copy.ftdBackedges = ftdBackedges;
   return copy;
 }
 
-CFDFCUnit *CFDFC::addUnit(Operation *op) {
+CFUnit *CFDFC::addUnit(Operation *op) {
   auto [it, inserted] =
-      units.try_emplace(op, std::unique_ptr<CFDFCUnit>(new CFDFCUnit(op)));
+      units.try_emplace(op, std::unique_ptr<CFUnit>(new CFUnit(op)));
   assert(inserted && "unit added twice to the CFDFC");
-  CFDFCUnit *unit = it->second.get();
+  CFUnit *unit = it->second.get();
   entry->succs.push_back(unit);
   return unit;
-}
-
-void CFDFC::addChannel(Value value, CFDFCUnit *src, CFDFCUnit *dst,
-                       bool isBackedge) {
-  auto [it, inserted] = channels.try_emplace(
-      value, std::unique_ptr<CFDFCChannel>(
-                 new CFDFCChannel(value, src, dst, isBackedge)));
-  assert(inserted && "channel added twice to the CFDFC");
-  CFDFCChannel *channel = it->second.get();
-  src->outChannels.push_back(channel);
-  src->succs.push_back(dst);
-  dst->inChannels.push_back(channel);
-  dst->preds.push_back(src);
 }
 
 void CFDFC::addChannel(Value value, bool isBackedge) {
@@ -376,27 +363,38 @@ void CFDFC::addChannel(Value value, bool isBackedge) {
   auto dstIt = units.find(*value.getUsers().begin());
   assert(srcIt != units.end() && dstIt != units.end() &&
          "channel endpoints must be units of the CFDFC");
-  addChannel(value, srcIt->second.get(), dstIt->second.get(), isBackedge);
+  CFUnit *src = srcIt->second.get();
+  CFUnit *dst = dstIt->second.get();
+
+  auto [it, inserted] = channels.try_emplace(
+      value,
+      std::unique_ptr<CFChannel>(new CFChannel(value, src, dst, isBackedge)));
+  assert(inserted && "channel added twice to the CFDFC");
+  CFChannel *channel = it->second.get();
+  src->outChannels.push_back(channel);
+  src->succs.push_back(dst);
+  dst->inChannels.push_back(channel);
+  dst->preds.push_back(src);
 }
 
 size_t CFDFC::getNumBackedges() const {
-  return llvm::count_if(getCFDFCChannels(), [](const CFDFCChannel *channel) {
+  return llvm::count_if(getCFChannels(), [](const CFChannel *channel) {
     return channel->isBackedge();
   });
 }
 
-const CFDFCUnit *CFDFC::lookup(Operation *op) const {
+const CFUnit *CFDFC::lookup(Operation *op) const {
   auto it = units.find(op);
   return it == units.end() ? nullptr : it->second.get();
 }
 
-const CFDFCChannel *CFDFC::lookup(Value value) const {
+const CFChannel *CFDFC::lookup(Value value) const {
   auto it = channels.find(value);
   return it == channels.end() ? nullptr : it->second.get();
 }
 
 bool CFDFC::isBackedge(Value value) const {
-  const CFDFCChannel *channel = lookup(value);
+  const CFChannel *channel = lookup(value);
   return channel && channel->isBackedge();
 }
 
@@ -406,7 +404,7 @@ std::vector<SmallVector<Operation *>> CFDFC::getSCCs() const {
     if (it->front() == getEntryNode())
       continue;
     SmallVector<Operation *> &scc = sccs.emplace_back();
-    for (const CFDFCUnit *unit : *it)
+    for (const CFUnit *unit : *it)
       scc.push_back(unit->getOp());
   }
   return sccs;
@@ -414,8 +412,8 @@ std::vector<SmallVector<Operation *>> CFDFC::getSCCs() const {
 
 /// Removes `channel` from `channels`, and the unit at the same position from
 /// `units`, which lists the other endpoint of each of the channels.
-static void unlink(SmallVectorImpl<CFDFCChannel *> &channels,
-                   SmallVectorImpl<CFDFCUnit *> &units, CFDFCChannel *channel) {
+static void unlink(SmallVectorImpl<CFChannel *> &channels,
+                   SmallVectorImpl<CFUnit *> &units, CFChannel *channel) {
   auto *it = llvm::find(channels, channel);
   assert(it != channels.end() && "channel not linked to the unit");
   units.erase(units.begin() + (it - channels.begin()));
@@ -427,32 +425,31 @@ void CFDFC::insertUnitsOnChannel(Value value, ArrayRef<Operation *> newOps) {
     return;
   auto channelIt = channels.find(value);
   assert(channelIt != channels.end() && "channel must be in the CFDFC");
-  CFDFCChannel *channel = channelIt->second.get();
-  CFDFCUnit *originalDst = channel->dst;
+  assert(*value.getUsers().begin() == newOps.front() &&
+         "the IR must already be rewired through the new units");
+  CFChannel *channel = channelIt->second.get();
+  CFUnit *src = channel->src;
+  CFUnit *originalDst = channel->dst;
 
-  SmallVector<CFDFCUnit *> newUnits;
-  for (Operation *op : newOps)
-    newUnits.push_back(addUnit(op));
+  CFUnit *first = addUnit(newOps.front());
+  for (Operation *op : newOps.drop_front())
+    addUnit(op);
 
-  CFDFCUnit *src = channel->src;
   auto *outIt = llvm::find(src->outChannels, channel);
-  src->succs[outIt - src->outChannels.begin()] = newUnits.front();
+  src->succs[outIt - src->outChannels.begin()] = first;
   unlink(originalDst->inChannels, originalDst->preds, channel);
-  channel->dst = newUnits.front();
-  channel->dst->inChannels.push_back(channel);
-  channel->dst->preds.push_back(src);
+  channel->dst = first;
+  first->inChannels.push_back(channel);
+  first->preds.push_back(src);
 
-  for (auto [idx, unit] : llvm::enumerate(newUnits)) {
-    CFDFCUnit *next =
-        idx + 1 < newUnits.size() ? newUnits[idx + 1] : originalDst;
-    addChannel(unit->getOp()->getResult(0), unit, next, /*isBackedge=*/false);
-  }
+  for (Operation *op : newOps)
+    addChannel(op->getResult(0), /*isBackedge=*/false);
 }
 
 void CFDFC::removeChannel(Value value) {
   auto it = channels.find(value);
   assert(it != channels.end() && "channel must be in the CFDFC");
-  CFDFCChannel *channel = it->second.get();
+  CFChannel *channel = it->second.get();
 
   unlink(channel->src->outChannels, channel->src->succs, channel);
   unlink(channel->dst->inChannels, channel->dst->preds, channel);
