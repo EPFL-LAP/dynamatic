@@ -909,9 +909,6 @@ HandshakeAnnotatePropertiesPass::annotateIndexValueRange(ModuleOp modOp) {
     // number of values is a power of two, every encoding is one of the values
     if (llvm::isPowerOf2_64(values.size()))
       continue;
-    // The values of pipeline slots and other states are not modeled
-    if (!namer->tryConstrain(values.front()))
-      continue;
     std::vector<PropertyExpr> terms;
     for (int32_t value : values)
       terms.emplace_back(UnaryExpr(UnaryExpr::ToInt, State(namer, value)));
