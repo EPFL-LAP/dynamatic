@@ -369,7 +369,7 @@ static void logFuncInfo(FuncInfo &info) {
     os << "- Number of units: " << cf->getNumUnits() << "\n";
     os << "- Number of channels: " << cf->getNumChannels() << "\n";
     os << "- Number of backedges: "
-       << cf->getNumBackedges() + cf->getFTDBackwardEdges().size() << "\n\n";
+       << cf->getNumBackedges() + cf->getFTDBackedges().size() << "\n\n";
     os.unindent();
   }
 

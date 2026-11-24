@@ -174,7 +174,7 @@ struct CFDFC {
         graph.edges, [](const CFDFCEdge &edge) { return edge.getChannel(); });
   }
   /// Returns the backedges of the CFDFC, in edge order. In FTD mode, see also
-  /// getFTDBackwardEdges.
+  /// getFTDBackedges.
   auto getBackedges() const {
     return llvm::map_range(
         llvm::make_filter_range(
@@ -190,9 +190,7 @@ struct CFDFC {
   /// (FTD only) Backward channels between units of the CFDFC that are not
   /// channels of the CFDFC because they do not follow an edge of the CFDFC's
   /// block cycle. They are not part of the graph: their nodes do not list them.
-  ArrayRef<CFDFCEdge> getFTDBackwardEdges() const {
-    return graph.ftdBackwardEdges;
-  }
+  ArrayRef<CFDFCEdge> getFTDBackedges() const { return graph.ftdBackedges; }
 
   /// Returns the node of a unit, if the unit is in the CFDFC.
   std::optional<CFDFCNodeId> lookup(Operation *unit) const;
@@ -263,7 +261,7 @@ private:
     /// the nodes.
     std::vector<CFDFCNode> nodes;
     std::vector<CFDFCEdge> edges;
-    std::vector<CFDFCEdge> ftdBackwardEdges;
+    std::vector<CFDFCEdge> ftdBackedges;
     DenseMap<Operation *, CFDFCNodeId> nodeOfUnit;
     DenseMap<Value, CFDFCEdgeId> edgeOfChannel;
     CFDFCNode entry;

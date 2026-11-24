@@ -1751,12 +1751,6 @@ void BufferPlacementMILP::addBackedgeConstraints(
     ArrayRef<CFDFC *> cfdfcs, llvm::MapVector<Value, CPVar> &channelOccupancy) {
   for (size_t i = 0; i < cfdfcs.size(); ++i) {
     CFDFC *cfdfc = cfdfcs[i];
-    // for (Value channel : cfdfc->backedges) {
-    //   if (channelOccupancy.count(channel)) {
-    //     model->addConstr(channelOccupancy[channel] >= 1.0,
-    //                      "backedge_" + std::to_string(i));
-    //   }
-    // }
     auto addBackedgeConstraint = [&](Value channel) {
       if (channelOccupancy.count(channel)) {
         model->addConstr(channelOccupancy[channel] >= 1.0,

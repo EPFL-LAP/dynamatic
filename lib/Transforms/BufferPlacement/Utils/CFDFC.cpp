@@ -274,8 +274,6 @@ void CFDFC::collectChannels() {
 }
 
 void CFDFC::collectChannelsFTD(const DenseSet<Value> &backwardChannels) {
-  // Iterate over the pre-collected units which have been filtered to just
-  // this CFDFC
   for (Operation *op : getUnits()) {
     unsigned srcBB = *getLogicBB(op);
 
@@ -284,16 +282,10 @@ void CFDFC::collectChannelsFTD(const DenseSet<Value> &backwardChannels) {
     for (OpResult res : op->getResults()) {
       assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
              "value must have unique user");
-
-      // Get the value's unique user and its basic block
       Operation *user = *res.getUsers().begin();
       std::optional<unsigned> optDstBB = getLogicBB(user);
-
-      // Channels to users without a basic block are not added to the CFDFC
       if (optDstBB.has_value()) {
         unsigned dstBB = *optDstBB;
-
-        // Channels to users outside the cycle are not added to the CFDFC
         if (cycle.contains(dstBB)) {
           // FTD circuits may contain channels between blocks without a matching
           // CFG edge. Include every non-backward channel whose endpoints belong
@@ -306,9 +298,9 @@ void CFDFC::collectChannelsFTD(const DenseSet<Value> &backwardChannels) {
             // channels and backedges
             addChannel(res, /*isBackedge=*/true);
           } else {
-            // Other backward channels are recorded as backedges, but are not
-            // CFDFC channels
-            graph.ftdBackwardEdges.push_back(
+            // Other backward channels are recorded as FTD backedges, but are
+            // not CFDFC channels
+            graph.ftdBackedges.push_back(
                 CFDFCEdge(res, *lookup(op), *lookup(user), /*backedge=*/true));
           }
         }
@@ -350,9 +342,8 @@ bool CFDFC::isCFDFCBackedge(Value val) {
 //===----------------------------------------------------------------------===//
 
 CFDFC::Graph::Graph(const Graph &other)
-    : nodes(other.nodes), edges(other.edges),
-      ftdBackwardEdges(other.ftdBackwardEdges), nodeOfUnit(other.nodeOfUnit),
-      edgeOfChannel(other.edgeOfChannel) {
+    : nodes(other.nodes), edges(other.edges), ftdBackedges(other.ftdBackedges),
+      nodeOfUnit(other.nodeOfUnit), edgeOfChannel(other.edgeOfChannel) {
   rebuild();
 }
 
@@ -361,7 +352,7 @@ CFDFC::Graph &CFDFC::Graph::operator=(const Graph &other) {
     return *this;
   nodes = other.nodes;
   edges = other.edges;
-  ftdBackwardEdges = other.ftdBackwardEdges;
+  ftdBackedges = other.ftdBackedges;
   nodeOfUnit = other.nodeOfUnit;
   edgeOfChannel = other.edgeOfChannel;
   rebuild();
@@ -492,7 +483,7 @@ CFDFCUnion::CFDFCUnion(ArrayRef<CFDFC *> cfdfcs) {
     // Backedges
     for (Value val : cf->getBackedges())
       backedges.insert(val);
-    for (const CFDFCEdge &edge : cf->getFTDBackwardEdges())
+    for (const CFDFCEdge &edge : cf->getftdBackedges())
       backedges.insert(edge.getChannel());
 
     this->cfdfcs.push_back(cf);
