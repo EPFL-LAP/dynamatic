@@ -483,7 +483,7 @@ CFDFCUnion::CFDFCUnion(ArrayRef<CFDFC *> cfdfcs) {
     // Backedges
     for (Value val : cf->getBackedges())
       backedges.insert(val);
-    for (const CFDFCEdge &edge : cf->getftdBackedges())
+    for (const CFDFCEdge &edge : cf->getFTDBackedges())
       backedges.insert(edge.getChannel());
 
     this->cfdfcs.push_back(cf);
