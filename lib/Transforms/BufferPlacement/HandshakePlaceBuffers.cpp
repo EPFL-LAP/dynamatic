@@ -268,7 +268,7 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
       return failure();
 
     instantiateBuffers(placement, cfdfcs);
-    cfdfcAnalysis.mapFuncOpToCFDFCs[info.funcOp] = cfdfcs;
+    cfdfcAnalysis.mapFuncOpToCFDFCs[info.funcOp] = std::move(cfdfcs);
   }
 
   markAnalysesPreserved<NameAnalysis, CFDFCAnalysis>();
@@ -572,7 +572,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     }
 
     if (selects.empty()) {
-      cfdfcs.push_back(cf);
+      cfdfcs.push_back(std::move(cf));
     } else {
       // "Duplicate" this CFDFC in two, leaving one untouched but with 0 impact
       // on TP (`cfCopy`), the other with one input edge deleted (`cf`)
