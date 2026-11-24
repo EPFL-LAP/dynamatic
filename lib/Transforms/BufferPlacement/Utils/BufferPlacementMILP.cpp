@@ -1759,7 +1759,7 @@ void BufferPlacementMILP::addBackedgeConstraints(
     };
     for (Value channel : cfdfc->getBackedges())
       addBackedgeConstraint(channel);
-    for (const CFDFCEdge &edge : cfdfc->getFTDBackwardEdges())
+    for (const CFDFCEdge &edge : cfdfc->getFTDBackedges())
       addBackedgeConstraint(edge.getChannel());
   }
 }
