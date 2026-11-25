@@ -54,14 +54,14 @@ CFDFCGraph::CFDFCGraph(const buffer::CFDFC &cfdfc,
                        const TimingDatabase &timingDB, unsigned ii,
                        double targetCP) {
   // Add the units of the CFDFC
-  for (Operation *op : cfdfc.units)
+  for (Operation *op : cfdfc.getUnits())
     addNode(op, extractNodeLatency(op, timingDB, targetCP));
 
   // Add the channels of the CFDFC; a backedge carries a latency of -II, since
   // its token belongs to the previous iteration
-  for (Value channel : cfdfc.channels) {
+  for (Value channel : cfdfc.getChannels()) {
     addChannelEdges(channel);
-    if (cfdfc.backedges.contains(channel))
+    if (cfdfc.isBackedge(channel))
       addChannelBackedges(channel, (ii * -1));
   }
 }

@@ -24,6 +24,12 @@
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/StdProfiler.h"
+#include "llvm/ADT/GraphTraits.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/iterator_range.h"
+#include <memory>
+#include <vector>
 
 namespace dynamatic {
 namespace buffer {
@@ -33,19 +39,90 @@ using ArchSet = mlir::SetVector<dynamatic::experimental::ArchBB *>;
 /// A set of basic block IDs with a deterministic iteration order.
 using BBSet = mlir::SetVector<unsigned>;
 
-/// Represents a CFDFC i.e., a set of control-free units and channels from a
-/// dataflow circuit accompanied by the number of times it was executed.
-struct CFDFC {
+struct CFDFC;
+class CFChannel;
+
+/// A unit of a CFDFC together with the CFDFC channels that enter and leave it.
+/// Units are owned by their CFDFC and only ever built and modified by it.
+class CFUnit {
+public:
+  /// Units should never be copied, as they're handled through pointers in
+  /// CFDFC, so we remove its copy constructor and copy assignment.
+  CFUnit(const CFUnit &) = delete;
+  CFUnit &operator=(const CFUnit &) = delete;
+
+  /// Returns the operation this unit stands for, or nullptr for the CFDFC's
+  /// ghost entry unit.
+  Operation *getOp() const { return op; }
+
+  /// Returns the CFDFC channels entering the unit.
+  ArrayRef<const CFChannel *> getInChannels() const { return inChannels; }
+
+  /// Returns the CFDFC channels leaving the unit.
+  ArrayRef<const CFChannel *> getOutChannels() const { return outChannels; }
+
+  /// Returns the consumers of the unit's out channels.
+  ArrayRef<const CFUnit *> getSuccessors() const { return succs; }
+
+  /// Returns the producers of the unit's in channels.
+  ArrayRef<const CFUnit *> getPredecessors() const { return preds; }
+
+private:
+  /// The CFDFC is the only builder of units and channels.
+  friend struct CFDFC;
+
+  explicit CFUnit(Operation *op) : op(op) {}
+
+  Operation *op;
+  SmallVector<CFChannel *, 4> inChannels;
+  SmallVector<CFChannel *, 4> outChannels;
+
+  SmallVector<CFUnit *, 4> succs;
+  SmallVector<CFUnit *, 4> preds;
+};
+
+/// A channel of a CFDFC, from the unit of its producer to the unit of its
+/// consumer. Channels are owned by their CFDFC and only ever built and modified
+/// by it.
+class CFChannel {
+public:
+  /// Channels should never be copied, as they're handled through pointers in
+  /// CFDFC, so we remove its copy constructor and copy assignment.
+  CFChannel(const CFChannel &) = delete;
+  CFChannel &operator=(const CFChannel &) = delete;
+
+  /// Returns the MLIR value this channel stands for.
+  Value getValue() const { return value; }
+
+  /// Returns the unit of the channel's producer.
+  const CFUnit *getSrc() const { return src; }
+
+  /// Returns the unit of the channel's consumer.
+  const CFUnit *getDst() const { return dst; }
+
+  /// Returns whether the channel is a "CFDFC backedge" (see
+  /// CFDFC::isCFDFCBackedge).
+  bool isBackedge() const { return backedge; }
+
+private:
+  /// The CFDFC is the only builder of units and channels.
+  friend struct CFDFC;
+
+  CFChannel(Value value, CFUnit *src, CFUnit *dst, bool backedge)
+      : value(value), src(src), dst(dst), backedge(backedge) {}
+
+  Value value;
+  CFUnit *src;
+  CFUnit *dst;
+  bool backedge;
+};
+
+/// The data of a CFDFC apart from its units and channels.
+struct CFDFCInfo {
   /// The list of basic blocks that make up the CFDFC.
   mlir::SetVector<unsigned> cycle;
-  /// Units (i.e., MLIR operations) in the CFDFC.
-  mlir::SetVector<Operation *> units;
-  /// Channels (i.e., MLIR values) in the CFDFC.
-  mlir::SetVector<Value> channels;
-  /// Backedges in the CFDFC.
-  mlir::SetVector<Value> backedges;
   /// Number of executions of the CFDFC.
-  unsigned numExecs;
+  unsigned numExecs = 0;
 
   /// (Available after placement) The achieved throughput after the placement
   double throughput = 0.0;
@@ -56,6 +133,32 @@ struct CFDFC {
   /// instantiating the buffers, this value is cleared and transferred to the
   /// buffer(s).
   mlir::DenseMap<Value, double> channelOccupancy;
+};
+
+/// Represents a CFDFC i.e., a set of control-free units and channels from a
+/// dataflow circuit accompanied by the number of times it was executed.
+/// The units and channels form a directed graph.
+///
+/// A CFDFC owns its units and channels, which keep their address for the
+/// CFDFC's whole lifetime, including when the CFDFC is moved. CFDFCs cannot be
+/// copied implicitly; use `clone` to duplicate one.
+struct CFDFC : public CFDFCInfo {
+private:
+  using UnitMap = llvm::MapVector<Operation *, std::unique_ptr<CFUnit>>;
+  using ChannelMap = llvm::MapVector<Value, std::unique_ptr<CFChannel>>;
+
+  static const CFUnit *getUnitPtr(const UnitMap::value_type &entry) {
+    return entry.second.get();
+  }
+  static const CFChannel *getChannelPtr(const ChannelMap::value_type &entry) {
+    return entry.second.get();
+  }
+
+public:
+  using unit_iterator =
+      llvm::mapped_iterator<UnitMap::const_iterator, decltype(&getUnitPtr)>;
+  using channel_iterator = llvm::mapped_iterator<ChannelMap::const_iterator,
+                                                 decltype(&getChannelPtr)>;
 
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
   /// function using the traditional channel selection.
@@ -69,6 +172,96 @@ struct CFDFC {
                          unsigned numExec,
                          const DenseSet<Value> &backwardChannels);
 
+  CFDFC(const CFDFC &) = delete;
+  CFDFC &operator=(const CFDFC &) = delete;
+  CFDFC(CFDFC &&) = default;
+  CFDFC &operator=(CFDFC &&) = default;
+
+  /// Returns a copy of the CFDFC with its own units and channels.
+  CFDFC clone() const;
+
+  //===--------------------------------------------------------------------===//
+  // Graph access
+  //===--------------------------------------------------------------------===//
+
+  /// Returns the units of the CFDFC, in insertion order.
+  llvm::iterator_range<unit_iterator> getCFUnits() const {
+    return {unit_iterator(units.begin(), &getUnitPtr),
+            unit_iterator(units.end(), &getUnitPtr)};
+  }
+  /// Returns the channels of the CFDFC, in insertion order.
+  llvm::iterator_range<channel_iterator> getCFChannels() const {
+    return {channel_iterator(channels.begin(), &getChannelPtr),
+            channel_iterator(channels.end(), &getChannelPtr)};
+  }
+
+  /// Returns the operations of the CFDFC's units, in insertion order.
+  auto getUnits() const { return llvm::make_first_range(units); }
+  /// Returns the values of the CFDFC's channels, in insertion order.
+  auto getChannels() const { return llvm::make_first_range(channels); }
+  /// Returns the values of the CFDFC's backedges, in insertion order. In FTD
+  /// mode, see also getFTDBackedges.
+  auto getBackedges() const {
+    return llvm::map_range(
+        llvm::make_filter_range(
+            getCFChannels(),
+            [](const CFChannel *channel) { return channel->isBackedge(); }),
+        [](const CFChannel *channel) { return channel->getValue(); });
+  }
+
+  size_t getNumUnits() const { return units.size(); }
+  size_t getNumChannels() const { return channels.size(); }
+  size_t getNumBackedges() const;
+
+  /// (FTD only) Backward channels between units of the CFDFC that are not
+  /// channels of the CFDFC because they do not follow an edge of the CFDFC's
+  /// block cycle. They are not part of the graph.
+  ArrayRef<Value> getFTDBackedges() const { return ftdBackedges; }
+
+  /// Returns the unit standing for the operation, or nullptr if the operation
+  /// is not in the CFDFC.
+  const CFUnit *lookup(Operation *op) const;
+  /// Returns the channel standing for the value, or nullptr if the value is not
+  /// in the CFDFC.
+  const CFChannel *lookup(Value value) const;
+
+  bool contains(Operation *op) const { return units.count(op); }
+  bool contains(Value value) const { return channels.count(value); }
+
+  /// Returns whether the value is a backedge of the CFDFC.
+  bool isBackedge(Value value) const;
+
+  /// Returns the ghost entry unit, which is not part of the CFDFC's units, with
+  /// an edge to every unit and no incoming edge. Algorithms that start from a
+  /// single entry node (e.g., llvm::scc_iterator) reach the whole CFDFC from
+  /// it.
+  const CFUnit *getEntryNode() const { return entry.get(); }
+
+  /// Returns the strongly connected components of the CFDFC, each as the list
+  /// of the operations of its units, in reverse topological order (as
+  /// llvm::scc_iterator).
+  std::vector<SmallVector<Operation *>> getSCCs() const;
+
+  //===--------------------------------------------------------------------===//
+  // Graph modification
+  //===--------------------------------------------------------------------===//
+
+  /// Removes a channel from the CFDFC. Its producer and consumer stay in the
+  /// CFDFC.
+  void removeChannel(Value value);
+
+  /// Adds units placed on a channel of the CFDFC (e.g., buffers) to the CFDFC.
+  /// The IR must already be rewired through the units, in order: the first
+  /// unit consumes `value`, and each unit's first result is the only input of
+  /// the next unit or, for the last one, of the channel's original consumer.
+  /// The channel then ends at the first unit, and the units' results become
+  /// new, non-backedge channels.
+  void insertUnitsOnChannel(Value value, ArrayRef<Operation *> newOps);
+
+  //===--------------------------------------------------------------------===//
+  // Helpers
+  //===--------------------------------------------------------------------===//
+
   /// Returns whether the channel between the two blocks has a corresponding
   /// edge in this CFDFC's CFG cycle.
   bool isCFGCompliant(unsigned srcBB, unsigned dstBB) const;
@@ -80,10 +273,20 @@ struct CFDFC {
   static bool isCFDFCBackedge(Value val);
 
 private:
+  /// Builds an empty CFDFC, with only its ghost entry unit.
+  CFDFC();
+
   /// Builds the block cycle from the selected archs and collects the units
   /// belonging to it. Channels are collected afterwards by one of the
   /// collect functions.
   CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
+
+  /// Adds a unit for the operation, which must not be in the CFDFC yet.
+  CFUnit *addUnit(Operation *op);
+
+  /// Adds a channel for the value between the units of its producer and of its
+  /// consumer, which must be in the CFDFC.
+  void addChannel(Value value, bool isBackedge);
 
   /// Collects the channels and backedges of the units using the traditional
   /// channel selection.
@@ -92,6 +295,16 @@ private:
   /// Collects the channels and backedges of the units using the FTD-specific
   /// channel selection.
   void collectChannelsFTD(const DenseSet<Value> &backwardChannels);
+
+  UnitMap units;
+  ChannelMap channels;
+  /// Not part of `CFDFCInfo` because it is set together with the channels;
+  /// `clone` copies it explicitly.
+  SmallVector<Value> ftdBackedges;
+  /// "Ghost" entry node, heap-allocated like the other units.
+  /// We need such a node so that algorithms that start from a single entry node
+  /// (e.g., llvm::scc_iterator) can reach the whole CFDFC.
+  std::unique_ptr<CFUnit> entry;
 };
 
 /// Represents a union of CFDFCs. Its blocks, units, channels, and backedges are
@@ -140,5 +353,40 @@ LogicalResult extractCFDFC(handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
 
 } // namespace buffer
 } // namespace dynamatic
+
+namespace llvm {
+template <>
+struct GraphTraits<const dynamatic::buffer::CFUnit *> {
+  using NodeRef = const dynamatic::buffer::CFUnit *;
+  using ChildIteratorType = ArrayRef<NodeRef>::iterator;
+  static NodeRef getEntryNode(NodeRef unit) { return unit; }
+  static ChildIteratorType child_begin(NodeRef unit) {
+    return unit->getSuccessors().begin();
+  }
+  static ChildIteratorType child_end(NodeRef unit) {
+    return unit->getSuccessors().end();
+  }
+};
+
+/// Walking a CFDFC starts from its ghost entry unit, from which every unit is
+/// guaranteed to be reachable.
+template <>
+struct GraphTraits<const dynamatic::buffer::CFDFC *>
+    : public GraphTraits<const dynamatic::buffer::CFUnit *> {
+  using nodes_iterator = dynamatic::buffer::CFDFC::unit_iterator;
+  static NodeRef getEntryNode(const dynamatic::buffer::CFDFC *cfdfc) {
+    return cfdfc->getEntryNode();
+  }
+  static nodes_iterator nodes_begin(const dynamatic::buffer::CFDFC *cfdfc) {
+    return cfdfc->getCFUnits().begin();
+  }
+  static nodes_iterator nodes_end(const dynamatic::buffer::CFDFC *cfdfc) {
+    return cfdfc->getCFUnits().end();
+  }
+  static unsigned size(const dynamatic::buffer::CFDFC *cfdfc) {
+    return cfdfc->getNumUnits();
+  }
+};
+} // namespace llvm
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_CFDFC_H

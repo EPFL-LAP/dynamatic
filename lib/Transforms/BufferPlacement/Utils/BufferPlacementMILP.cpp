@@ -300,11 +300,11 @@ static bool pathBelongsToCFDFC(const SimplePath &path,
     const DataflowGraphNode &node = graph.nodes[nodeId];
     if (node.type != DataflowGraphNode::REGULAR)
       continue;
-    if (!cfdfc.units.contains(node.op))
+    if (!cfdfc.contains(node.op))
       return false;
   }
   for (EdgeIdType edgeId : path.edges) {
-    if (!cfdfc.channels.contains(graph.edges[edgeId].channel))
+    if (!cfdfc.contains(graph.edges[edgeId].channel))
       return false;
   }
   return true;
@@ -481,7 +481,7 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   };
 
   // Create a set of variables for each unit in the CFDFC
-  for (Operation *unit : cfdfc.units) {
+  for (Operation *unit : cfdfc.getUnits()) {
     std::string suffix = "_" + getUniqueName(unit).str();
 
     // Construct UnitVars from the op
@@ -524,7 +524,7 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   }
 
   // Create a variable to represent the throughput of each CFDFC channel
-  for (Value channel : cfdfc.channels) {
+  for (Value channel : cfdfc.getChannels()) {
     cfVars.channelThroughputs[channel] =
         createVar("throughput_" + getUniqueName(*channel.getUses().begin()));
   }
@@ -769,7 +769,8 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
 void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
-  for (Value channel : cfdfc.channels) {
+  for (const CFChannel *cfChannel : cfdfc.getCFChannels()) {
+    Value channel = cfChannel->getValue();
     // Get the operations, operand number, and result number
     // of this channel
     Operation *srcOp = channel.getDefiningOp();
@@ -803,7 +804,7 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     CPVar &retDst = dstVars.getRetIn(dstOperandIdx);
 
     // get if the channel is a backedge as an integer
-    unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
+    unsigned backedge = cfChannel->isBackedge() ? 1 : 0;
 
     // If the channel isn't a backedge, its steady-state occupancy
     // equals the difference between the fluid retiming variables
@@ -823,7 +824,7 @@ void BufferPlacementMILP::
     addChannelThroughputConstraintsForBinaryLatencyChannel(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
-  for (Value channel : cfdfc.channels) {
+  for (Value channel : cfdfc.getChannels()) {
     // The channel must have variables for the data signal
     ChannelVars &chVars = vars.channelVars[channel];
     auto dataVars = chVars.signalVars.find(SignalType::DATA);
@@ -890,7 +891,7 @@ void BufferPlacementMILP::
     addChannelThroughputConstraintsForIntegerLatencyChannel(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
-  for (Value channel : cfdfc.channels) {
+  for (Value channel : cfdfc.getChannels()) {
     // The channel must have variables for the data and ready signals
     ChannelVars &chVars = vars.channelVars[channel];
     auto dataVars = chVars.signalVars.find(SignalType::DATA);
@@ -958,7 +959,7 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
   // get the MILP variables for the cfdfc
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   // for each unit
-  for (Operation *unit : cfdfc.units) {
+  for (Operation *unit : cfdfc.getUnits()) {
     // get the MILP variables for that unit in this cfdfc
     UnitVars &unitVars = cfVars.getUnitVarsFor(unit);
 
@@ -1027,7 +1028,7 @@ static std::optional<OpResult> getLSQGroupLazyForkOutput(Operation *memAccess) {
 
 void BufferPlacementMILP::addLSQAllocationConstraints(CFDFC &cfdfc) {
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
-  for (Operation *unit : cfdfc.units) {
+  for (Operation *unit : cfdfc.getUnits()) {
     // iterate loads and stores in the cfdfc
     auto memPort = dyn_cast<handshake::MemPortOpInterface>(unit);
     if (!memPort)
@@ -1040,7 +1041,7 @@ void BufferPlacementMILP::addLSQAllocationConstraints(CFDFC &cfdfc) {
       continue;
 
     Operation *gaControlProducer = gaControl->getOwner();
-    assert(cfdfc.units.contains(gaControlProducer) &&
+    assert(cfdfc.contains(gaControlProducer) &&
            "producer of an LSQ group allocator control input is not in the "
            "CFDFC of its loads and stores");
 
@@ -1388,7 +1389,7 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   // represents
   unsigned numExec = isBackedge(channel, ftd) ? 0 : 1;
   for (auto &[cfdfc, _] : funcInfo.cfdfcs)
-    if (cfdfc->channels.contains(channel))
+    if (cfdfc->contains(channel))
       numExec += cfdfc->numExecs;
   return numExec;
 }
@@ -1411,7 +1412,7 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   double fTotalExecs = static_cast<double>(totalExecs);
   if (totalExecs != 0) {
     for (CFDFC *cfdfc : cfdfcs) {
-      double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
+      double coef = (cfdfc->getNumChannels() * cfdfc->numExecs) / fTotalExecs;
       objective += coef * vars.cfdfcVars[cfdfc].throughput;
       maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
     }
@@ -1454,7 +1455,7 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
   double fTotalExecs = static_cast<double>(totalExecs);
   if (totalExecs != 0) {
     for (CFDFC *cfdfc : cfdfcs) {
-      double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
+      double coef = (cfdfc->getNumChannels() * cfdfc->numExecs) / fTotalExecs;
       objective += coef * vars.cfdfcVars[cfdfc].throughput;
       maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
     }
@@ -1578,7 +1579,7 @@ void BufferPlacementMILP::addOccupancyVars(
 
   // Add the per-CFC channel occupancy variables N^c_{CFC_i}.
   for (auto [i, cfdfc] : llvm::enumerate(cfdfcs)) {
-    for (Value channel : cfdfc->channels) {
+    for (Value channel : cfdfc->getChannels()) {
       // Skip the memref channels that have no N_max.
       if (!maxChannelOccupancy.count(channel))
         continue;
@@ -1591,7 +1592,7 @@ void BufferPlacementMILP::addOccupancyVars(
 
   // Add the per-CFC unit occupancy variables N^u_{CFC_i}.
   for (auto [i, cfdfc] : llvm::enumerate(cfdfcs)) {
-    for (Operation *unit : cfdfc->units) {
+    for (Operation *unit : cfdfc->getUnits()) {
       std::string name = getUniqueName(unit).str();
       cfdfcUnitOccupancy[cfdfc][unit] = model->addVar(
           "nU_" + name + "_cfdfc" + std::to_string(i), REAL, 0.0, maxOccupancy);
@@ -1750,12 +1751,16 @@ void BufferPlacementMILP::addBackedgeConstraints(
     ArrayRef<CFDFC *> cfdfcs, llvm::MapVector<Value, CPVar> &channelOccupancy) {
   for (size_t i = 0; i < cfdfcs.size(); ++i) {
     CFDFC *cfdfc = cfdfcs[i];
-    for (Value channel : cfdfc->backedges) {
+    auto addBackedgeConstraint = [&](Value channel) {
       if (channelOccupancy.count(channel)) {
         model->addConstr(channelOccupancy[channel] >= 1.0,
                          "backedge_" + std::to_string(i));
       }
-    }
+    };
+    for (Value channel : cfdfc->getBackedges())
+      addBackedgeConstraint(channel);
+    for (Value channel : cfdfc->getFTDBackedges())
+      addBackedgeConstraint(channel);
   }
 }
 
@@ -2142,7 +2147,7 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     auto [cf, cfVars] = cfdfcWithVars;
     os << "Unit retimings of CFDFC #" << idx << ":\n";
     os.indent();
-    for (Operation *op : cf->units) {
+    for (Operation *op : cf->getUnits()) {
       UnitVars &unitVars = cfVars.getUnitVarsFor(op);
       os << getUniqueName(op) << ":\n";
       os.indent();

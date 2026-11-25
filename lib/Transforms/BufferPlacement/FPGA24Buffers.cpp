@@ -259,7 +259,7 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
       numSlots = 1;
 
     for (CFDFC *cfdfc : cfdfcs) {
-      if (!cfdfc->channels.contains(channel))
+      if (!cfdfc->contains(channel))
         continue;
       auto *cfcIt = cfdfcChannelOccupancy.find(cfdfc);
       if (cfcIt == cfdfcChannelOccupancy.end())
@@ -476,7 +476,7 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
                                              ArrayRef<CFDFC *> cfdfcs) {
   /// Add R for Mux/Merge/ControlMerge outputs for deadlock prevention.
   for (CFDFC *cfdfc : cfdfcs) {
-    for (Value channel : cfdfc->channels) {
+    for (Value channel : cfdfc->getChannels()) {
       Operation *srcOp = channel.getDefiningOp();
       bool isMergeLike = isa_and_nonnull<handshake::MuxOp, handshake::MergeOp,
                                          handshake::ControlMergeOp>(srcOp);
@@ -556,7 +556,7 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
   });
 
   for (CFDFC *cfdfc : cfdfcPtrs) {
-    for (Value channel : cfdfc->channels) {
+    for (Value channel : cfdfc->getChannels()) {
       if (cfdfc->channelOccupancy.count(channel) == 0)
         cfdfc->channelOccupancy[channel] = 0.0;
     }
