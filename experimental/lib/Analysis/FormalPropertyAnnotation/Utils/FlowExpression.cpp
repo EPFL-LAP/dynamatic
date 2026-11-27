@@ -204,7 +204,13 @@ LogicalResult FlowEquationExtractor::extractAll(ModuleOp modOp) {
         res = failure();
     }
     for (Operation &op : funcOp.getOps()) {
-      if (isa<ArithOpInterface>(op)) {
+      // A select is an arithmetic op, but it is not a join: it can produce its
+      // result before the token of the data input it does not select arrives
+      if (auto selectOp = dyn_cast<SelectOp>(op)) {
+        if (failed(extractSelectOp(selectOp))) {
+          res = failure();
+        }
+      } else if (isa<ArithOpInterface>(op)) {
         if (failed(extractArithmeticJoinOp(op))) {
           res = failure();
         }
@@ -796,6 +802,41 @@ LogicalResult FlowEquationExtractor::extractMuxOp(MuxOp muxOp) {
     FlowVariable data(indexChannelAnalysis, ChannelLambda(operand));
     equations.push_back(selectVar.setTrackedTokens(i) - data);
   }
+  return success();
+}
+
+LogicalResult FlowEquationExtractor::extractSelectOp(SelectOp selectOp) {
+  // With an antitoken depth of 0, the select waits for all its inputs and
+  // consumes them together, like a join
+  unsigned antitokenDepth = selectOp.getAntitokenDepth().value_or(1);
+  if (antitokenDepth == 0)
+    return extractArithmeticJoinOp(*selectOp);
+
+  // The select produces its result when it consumes its condition. Each
+  // condition consumes one token of each data input: the selected one, and
+  // the other one, which is killed. A token that has not arrived yet when the
+  // select fires is owed a kill, so for each data input:
+  // lambda_condition = lambda_result
+  // lambda_condition = lambda_trueValue + owedTrue
+  // lambda_condition = lambda_falseValue + owedFalse
+  FlowVariable condition(indexChannelAnalysis,
+                         ChannelLambda(selectOp.getCondition()));
+  FlowVariable result(indexChannelAnalysis,
+                      ChannelLambda(selectOp.getResult()));
+  FlowVariable trueValue(indexChannelAnalysis,
+                         ChannelLambda(selectOp.getTrueValue()));
+  FlowVariable falseValue(indexChannelAnalysis,
+                          ChannelLambda(selectOp.getFalseValue()));
+
+  std::string name = getUniqueName(selectOp).str();
+  FlowVariable owedTrue(
+      FlowInternalState(SelectOwedKillsNamer(name, /*killsTrueValue=*/true)));
+  FlowVariable owedFalse(
+      FlowInternalState(SelectOwedKillsNamer(name, /*killsTrueValue=*/false)));
+
+  equations.push_back(condition - result);
+  equations.push_back(condition - trueValue - owedTrue);
+  equations.push_back(condition - falseValue - owedFalse);
   return success();
 }
 

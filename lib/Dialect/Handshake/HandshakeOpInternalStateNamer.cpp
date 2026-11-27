@@ -24,6 +24,8 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::EntrySlot;
   if (s == TOKEN_COUNT)
     return TYPE::TokenCount;
+  if (s == SELECT_OWED_KILLS)
+    return TYPE::SelectOwedKills;
   llvm::errs() << "unknown type\n";
   return std::nullopt;
 }
@@ -46,6 +48,8 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return ENTRY_SLOT.str();
   case TYPE::TokenCount:
     return TOKEN_COUNT.str();
+  case TYPE::SelectOwedKills:
+    return SELECT_OWED_KILLS.str();
   }
 }
 
@@ -105,6 +109,7 @@ bool fromJSON(const llvm::json::Value &value,
   EffectiveSlotNamer es;
   TokenCountNamer tc;
   EntrySlotNamer en;
+  SelectOwedKillsNamer sk;
   switch (type) {
   case InternalStateNamer::TYPE::EagerForkSent:
     ef = EagerForkSentNamer();
@@ -149,6 +154,11 @@ bool fromJSON(const llvm::json::Value &value,
     if (!mapper.map(InternalStateNamer::INNER_LIT, en))
       return false;
     namer = std::make_unique<EntrySlotNamer>(std::move(en));
+    break;
+  case InternalStateNamer::TYPE::SelectOwedKills:
+    if (!mapper.map(InternalStateNamer::INNER_LIT, sk))
+      return false;
+    namer = std::make_unique<SelectOwedKillsNamer>(std::move(sk));
     break;
   }
   namer->type = type;
@@ -365,6 +375,15 @@ std::optional<TokenCountNamer> getTokenCountNamerOfOperation(Operation *op) {
     return std::nullopt;
   }
   return TokenCountNamer(std::move(tokens));
+}
+
+bool fromJSON(const llvm::json::Value &value, SelectOwedKillsNamer &namer,
+              llvm::json::Path path) {
+  llvm::json::ObjectMapper mapper(value, path);
+  return mapper &&
+         mapper.map(SelectOwedKillsNamer::OPERATION_LIT, namer.opName) &&
+         mapper.map(SelectOwedKillsNamer::KILLS_TRUE_VALUE_LIT,
+                    namer.killsTrueValue);
 }
 
 } // namespace handshake

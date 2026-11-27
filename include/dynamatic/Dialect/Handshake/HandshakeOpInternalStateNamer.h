@@ -20,6 +20,7 @@ struct MemoryControllerSlotNamer;
 struct EffectiveSlotNamer;
 struct ConstrainedEffectiveSlotNamer;
 struct EntrySlotNamer;
+struct SelectOwedKillsNamer;
 struct TerminatingSinkNamer;
 
 std::vector<std::unique_ptr<InternalStateNamer>>
@@ -44,6 +45,7 @@ struct InternalStateNamer {
     MemoryControllerSlot,
     EffectiveSlot,
     EntrySlot,
+    SelectOwedKills,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);
@@ -88,6 +90,7 @@ struct InternalStateNamer {
   static constexpr llvm::StringLiteral EFFECTIVE_SLOT = "EffectiveSlot";
   static constexpr llvm::StringLiteral ENTRY_SLOT = "EntrySlot";
   static constexpr llvm::StringLiteral TOKEN_COUNT = "TokenCount";
+  static constexpr llvm::StringLiteral SELECT_OWED_KILLS = "SelectOwedKills";
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
 };
 
@@ -459,6 +462,46 @@ struct EntrySlotNamer : InternalStateNamer {
   std::string argName;
   static constexpr llvm::StringLiteral ARG_NAME_LIT = "arg_name";
 };
+
+/// The number of kills a select owes to one of its data inputs: the select has
+/// fired with the other input before the tokens of this input arrived, and
+/// kills them when they arrive. The select owes kills to at most one input at
+/// a time, and at most antitokenDepth of them.
+struct SelectOwedKillsNamer : InternalStateNamer {
+  SelectOwedKillsNamer() = default;
+  SelectOwedKillsNamer(const std::string &opName, bool killsTrueValue)
+      : InternalStateNamer(TYPE::SelectOwedKills), opName(opName),
+        killsTrueValue(killsTrueValue) {}
+  ~SelectOwedKillsNamer() = default;
+
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::SelectOwedKills;
+  }
+
+  inline std::string getSMVName() const override {
+    // The SMV model of the select counts the owed kills in cnt, and its state
+    // says which input they are owed to
+    return llvm::formatv("({0}.{1} ? {0}.cnt : 0)", opName,
+                         killsTrueValue ? "killTrueOwed" : "killFalseOwed")
+        .str();
+  }
+
+  inline llvm::json::Value toInnerJSON() const override {
+    return llvm::json::Object(
+        {{OPERATION_LIT, opName}, {KILLS_TRUE_VALUE_LIT, killsTrueValue}});
+  }
+
+  friend bool fromJSON(const llvm::json::Value &value,
+                       SelectOwedKillsNamer &namer, llvm::json::Path path);
+
+  std::string opName;
+  // Whether the kills are owed to trueValue (otherwise to falseValue)
+  bool killsTrueValue;
+  static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
+  static constexpr llvm::StringLiteral KILLS_TRUE_VALUE_LIT =
+      "kills_true_value";
+};
+
 // Specialize llvm::json toJSON template for each namer so that they can be
 // converted to json automatically by llvm where necessary
 inline llvm::json::Value toJSON(const EagerForkSentNamer &namer) {
@@ -483,6 +526,9 @@ inline llvm::json::Value toJSON(const EntrySlotNamer &namer) {
   return namer.toInnerJSON();
 }
 inline llvm::json::Value toJSON(const TokenCountNamer &namer) {
+  return namer.toInnerJSON();
+}
+inline llvm::json::Value toJSON(const SelectOwedKillsNamer &namer) {
   return namer.toInnerJSON();
 }
 
